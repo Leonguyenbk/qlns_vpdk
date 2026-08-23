@@ -1,0 +1,263 @@
+{% extends "base.html" %}
+{% block title %}{{ 'Sửa hồ sơ' if cb else 'Thêm hồ sơ mới' }}{% endblock %}
+{% block content %}
+<div class="page-title">{{ 'Sửa hồ sơ: ' + cb.ho_ten_khai_sinh if cb else 'Thêm hồ sơ mới' }}</div>
+<div class="page-sub">Nhập theo cấu trúc Sơ yếu lý lịch cán bộ, công chức (Mẫu 2C-TCTW/98).</div>
+
+<form method="POST">
+  <div class="card">
+    <div class="section-title"><span class="section-num">1</span> Thông tin cá nhân</div>
+    <div class="form-grid cols-3">
+      <div class="f-group"><label>Họ và tên khai sinh *</label><input type="text" name="ho_ten_khai_sinh" required value="{{ cb.ho_ten_khai_sinh if cb else '' }}"></div>
+      <div class="f-group"><label>Tên gọi khác</label><input type="text" name="ten_goi_khac" value="{{ cb.ten_goi_khac if cb else '' }}"></div>
+      <div class="f-group"><label>Giới tính</label>
+        <select name="gioi_tinh"><option value="">—</option>
+          <option {% if cb and cb.gioi_tinh=='Nam' %}selected{% endif %}>Nam</option>
+          <option {% if cb and cb.gioi_tinh=='Nữ' %}selected{% endif %}>Nữ</option>
+        </select>
+      </div>
+      <div class="f-group"><label>Ngày sinh</label><input type="date" name="ngay_sinh" value="{{ cb.ngay_sinh if cb and cb.ngay_sinh else '' }}"></div>
+      <div class="f-group"><label>Nơi sinh</label><input type="text" name="noi_sinh" value="{{ cb.noi_sinh if cb else '' }}"></div>
+      <div class="f-group"><label>Số CMND/CCCD</label><input type="text" name="so_cmnd_cccd" value="{{ cb.so_cmnd_cccd if cb else '' }}"></div>
+      <div class="f-group"><label>Quê quán - Xã/Phường</label><input type="text" name="que_quan_xa" value="{{ cb.que_quan_xa if cb else '' }}"></div>
+      <div class="f-group"><label>Quê quán - Huyện/Quận</label><input type="text" name="que_quan_huyen" value="{{ cb.que_quan_huyen if cb else '' }}"></div>
+      <div class="f-group"><label>Quê quán - Tỉnh/TP</label><input type="text" name="que_quan_tinh" value="{{ cb.que_quan_tinh if cb else '' }}"></div>
+      <div class="f-group span-2"><label>Nơi ở hiện nay</label><input type="text" name="noi_o_hien_nay" value="{{ cb.noi_o_hien_nay if cb else '' }}"></div>
+      <div class="f-group"><label>Điện thoại</label><input type="text" name="dien_thoai" value="{{ cb.dien_thoai if cb else '' }}"></div>
+      <div class="f-group"><label>Email</label><input type="text" name="email" value="{{ cb.email if cb else '' }}"></div>
+      <div class="f-group"><label>Dân tộc</label><input type="text" name="dan_toc" value="{{ cb.dan_toc if cb else '' }}"></div>
+      <div class="f-group"><label>Tôn giáo</label><input type="text" name="ton_giao" value="{{ cb.ton_giao if cb else '' }}"></div>
+      <div class="f-group span-2"><label>Thành phần gia đình xuất thân</label><input type="text" name="thanh_phan_gia_dinh" value="{{ cb.thanh_phan_gia_dinh if cb else '' }}"></div>
+      <div class="f-group span-3"><label>Nghề nghiệp trước khi tuyển dụng</label><input type="text" name="nghe_nghiep_truoc_tuyen_dung" value="{{ cb.nghe_nghiep_truoc_tuyen_dung if cb else '' }}"></div>
+    </div>
+
+    <div class="section-title"><span class="section-num">2</span> Đơn vị công tác &amp; trạng thái</div>
+    <div class="form-grid cols-3">
+      <div class="f-group"><label>Đơn vị trực thuộc</label>
+        <select name="don_vi_id">
+          <option value="">— Chọn đơn vị —</option>
+          {% for dv in don_vi_list %}
+          <option value="{{ dv.id }}" {% if cb and cb.don_vi_id==dv.id %}selected{% endif %}>{{ dv.ten_don_vi }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="f-group"><label>Đơn vị cơ sở</label><input type="text" name="don_vi_co_so" value="{{ cb.don_vi_co_so if cb else '' }}"></div>
+      <div class="f-group"><label>Số hiệu cán bộ, công chức</label><input type="text" name="so_hieu_can_bo" value="{{ cb.so_hieu_can_bo if cb else '' }}"></div>
+      <div class="f-group"><label>Trạng thái</label>
+        <select name="trang_thai">
+          {% for tt in ['Đang công tác','Nghỉ hưu','Thôi việc','Chuyển công tác'] %}
+          <option {% if cb and cb.trang_thai==tt %}selected{% endif %}>{{ tt }}</option>
+          {% endfor %}
+        </select>
+      </div>
+    </div>
+
+    <div class="section-title"><span class="section-num">3</span> Tuyển dụng, Đảng, đoàn thể, quân đội</div>
+    <div class="form-grid cols-3">
+      <div class="f-group"><label>Ngày tuyển dụng</label><input type="date" name="ngay_tuyen_dung" value="{{ cb.ngay_tuyen_dung if cb and cb.ngay_tuyen_dung else '' }}"></div>
+      <div class="f-group span-2"><label>Nơi tuyển dụng</label><input type="text" name="noi_tuyen_dung" value="{{ cb.noi_tuyen_dung if cb else '' }}"></div>
+      <div class="f-group"><label>Ngày vào cơ quan hiện tại</label><input type="date" name="ngay_vao_co_quan_hien_tai" value="{{ cb.ngay_vao_co_quan_hien_tai if cb and cb.ngay_vao_co_quan_hien_tai else '' }}"></div>
+      <div class="f-group"><label>Ngày tham gia cách mạng</label><input type="date" name="ngay_tham_gia_cach_mang" value="{{ cb.ngay_tham_gia_cach_mang if cb and cb.ngay_tham_gia_cach_mang else '' }}"></div>
+      <div class="f-group"><label>Ngày vào Đảng</label><input type="date" name="ngay_vao_dang" value="{{ cb.ngay_vao_dang if cb and cb.ngay_vao_dang else '' }}"></div>
+      <div class="f-group"><label>Ngày chính thức</label><input type="date" name="ngay_chinh_thuc_dang" value="{{ cb.ngay_chinh_thuc_dang if cb and cb.ngay_chinh_thuc_dang else '' }}"></div>
+      <div class="f-group span-2"><label>Tham gia tổ chức chính trị - xã hội (ngày, tổ chức)</label><input type="text" name="ngay_tham_gia_to_chuc_ct_xh" value="{{ cb.ngay_tham_gia_to_chuc_ct_xh if cb else '' }}"></div>
+      <div class="f-group"><label>Ngày nhập ngũ</label><input type="date" name="ngay_nhap_ngu" value="{{ cb.ngay_nhap_ngu if cb and cb.ngay_nhap_ngu else '' }}"></div>
+      <div class="f-group"><label>Ngày xuất ngũ</label><input type="date" name="ngay_xuat_ngu" value="{{ cb.ngay_xuat_ngu if cb and cb.ngay_xuat_ngu else '' }}"></div>
+      <div class="f-group"><label>Quân hàm / chức vụ cao nhất</label><input type="text" name="quan_ham_chuc_vu_cao_nhat" value="{{ cb.quan_ham_chuc_vu_cao_nhat if cb else '' }}"></div>
+    </div>
+
+    <div class="section-title"><span class="section-num">4</span> Trình độ, chức vụ, ngạch lương</div>
+    <div class="form-grid cols-3">
+      <div class="f-group"><label>Giáo dục phổ thông (lớp)</label><input type="text" name="trinh_do_giao_duc_pho_thong" value="{{ cb.trinh_do_giao_duc_pho_thong if cb else '' }}"></div>
+      <div class="f-group"><label>Học hàm / học vị cao nhất</label><input type="text" name="hoc_ham_hoc_vi_cao_nhat" value="{{ cb.hoc_ham_hoc_vi_cao_nhat if cb else '' }}"></div>
+      <div class="f-group"><label>Lý luận chính trị</label><input type="text" name="ly_luan_chinh_tri" value="{{ cb.ly_luan_chinh_tri if cb else '' }}"></div>
+      <div class="f-group"><label>Ngoại ngữ</label><input type="text" name="ngoai_ngu" value="{{ cb.ngoai_ngu if cb else '' }}"></div>
+      <div class="f-group"><label>Cấp ủy hiện tại</label><input type="text" name="cap_uy_hien_tai" value="{{ cb.cap_uy_hien_tai if cb else '' }}"></div>
+      <div class="f-group"><label>Cấp ủy kiêm</label><input type="text" name="cap_uy_kiem" value="{{ cb.cap_uy_kiem if cb else '' }}"></div>
+      <div class="f-group span-2"><label>Chức vụ (Đảng, đoàn thể, chính quyền)</label><input type="text" name="chuc_vu" value="{{ cb.chuc_vu if cb else '' }}"></div>
+      <div class="f-group"><label>Phụ cấp chức vụ</label><input type="text" name="phu_cap_chuc_vu" value="{{ cb.phu_cap_chuc_vu if cb else '' }}"></div>
+      <div class="f-group span-3"><label>Công tác chính đang làm</label><input type="text" name="cong_tac_chinh_dang_lam" value="{{ cb.cong_tac_chinh_dang_lam if cb else '' }}"></div>
+      <div class="f-group"><label>Ngạch công chức</label><input type="text" name="ngach_cong_chuc" value="{{ cb.ngach_cong_chuc if cb else '' }}"></div>
+      <div class="f-group"><label>Mã số ngạch</label><input type="text" name="ma_so_ngach" value="{{ cb.ma_so_ngach if cb else '' }}"></div>
+      <div class="f-group"><label>Bậc lương</label><input type="text" name="bac_luong" value="{{ cb.bac_luong if cb else '' }}"></div>
+      <div class="f-group"><label>Hệ số lương</label><input type="number" step="0.01" name="he_so_luong" value="{{ cb.he_so_luong if cb else '' }}"></div>
+      <div class="f-group"><label>Hưởng lương từ (tháng/năm)</label><input type="text" name="luong_tu_thang_nam" placeholder="vd: 07/2020" value="{{ cb.luong_tu_thang_nam if cb else '' }}"></div>
+      <div class="f-group span-2"><label>Danh hiệu được phong</label><input type="text" name="danh_hieu_duoc_phong" value="{{ cb.danh_hieu_duoc_phong if cb else '' }}"></div>
+      <div class="f-group"><label>Sở trường công tác</label><input type="text" name="so_truong_cong_tac" value="{{ cb.so_truong_cong_tac if cb else '' }}"></div>
+      <div class="f-group span-2"><label>Công việc làm lâu nhất</label><input type="text" name="cong_viec_lam_lau_nhat" value="{{ cb.cong_viec_lam_lau_nhat if cb else '' }}"></div>
+    </div>
+
+    <div class="section-title"><span class="section-num">5</span> Sức khỏe</div>
+    <div class="form-grid cols-3">
+      <div class="f-group"><label>Tình trạng sức khỏe</label><input type="text" name="tinh_trang_suc_khoe" value="{{ cb.tinh_trang_suc_khoe if cb else '' }}"></div>
+      <div class="f-group"><label>Chiều cao (cm)</label><input type="number" step="0.1" name="chieu_cao_cm" value="{{ cb.chieu_cao_cm if cb else '' }}"></div>
+      <div class="f-group"><label>Cân nặng (kg)</label><input type="number" step="0.1" name="can_nang_kg" value="{{ cb.can_nang_kg if cb else '' }}"></div>
+      <div class="f-group"><label>Nhóm máu</label><input type="text" name="nhom_mau" value="{{ cb.nhom_mau if cb else '' }}"></div>
+      <div class="f-group"><label>Thương binh loại</label><input type="text" name="thuong_binh_loai" value="{{ cb.thuong_binh_loai if cb else '' }}"></div>
+      <div class="f-group" style="flex-direction:row; align-items:center; gap:8px; margin-top:20px;">
+        <input type="checkbox" name="gia_dinh_liet_si" value="1" style="width:auto;" {% if cb and cb.gia_dinh_liet_si %}checked{% endif %}>
+        <label style="margin:0;">Gia đình liệt sĩ</label>
+      </div>
+    </div>
+
+    <!-- 26 Đào tạo -->
+    <div class="section-title"><span class="section-num">26</span> Đào tạo, bồi dưỡng</div>
+    <table class="repeat-table" id="tbl-dt">
+      <thead><tr><th>Tên trường</th><th>Ngành học</th><th>Từ năm</th><th>Đến năm</th><th>Hình thức</th><th>Văn bằng/chứng chỉ</th><th></th></tr></thead>
+      <tbody>
+      {% for d in (cb.dao_tao if cb else []) %}
+      <tr>
+        <td><input type="text" name="dt_ten_truong" value="{{ d.ten_truong or '' }}"></td>
+        <td><input type="text" name="dt_nganh_hoc" value="{{ d.nganh_hoc or '' }}"></td>
+        <td><input type="number" name="dt_tu_nam" value="{{ d.tu_nam or '' }}"></td>
+        <td><input type="number" name="dt_den_nam" value="{{ d.den_nam or '' }}"></td>
+        <td><input type="text" name="dt_hinh_thuc" value="{{ d.hinh_thuc_hoc or '' }}"></td>
+        <td><input type="text" name="dt_van_bang" value="{{ d.van_bang_chung_chi or '' }}"></td>
+        <td><button type="button" class="btn btn-danger btn-sm" onclick="this.closest('tr').remove()">✕</button></td>
+      </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    <div class="repeat-actions"><button type="button" class="btn btn-outline btn-sm" onclick="addRow('tbl-dt', ['dt_ten_truong','dt_nganh_hoc','dt_tu_nam','dt_den_nam','dt_hinh_thuc','dt_van_bang'])">+ Thêm dòng đào tạo</button></div>
+
+    <!-- 27 Quá trình công tác -->
+    <div class="section-title"><span class="section-num">27</span> Tóm tắt quá trình công tác</div>
+    <table class="repeat-table" id="tbl-qt">
+      <thead><tr><th>Từ (tháng/năm)</th><th>Đến (tháng/năm)</th><th>Chức danh, chức vụ, đơn vị công tác</th><th></th></tr></thead>
+      <tbody>
+      {% for q in (cb.qua_trinh_cong_tac if cb else []) %}
+      <tr>
+        <td><input type="text" name="qt_tu" value="{{ q.tu_thang_nam or '' }}"></td>
+        <td><input type="text" name="qt_den" value="{{ q.den_thang_nam or '' }}"></td>
+        <td><input type="text" name="qt_chuc_danh" value="{{ q.chuc_danh_don_vi or '' }}"></td>
+        <td><button type="button" class="btn btn-danger btn-sm" onclick="this.closest('tr').remove()">✕</button></td>
+      </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    <div class="repeat-actions"><button type="button" class="btn btn-outline btn-sm" onclick="addRow('tbl-qt', ['qt_tu','qt_den','qt_chuc_danh'])">+ Thêm dòng công tác</button></div>
+
+    <!-- 22 Khen thưởng -->
+    <div class="section-title"><span class="section-num">22</span> Khen thưởng</div>
+    <table class="repeat-table" id="tbl-kt">
+      <thead><tr><th>Nội dung (huân/huy chương, danh hiệu...)</th><th>Năm</th><th></th></tr></thead>
+      <tbody>
+      {% for k in (cb.khen_thuong if cb else []) %}
+      <tr>
+        <td><input type="text" name="kt_noi_dung" value="{{ k.noi_dung or '' }}"></td>
+        <td><input type="number" name="kt_nam" value="{{ k.nam or '' }}"></td>
+        <td><button type="button" class="btn btn-danger btn-sm" onclick="this.closest('tr').remove()">✕</button></td>
+      </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    <div class="repeat-actions"><button type="button" class="btn btn-outline btn-sm" onclick="addRow('tbl-kt', ['kt_noi_dung','kt_nam'])">+ Thêm khen thưởng</button></div>
+
+    <!-- 23 Kỷ luật -->
+    <div class="section-title"><span class="section-num">23</span> Kỷ luật</div>
+    <table class="repeat-table" id="tbl-kl">
+      <thead><tr><th>Hình thức</th><th>Cấp quyết định</th><th>Lý do</th><th>Năm</th><th></th></tr></thead>
+      <tbody>
+      {% for k in (cb.ky_luat if cb else []) %}
+      <tr>
+        <td><input type="text" name="kl_hinh_thuc" value="{{ k.hinh_thuc or '' }}"></td>
+        <td><input type="text" name="kl_cap_qd" value="{{ k.cap_quyet_dinh or '' }}"></td>
+        <td><input type="text" name="kl_ly_do" value="{{ k.ly_do or '' }}"></td>
+        <td><input type="number" name="kl_nam" value="{{ k.nam or '' }}"></td>
+        <td><button type="button" class="btn btn-danger btn-sm" onclick="this.closest('tr').remove()">✕</button></td>
+      </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    <div class="repeat-actions"><button type="button" class="btn btn-outline btn-sm" onclick="addRow('tbl-kl', ['kl_hinh_thuc','kl_cap_qd','kl_ly_do','kl_nam'])">+ Thêm kỷ luật</button></div>
+
+    <!-- 28 Lịch sử bản thân -->
+    <div class="section-title"><span class="section-num">28</span> Đặc điểm lịch sử bản thân</div>
+    <div class="form-grid full">
+      <div class="f-group"><label>Bị bắt, bị tù (thời gian, ở đâu, khai báo cho ai...)</label>
+        <textarea name="ls_bat_tu" rows="2">{{ (cb.lich_su_ban_than|selectattr('loai','equalto','Bị bắt/bị tù')|map(attribute='noi_dung')|first) if cb else '' }}</textarea></div>
+      <div class="f-group"><label>Làm việc trong chế độ cũ (cơ quan, địa điểm, chức danh, thời gian...)</label>
+        <textarea name="ls_che_do_cu" rows="2">{{ (cb.lich_su_ban_than|selectattr('loai','equalto','Làm việc chế độ cũ')|map(attribute='noi_dung')|first) if cb else '' }}</textarea></div>
+    </div>
+
+    <!-- 29 Quan hệ nước ngoài -->
+    <div class="section-title"><span class="section-num">29</span> Quan hệ với nước ngoài</div>
+    <div class="form-grid full">
+      <div class="f-group"><label>Tham gia / quan hệ với tổ chức chính trị, kinh tế, xã hội ở nước ngoài</label>
+        <textarea name="qhnn_to_chuc" rows="2">{{ (cb.quan_he_nuoc_ngoai|selectattr('loai','equalto','Tổ chức chính trị/kinh tế/xã hội')|map(attribute='noi_dung')|first) if cb else '' }}</textarea></div>
+      <div class="f-group"><label>Thân nhân (bố, mẹ, vợ/chồng, con, anh chị em ruột) ở nước ngoài</label>
+        <textarea name="qhnn_than_nhan" rows="2">{{ (cb.quan_he_nuoc_ngoai|selectattr('loai','equalto','Thân nhân ở nước ngoài')|map(attribute='noi_dung')|first) if cb else '' }}</textarea></div>
+    </div>
+
+    <!-- 30 Quan hệ gia đình -->
+    <div class="section-title"><span class="section-num">30</span> Quan hệ gia đình</div>
+    <table class="repeat-table" id="tbl-gd">
+      <thead><tr><th>Nhóm</th><th>Quan hệ</th><th>Họ tên</th><th>Năm sinh</th><th>Thông tin (quê quán, nghề nghiệp...)</th><th></th></tr></thead>
+      <tbody>
+      {% for g in (cb.quan_he_gia_dinh if cb else []) %}
+      <tr>
+        <td>
+          <select name="gd_nhom"><option {% if g.nhom=='Bản thân' %}selected{% endif %}>Bản thân</option><option {% if g.nhom=='Bên vợ/chồng' %}selected{% endif %}>Bên vợ/chồng</option></select>
+        </td>
+        <td><input type="text" name="gd_quan_he" value="{{ g.quan_he or '' }}" placeholder="Bố/Mẹ/Vợ/Chồng/Con..."></td>
+        <td><input type="text" name="gd_ho_ten" value="{{ g.ho_ten or '' }}"></td>
+        <td><input type="number" name="gd_nam_sinh" value="{{ g.nam_sinh or '' }}"></td>
+        <td><input type="text" name="gd_thong_tin" value="{{ g.thong_tin or '' }}"></td>
+        <td><button type="button" class="btn btn-danger btn-sm" onclick="this.closest('tr').remove()">✕</button></td>
+      </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    <div class="repeat-actions"><button type="button" class="btn btn-outline btn-sm" onclick="addFamilyRow()">+ Thêm thân nhân</button></div>
+
+    <!-- 31 Hoàn cảnh kinh tế -->
+    <div class="section-title"><span class="section-num">31</span> Hoàn cảnh kinh tế gia đình</div>
+    {% set h = cb.hoan_canh_kinh_te if cb else None %}
+    <div class="form-grid cols-3">
+      <div class="f-group"><label>Nguồn thu nhập từ lương</label><input type="text" name="hckt_nguon_luong" value="{{ h.nguon_thu_nhap_luong if h else '' }}"></div>
+      <div class="f-group span-2"><label>Nguồn thu nhập khác</label><input type="text" name="hckt_nguon_khac" value="{{ h.nguon_thu_nhap_khac if h else '' }}"></div>
+      <div class="f-group"><label>Loại nhà ở</label><input type="text" name="hckt_nha_o_loai" value="{{ h.nha_o_loai if h else '' }}"></div>
+      <div class="f-group"><label>Diện tích nhà ở (m²)</label><input type="number" step="0.01" name="hckt_nha_o_dien_tich" value="{{ h.nha_o_dien_tich_m2 if h else '' }}"></div>
+      <div class="f-group"><label>Đất được cấp (m²)</label><input type="number" step="0.01" name="hckt_dat_duoc_cap" value="{{ h.dat_o_duoc_cap_m2 if h else '' }}"></div>
+      <div class="f-group"><label>Đất tự mua (m²)</label><input type="number" step="0.01" name="hckt_dat_tu_mua" value="{{ h.dat_o_tu_mua_m2 if h else '' }}"></div>
+      <div class="f-group span-3"><label>Đất sản xuất, kinh doanh</label><input type="text" name="hckt_dat_san_xuat" value="{{ h.dat_san_xuat_kinh_doanh if h else '' }}"></div>
+    </div>
+
+    <div style="margin-top:26px; display:flex; gap:10px;">
+      <button class="btn btn-primary" type="submit">{{ 'Lưu thay đổi' if cb else 'Thêm hồ sơ' }}</button>
+      <a href="{{ url_for('index') if not cb else url_for('chi_tiet', id=cb.id) }}" class="btn btn-outline">Hủy</a>
+    </div>
+  </div>
+</form>
+
+<script>
+function addRow(tableId, names){
+  const tbody = document.getElementById(tableId).querySelector('tbody');
+  const tr = document.createElement('tr');
+  names.forEach(n => {
+    const td = document.createElement('td');
+    const input = document.createElement('input');
+    input.type = n.includes('nam') && !n.includes('ten') ? 'number' : 'text';
+    input.name = n;
+    td.appendChild(input);
+    tr.appendChild(td);
+  });
+  const tdBtn = document.createElement('td');
+  tdBtn.innerHTML = '<button type="button" class="btn btn-danger btn-sm" onclick="this.closest(\'tr\').remove()">✕</button>';
+  tr.appendChild(tdBtn);
+  tbody.appendChild(tr);
+}
+function addFamilyRow(){
+  const tbody = document.getElementById('tbl-gd').querySelector('tbody');
+  const tr = document.createElement('tr');
+  tr.innerHTML = `
+    <td><select name="gd_nhom"><option>Bản thân</option><option>Bên vợ/chồng</option></select></td>
+    <td><input type="text" name="gd_quan_he" placeholder="Bố/Mẹ/Vợ/Chồng/Con..."></td>
+    <td><input type="text" name="gd_ho_ten"></td>
+    <td><input type="number" name="gd_nam_sinh"></td>
+    <td><input type="text" name="gd_thong_tin"></td>
+    <td><button type="button" class="btn btn-danger btn-sm" onclick="this.closest('tr').remove()">✕</button></td>`;
+  tbody.appendChild(tr);
+}
+</script>
+{% endblock %}

@@ -1,0 +1,75 @@
+{% extends "base.html" %}
+{% block title %}Tra cứu nhân sự{% endblock %}
+{% block content %}
+<div class="page-title">Tra cứu nhân sự</div>
+<div class="page-sub">Danh sách cán bộ, công chức, viên chức toàn Sở và các đơn vị trực thuộc.</div>
+
+<div class="stat-row">
+  <div class="stat"><div class="num">{{ tong_so }}</div><div class="label">Tổng hồ sơ</div></div>
+  <div class="stat"><div class="num">{{ don_vi_list|length }}</div><div class="label">Đơn vị</div></div>
+  <div class="stat"><div class="num">{{ ds_can_bo|length }}</div><div class="label">Kết quả lọc</div></div>
+</div>
+
+<div class="card">
+  <div class="toolbar">
+    <form method="GET">
+      <input type="text" name="q" placeholder="Tìm theo họ tên, số hiệu CB, CCCD, chức vụ..." value="{{ q }}" style="min-width:280px;">
+      <select name="don_vi_id">
+        <option value="">— Tất cả đơn vị —</option>
+        {% for dv in don_vi_list %}
+        <option value="{{ dv.id }}" {% if don_vi_id == dv.id %}selected{% endif %}>{{ dv.ten_don_vi }}</option>
+        {% endfor %}
+      </select>
+      <select name="trang_thai">
+        <option value="">— Mọi trạng thái —</option>
+        {% for tt in ['Đang công tác', 'Nghỉ hưu', 'Thôi việc', 'Chuyển công tác'] %}
+        <option value="{{ tt }}" {% if trang_thai == tt %}selected{% endif %}>{{ tt }}</option>
+        {% endfor %}
+      </select>
+      <button class="btn btn-primary" type="submit">Tìm kiếm</button>
+      {% if q or don_vi_id or trang_thai %}
+      <a href="{{ url_for('index') }}" class="btn btn-outline">Xóa lọc</a>
+      {% endif %}
+    </form>
+  </div>
+
+  {% if ds_can_bo %}
+  <table>
+    <thead>
+      <tr>
+        <th></th>
+        <th>Họ và tên</th>
+        <th>Số hiệu CB</th>
+        <th>Đơn vị</th>
+        <th>Chức vụ</th>
+        <th>Ngạch / Bậc lương</th>
+        <th>Trạng thái</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for cb in ds_can_bo %}
+      <tr>
+        <td><div class="avatar-circle">{{ cb.ho_ten_khai_sinh[:1] }}</div></td>
+        <td class="name-cell"><a href="{{ url_for('chi_tiet', id=cb.id) }}">{{ cb.ho_ten_khai_sinh }}</a></td>
+        <td>{{ cb.so_hieu_can_bo or '—' }}</td>
+        <td>{{ cb.don_vi.ten_don_vi if cb.don_vi else '—' }}</td>
+        <td>{{ cb.chuc_vu or '—' }}</td>
+        <td>{{ cb.ngach_cong_chuc or '—' }}{% if cb.bac_luong %} / {{ cb.bac_luong }}{% endif %}</td>
+        <td>
+          {% set cls = 'tag-active' if cb.trang_thai == 'Đang công tác' else ('tag-leave' if cb.trang_thai == 'Nghỉ hưu' else 'tag-other') %}
+          <span class="tag {{ cls }}">{{ cb.trang_thai }}</span>
+        </td>
+        <td><a href="{{ url_for('chi_tiet', id=cb.id) }}" class="btn btn-outline btn-sm">Xem</a></td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <div class="empty-state">
+    <div class="icon">🔍</div>
+    <div>Không tìm thấy hồ sơ nào phù hợp.</div>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

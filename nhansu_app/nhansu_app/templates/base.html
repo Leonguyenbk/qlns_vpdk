@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{% block title %}CSDL Nhân sự{% endblock %} · Sở Nông nghiệp và Môi trường</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+{% if session.get('user_id') %}
+<header class="app-header topo-bg">
+  <div class="brand">
+    <div class="badge">NN</div>
+    <div class="brand-text">
+      <div class="title">CSDL Nhân sự</div>
+      <div class="subtitle">Sở Nông nghiệp và Môi trường</div>
+    </div>
+  </div>
+  <nav>
+    <a href="{{ url_for('index') }}">Tra cứu</a>
+    <a href="{{ url_for('don_vi_list_page') }}">Đơn vị</a>
+    {% if current_user_role in ['admin','editor'] %}
+    <a href="{{ url_for('them_moi') }}">+ Thêm hồ sơ</a>
+    {% endif %}
+    <span class="user-chip">{{ current_user_name }} · {{ current_user_role }}</span>
+    <a href="{{ url_for('logout') }}">Đăng xuất</a>
+  </nav>
+</header>
+{% endif %}
+
+<div class="container">
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+      {% for category, message in messages %}
+        <div class="flash {{ category }}">{{ message }}</div>
+      {% endfor %}
+    {% endif %}
+  {% endwith %}
+  {% block content %}{% endblock %}
+</div>
+</body>
+</html>
