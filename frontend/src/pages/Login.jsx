@@ -23,9 +23,11 @@ export default function Login() {
   return (
     <div className="login-wrap">
       <div className="login-card">
-        <div className="badge-lg">NN</div>
-        <h1>CSDL Nhân sự</h1>
-        <p className="hint">Sở Nông nghiệp và Môi trường — hệ thống quản lý &amp; tra cứu sơ yếu lý lịch cán bộ, công chức.</p>
+        <div className="login-heading">
+          <div className="badge-lg">VPĐK</div>
+          <h1>QUẢN LÝ NHÂN SỰ</h1>
+          <p className="hint">Văn phòng Đăng ký đất đai — quản lý viên chức và người lao động.</p>
+        </div>
         <form onSubmit={handleSubmit}>
           <div className="f-group">
             <label htmlFor="tdn">Tên đăng nhập</label>
@@ -38,7 +40,6 @@ export default function Login() {
           {error && <p className="error">{error}</p>}
           <button className="btn btn-primary" type="submit">Đăng nhập</button>
         </form>
-        <div className="demo">Tài khoản mẫu: admin / admin123</div>
       </div>
     </div>
   )

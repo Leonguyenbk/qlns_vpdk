@@ -26,6 +26,10 @@ class DonVi(db.Model):
 
     con = db.relationship("DonVi", backref=db.backref("cha", remote_side=[id]))
     can_bo_list = db.relationship("CanBo", backref="don_vi", lazy=True)
+    gioi_han_chuc_vu_list = db.relationship(
+        "GioiHanChucVuDonVi", back_populates="don_vi", lazy=True,
+        cascade="all, delete-orphan"
+    )
 
     @property
     def si_so(self):
@@ -228,20 +232,47 @@ class CanBo(db.Model):
 class ChucVu(db.Model):
     __tablename__ = "chuc_vu"
     id = db.Column(db.Integer, primary_key=True)
+    ma_chuc_vu = db.Column(db.String(30), unique=True, nullable=True)
     ten_chuc_vu = db.Column(db.String(150), nullable=False)
     cap_bac = db.Column(db.Integer, nullable=False)
     mo_ta = db.Column(db.String(255))
 
     can_bo_list = db.relationship("CanBo", backref="chuc_vu_ref", lazy=True)
+    gioi_han_don_vi_list = db.relationship(
+        "GioiHanChucVuDonVi", back_populates="chuc_vu", lazy=True
+    )
 
     def to_dict(self):
         return {
             "id": self.id,
+            "ma_chuc_vu": self.ma_chuc_vu,
             "ten_chuc_vu": self.ten_chuc_vu,
             "cap_bac": self.cap_bac,
             "mo_ta": self.mo_ta,
             "si_so": len(self.can_bo_list),
         }
+
+
+class GioiHanChucVuDonVi(db.Model):
+    __tablename__ = "gioi_han_chuc_vu_don_vi"
+
+    id = db.Column(db.Integer, primary_key=True)
+    don_vi_id = db.Column(db.Integer, db.ForeignKey("don_vi.id"), nullable=False)
+    chuc_vu_id = db.Column(db.Integer, db.ForeignKey("chuc_vu.id"), nullable=False)
+    so_luong_toi_da = db.Column(db.Integer, nullable=False, default=1)
+    ghi_chu = db.Column(db.String(255))
+
+    don_vi = db.relationship("DonVi", back_populates="gioi_han_chuc_vu_list")
+    chuc_vu = db.relationship("ChucVu", back_populates="gioi_han_don_vi_list")
+
+    __table_args__ = (
+        db.UniqueConstraint(
+            "don_vi_id", "chuc_vu_id", name="uq_gioi_han_chuc_vu_don_vi"
+        ),
+        db.CheckConstraint("so_luong_toi_da >= 1", name="ck_gioi_han_so_luong_duong"),
+        db.Index("ix_gioi_han_don_vi_id", "don_vi_id"),
+        db.Index("ix_gioi_han_chuc_vu_id", "chuc_vu_id"),
+    )
 
 
 class DaoTao(db.Model):

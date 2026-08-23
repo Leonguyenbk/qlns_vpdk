@@ -1,6 +1,7 @@
 import os
 from datetime import datetime, date
 from functools import wraps
+from urllib.parse import parse_qsl, urlsplit
 
 from dotenv import load_dotenv
 from flask import Flask, request, jsonify, send_file
@@ -8,19 +9,31 @@ from flask_cors import CORS
 from flask_jwt_extended import (
     JWTManager, create_access_token, jwt_required, get_jwt_identity, get_jwt
 )
-from sqlalchemy import or_
+from sqlalchemy import func, or_
+from sqlalchemy.exc import IntegrityError
+from sqlalchemy.engine import URL
 
 from models import (
-    db, DonVi, CanBo, ChucVu, DaoTao, QuaTrinhCongTac, QuaTrinhLuong,
+    db, DonVi, CanBo, ChucVu, GioiHanChucVuDonVi, DaoTao, QuaTrinhCongTac, QuaTrinhLuong,
     KhenThuong, KyLuat, LichSuBanThan, QuanHeNuocNgoai, QuanHeGiaDinh,
     HoanCanhKinhTe, TaiKhoan
 )
 from docx_export import tao_docx_so_yeu_ly_lich
 
-load_dotenv()
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+load_dotenv(os.path.join(BASE_DIR, ".env"))
 
 app = Flask(__name__)
-app.config["SQLALCHEMY_DATABASE_URI"] = os.environ["DATABASE_URL"]
+database_parts = urlsplit(os.environ["DATABASE_URL"])
+app.config["SQLALCHEMY_DATABASE_URI"] = URL.create(
+    database_parts.scheme,
+    username=database_parts.username,
+    password=database_parts.password,
+    host=database_parts.hostname,
+    port=database_parts.port,
+    database=database_parts.path.lstrip("/"),
+    query=dict(parse_qsl(database_parts.query)),
+)
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 app.config["JWT_SECRET_KEY"] = os.environ["JWT_SECRET_KEY"]
 
@@ -33,6 +46,86 @@ jwt = JWTManager(app)
 def parse_date(value):
     if not value:
         return None
+
+
+def normalize_code(value):
+    return value.strip().upper() if isinstance(value, str) else ""
+
+
+def required_text(value):
+    return value.strip() if isinstance(value, str) else ""
+
+
+def bad_request(message, field=None):
+    payload = {"error": message}
+    if field:
+        payload["field"] = field
+    return jsonify(payload), 400
+
+
+def validate_parent(dv, parent_id):
+    if parent_id is None:
+        return None
+    if parent_id == dv.id:
+        return "Đơn vị không thể chọn chính nó làm đơn vị cấp trên."
+    parent = db.session.get(DonVi, parent_id)
+    if not parent:
+        return "Đơn vị cấp trên không tồn tại."
+    seen = {dv.id}
+    while parent:
+        if parent.id in seen:
+            return "Quan hệ đơn vị cha–con không được tạo vòng lặp."
+        seen.add(parent.id)
+        parent = parent.cha
+    return None
+
+
+def current_position_count(don_vi_id, chuc_vu_id):
+    return db.session.query(func.count(CanBo.id)).filter(
+        CanBo.don_vi_id == don_vi_id,
+        CanBo.chuc_vu_id == chuc_vu_id,
+        CanBo.trang_thai == "Đang công tác",
+    ).scalar() or 0
+
+
+def validate_position_limit(don_vi_id, chuc_vu_id):
+    if not don_vi_id or not chuc_vu_id:
+        return None
+    limit = GioiHanChucVuDonVi.query.filter_by(
+        don_vi_id=don_vi_id, chuc_vu_id=chuc_vu_id
+    ).with_for_update().first()
+    if limit and current_position_count(don_vi_id, chuc_vu_id) > limit.so_luong_toi_da:
+        don_vi = db.session.get(DonVi, don_vi_id)
+        chuc_vu = db.session.get(ChucVu, chuc_vu_id)
+        return (
+            f"{don_vi.ten_don_vi} đã đủ {limit.so_luong_toi_da:02d} "
+            f"{chuc_vu.ten_chuc_vu}."
+        )
+    return None
+
+
+def validate_assignment_limit(cb, same_assignment=False):
+    limit = GioiHanChucVuDonVi.query.filter_by(
+        don_vi_id=cb.don_vi_id, chuc_vu_id=cb.chuc_vu_id
+    ).with_for_update().first()
+    if not limit or cb.trang_thai != "Đang công tác" or same_assignment:
+        return None
+    count_query = db.session.query(func.count(CanBo.id)).filter(
+        CanBo.don_vi_id == cb.don_vi_id,
+        CanBo.chuc_vu_id == cb.chuc_vu_id,
+        CanBo.trang_thai == "Đang công tác",
+    )
+    if cb.id:
+        count_query = count_query.filter(CanBo.id != cb.id)
+    count = count_query.scalar() or 0
+    if count >= limit.so_luong_toi_da:
+        don_vi = db.session.get(DonVi, cb.don_vi_id)
+        chuc_vu = db.session.get(ChucVu, cb.chuc_vu_id)
+        return (
+            f"{don_vi.ten_don_vi} đã đủ {limit.so_luong_toi_da:02d} "
+            f"{chuc_vu.ten_chuc_vu}."
+        )
+    return None
     try:
         return datetime.strptime(value, "%Y-%m-%d").date()
     except (ValueError, TypeError):
@@ -84,7 +177,18 @@ def me():
 @app.route("/api/don-vi", methods=["GET"])
 @jwt_required()
 def don_vi_list():
-    ds = DonVi.query.order_by(DonVi.ten_don_vi).all()
+    query = DonVi.query
+    q = required_text(request.args.get("q"))
+    loai = required_text(request.args.get("loai_don_vi"))
+    parent_id = request.args.get("don_vi_cha_id", type=int)
+    if q:
+        like = f"%{q}%"
+        query = query.filter(or_(DonVi.ma_don_vi.ilike(like), DonVi.ten_don_vi.ilike(like)))
+    if loai:
+        query = query.filter(DonVi.loai_don_vi == loai)
+    if parent_id:
+        query = query.filter(DonVi.don_vi_cha_id == parent_id)
+    ds = query.order_by(DonVi.ten_don_vi).all()
     return jsonify([d.to_dict() for d in ds])
 
 
@@ -99,19 +203,33 @@ def don_vi_get(id):
 @role_required("admin")
 def don_vi_create():
     data = request.get_json(silent=True) or {}
-    if not data.get("ma_don_vi") or not data.get("ten_don_vi"):
-        return jsonify({"error": "Thiếu mã đơn vị hoặc tên đơn vị"}), 400
+    ma_don_vi = normalize_code(data.get("ma_don_vi"))
+    ten_don_vi = required_text(data.get("ten_don_vi"))
+    if not ma_don_vi:
+        return bad_request("Mã đơn vị là bắt buộc.", "ma_don_vi")
+    if not ten_don_vi:
+        return bad_request("Tên đơn vị là bắt buộc.", "ten_don_vi")
+    if DonVi.query.filter_by(ma_don_vi=ma_don_vi).first():
+        return bad_request("Mã đơn vị đã tồn tại.", "ma_don_vi")
+    parent_id = parse_int(data.get("don_vi_cha_id"))
+    parent_error = validate_parent(DonVi(), parent_id)
+    if parent_error:
+        return bad_request(parent_error, "don_vi_cha_id")
 
     dv = DonVi(
-        ma_don_vi=data.get("ma_don_vi"),
-        ten_don_vi=data.get("ten_don_vi"),
+        ma_don_vi=ma_don_vi,
+        ten_don_vi=ten_don_vi,
         loai_don_vi=data.get("loai_don_vi"),
-        don_vi_cha_id=data.get("don_vi_cha_id"),
+        don_vi_cha_id=parent_id,
         dia_chi=data.get("dia_chi"),
         ghi_chu=data.get("ghi_chu"),
     )
     db.session.add(dv)
-    db.session.commit()
+    try:
+        db.session.commit()
+    except IntegrityError:
+        db.session.rollback()
+        return bad_request("Mã đơn vị đã tồn tại.", "ma_don_vi")
     return jsonify(dv.to_dict()), 201
 
 
@@ -120,10 +238,32 @@ def don_vi_create():
 def don_vi_update(id):
     dv = DonVi.query.get_or_404(id)
     data = request.get_json(silent=True) or {}
-    for field in ["ma_don_vi", "ten_don_vi", "loai_don_vi", "don_vi_cha_id", "dia_chi", "ghi_chu"]:
+    if "ma_don_vi" in data:
+        ma_don_vi = normalize_code(data["ma_don_vi"])
+        if not ma_don_vi:
+            return bad_request("Mã đơn vị là bắt buộc.", "ma_don_vi")
+        duplicate = DonVi.query.filter(DonVi.ma_don_vi == ma_don_vi, DonVi.id != id).first()
+        if duplicate:
+            return bad_request("Mã đơn vị đã tồn tại.", "ma_don_vi")
+        dv.ma_don_vi = ma_don_vi
+    if "ten_don_vi" in data:
+        dv.ten_don_vi = required_text(data["ten_don_vi"])
+        if not dv.ten_don_vi:
+            return bad_request("Tên đơn vị là bắt buộc.", "ten_don_vi")
+    if "don_vi_cha_id" in data:
+        parent_id = parse_int(data["don_vi_cha_id"])
+        parent_error = validate_parent(dv, parent_id)
+        if parent_error:
+            return bad_request(parent_error, "don_vi_cha_id")
+        dv.don_vi_cha_id = parent_id
+    for field in ["loai_don_vi", "dia_chi", "ghi_chu"]:
         if field in data:
             setattr(dv, field, data[field])
-    db.session.commit()
+    try:
+        db.session.commit()
+    except IntegrityError:
+        db.session.rollback()
+        return bad_request("Mã đơn vị đã tồn tại.", "ma_don_vi")
     return jsonify(dv.to_dict())
 
 
@@ -133,6 +273,8 @@ def don_vi_delete(id):
     dv = DonVi.query.get_or_404(id)
     if dv.can_bo_list:
         return jsonify({"error": "Đơn vị còn cán bộ trực thuộc, không thể xóa"}), 400
+    if dv.con:
+        return jsonify({"error": "Đơn vị còn đơn vị trực thuộc, không thể xóa"}), 400
     db.session.delete(dv)
     db.session.commit()
     return "", 204
@@ -182,6 +324,10 @@ def can_bo_create():
 
     cb = CanBo()
     _apply_can_bo_data(cb, data)
+    error = validate_assignment_limit(cb)
+    if error:
+        db.session.rollback()
+        return bad_request(error)
     db.session.commit()
     return jsonify(cb.to_dict(full=True)), 201
 
@@ -191,7 +337,12 @@ def can_bo_create():
 def can_bo_update(id):
     cb = CanBo.query.get_or_404(id)
     data = request.get_json(silent=True) or {}
+    old_assignment = (cb.don_vi_id, cb.chuc_vu_id, cb.trang_thai)
     _apply_can_bo_data(cb, data)
+    error = validate_assignment_limit(cb, old_assignment == (cb.don_vi_id, cb.chuc_vu_id, cb.trang_thai))
+    if error:
+        db.session.rollback()
+        return bad_request(error)
     db.session.commit()
     return jsonify(cb.to_dict(full=True))
 
@@ -369,7 +520,31 @@ def _apply_can_bo_data(cb, data):
 @app.route("/api/chuc-vu", methods=["GET"])
 @jwt_required()
 def chuc_vu_list():
-    ds = ChucVu.query.order_by(ChucVu.cap_bac).all()
+    query = ChucVu.query
+    q = required_text(request.args.get("q"))
+    if q:
+        like = f"%{q}%"
+        query = query.filter(or_(ChucVu.ma_chuc_vu.ilike(like), ChucVu.ten_chuc_vu.ilike(like)))
+    if request.args.get("cap_bac"):
+        cap_bac = parse_int(request.args.get("cap_bac"))
+        if cap_bac is not None:
+            query = query.filter(ChucVu.cap_bac == cap_bac)
+    ds = query.order_by(ChucVu.cap_bac, ChucVu.ten_chuc_vu).all()
+    return jsonify([c.to_dict() for c in ds])
+
+
+@app.route("/api/chuc-vu/<int:id>", methods=["GET"])
+@jwt_required()
+def chuc_vu_get(id):
+    return jsonify(ChucVu.query.get_or_404(id).to_dict())
+
+
+@app.route("/api/chuc-vu/chua-co-ma", methods=["GET"])
+@jwt_required()
+def chuc_vu_without_code():
+    ds = ChucVu.query.filter(
+        or_(ChucVu.ma_chuc_vu.is_(None), ChucVu.ma_chuc_vu == "")
+    ).order_by(ChucVu.cap_bac, ChucVu.ten_chuc_vu).all()
     return jsonify([c.to_dict() for c in ds])
 
 
@@ -377,15 +552,29 @@ def chuc_vu_list():
 @role_required("admin")
 def chuc_vu_create():
     data = request.get_json(silent=True) or {}
-    if not data.get("ten_chuc_vu") or data.get("cap_bac") is None:
-        return jsonify({"error": "Thiếu tên chức vụ hoặc cấp bậc"}), 400
+    ma_chuc_vu = normalize_code(data.get("ma_chuc_vu"))
+    ten_chuc_vu = required_text(data.get("ten_chuc_vu"))
+    cap_bac = parse_int(data.get("cap_bac"))
+    if not ma_chuc_vu:
+        return bad_request("Mã chức vụ là bắt buộc khi tạo mới.", "ma_chuc_vu")
+    if not ten_chuc_vu:
+        return bad_request("Tên chức vụ là bắt buộc.", "ten_chuc_vu")
+    if cap_bac is None:
+        return bad_request("Cấp bậc phải là số nguyên hợp lệ.", "cap_bac")
+    if ChucVu.query.filter_by(ma_chuc_vu=ma_chuc_vu).first():
+        return bad_request("Mã chức vụ đã tồn tại.", "ma_chuc_vu")
     cv = ChucVu(
-        ten_chuc_vu=data["ten_chuc_vu"],
-        cap_bac=parse_int(data["cap_bac"]),
+        ma_chuc_vu=ma_chuc_vu,
+        ten_chuc_vu=ten_chuc_vu,
+        cap_bac=cap_bac,
         mo_ta=clean_str(data.get("mo_ta")),
     )
     db.session.add(cv)
-    db.session.commit()
+    try:
+        db.session.commit()
+    except IntegrityError:
+        db.session.rollback()
+        return bad_request("Mã chức vụ đã tồn tại.", "ma_chuc_vu")
     return jsonify(cv.to_dict()), 201
 
 
@@ -394,13 +583,29 @@ def chuc_vu_create():
 def chuc_vu_update(id):
     cv = ChucVu.query.get_or_404(id)
     data = request.get_json(silent=True) or {}
+    if "ma_chuc_vu" in data:
+        ma_chuc_vu = normalize_code(data["ma_chuc_vu"])
+        if not ma_chuc_vu:
+            return bad_request("Mã chức vụ không được để trống khi cập nhật.", "ma_chuc_vu")
+        duplicate = ChucVu.query.filter(ChucVu.ma_chuc_vu == ma_chuc_vu, ChucVu.id != id).first()
+        if duplicate:
+            return bad_request("Mã chức vụ đã tồn tại.", "ma_chuc_vu")
+        cv.ma_chuc_vu = ma_chuc_vu
     if "ten_chuc_vu" in data:
-        cv.ten_chuc_vu = data["ten_chuc_vu"]
+        cv.ten_chuc_vu = required_text(data["ten_chuc_vu"])
+        if not cv.ten_chuc_vu:
+            return bad_request("Tên chức vụ là bắt buộc.", "ten_chuc_vu")
     if "cap_bac" in data:
         cv.cap_bac = parse_int(data["cap_bac"])
+        if cv.cap_bac is None:
+            return bad_request("Cấp bậc phải là số nguyên hợp lệ.", "cap_bac")
     if "mo_ta" in data:
         cv.mo_ta = clean_str(data["mo_ta"])
-    db.session.commit()
+    try:
+        db.session.commit()
+    except IntegrityError:
+        db.session.rollback()
+        return bad_request("Mã chức vụ đã tồn tại.", "ma_chuc_vu")
     return jsonify(cv.to_dict())
 
 
@@ -410,7 +615,140 @@ def chuc_vu_delete(id):
     cv = ChucVu.query.get_or_404(id)
     if cv.can_bo_list:
         return jsonify({"error": "Còn cán bộ đang giữ chức vụ này, không thể xóa"}), 400
+    if cv.gioi_han_don_vi_list:
+        return jsonify({"error": "Chức vụ đang có cấu hình giới hạn tại đơn vị, không thể xóa"}), 400
     db.session.delete(cv)
+    db.session.commit()
+    return "", 204
+
+
+# ---------------------------------------------------------------- giới hạn chức vụ theo đơn vị
+def position_limit_to_dict(limit):
+    current = current_position_count(limit.don_vi_id, limit.chuc_vu_id)
+    remaining = max(limit.so_luong_toi_da - current, 0)
+    return {
+        "id": limit.id,
+        "don_vi_id": limit.don_vi_id,
+        "ma_don_vi": limit.don_vi.ma_don_vi,
+        "ten_don_vi": limit.don_vi.ten_don_vi,
+        "chuc_vu_id": limit.chuc_vu_id,
+        "ma_chuc_vu": limit.chuc_vu.ma_chuc_vu,
+        "ten_chuc_vu": limit.chuc_vu.ten_chuc_vu,
+        "so_luong_toi_da": limit.so_luong_toi_da,
+        "so_luong_hien_tai": current,
+        "so_luong_con_lai": remaining,
+        "da_dat_gioi_han": current >= limit.so_luong_toi_da,
+        "vuot_gioi_han": current > limit.so_luong_toi_da,
+        "ghi_chu": limit.ghi_chu,
+    }
+
+
+@app.route("/api/gioi-han-chuc-vu-don-vi", methods=["GET"])
+@jwt_required()
+def position_limit_list():
+    query = GioiHanChucVuDonVi.query.join(DonVi).join(ChucVu)
+    q = required_text(request.args.get("q"))
+    don_vi_id = request.args.get("don_vi_id", type=int)
+    chuc_vu_id = request.args.get("chuc_vu_id", type=int)
+    status = required_text(request.args.get("trang_thai"))
+    if q:
+        like = f"%{q}%"
+        query = query.filter(or_(DonVi.ma_don_vi.ilike(like), DonVi.ten_don_vi.ilike(like),
+                                 ChucVu.ma_chuc_vu.ilike(like), ChucVu.ten_chuc_vu.ilike(like)))
+    if don_vi_id:
+        query = query.filter(GioiHanChucVuDonVi.don_vi_id == don_vi_id)
+    if chuc_vu_id:
+        query = query.filter(GioiHanChucVuDonVi.chuc_vu_id == chuc_vu_id)
+    result = [position_limit_to_dict(limit) for limit in query.order_by(DonVi.ten_don_vi, ChucVu.cap_bac).all()]
+    if status == "con_vi_tri":
+        result = [item for item in result if not item["da_dat_gioi_han"]]
+    elif status == "da_du":
+        result = [item for item in result if item["da_dat_gioi_han"] and not item["vuot_gioi_han"]]
+    elif status == "vuot":
+        result = [item for item in result if item["vuot_gioi_han"]]
+    return jsonify(result)
+
+
+@app.route("/api/gioi-han-chuc-vu-don-vi/<int:id>", methods=["GET"])
+@jwt_required()
+def position_limit_get(id):
+    return jsonify(position_limit_to_dict(GioiHanChucVuDonVi.query.get_or_404(id)))
+
+
+def parse_position_limit(data, existing=None):
+    don_vi_id = parse_int(data.get("don_vi_id"))
+    chuc_vu_id = parse_int(data.get("chuc_vu_id"))
+    maximum = parse_int(data.get("so_luong_toi_da"))
+    if not don_vi_id:
+        return None, "Đơn vị là bắt buộc.", "don_vi_id"
+    if not chuc_vu_id:
+        return None, "Chức vụ là bắt buộc.", "chuc_vu_id"
+    if not db.session.get(DonVi, don_vi_id):
+        return None, "Đơn vị không tồn tại.", "don_vi_id"
+    if not db.session.get(ChucVu, chuc_vu_id):
+        return None, "Chức vụ không tồn tại.", "chuc_vu_id"
+    if maximum is None or maximum < 1:
+        return None, "Số lượng tối đa phải là số nguyên từ 1 trở lên.", "so_luong_toi_da"
+    current = current_position_count(don_vi_id, chuc_vu_id)
+    if maximum < current:
+        return None, f"Không thể đặt giới hạn thấp hơn số hiện tại ({current}).", "so_luong_toi_da"
+    values = {
+        "don_vi_id": don_vi_id, "chuc_vu_id": chuc_vu_id,
+        "so_luong_toi_da": maximum, "ghi_chu": clean_str(data.get("ghi_chu")),
+    }
+    return values, None, None
+
+
+@app.route("/api/gioi-han-chuc-vu-don-vi", methods=["POST"])
+@role_required("admin")
+def position_limit_create():
+    values, error, field = parse_position_limit(request.get_json(silent=True) or {})
+    if error:
+        return bad_request(error, field)
+    if GioiHanChucVuDonVi.query.filter_by(
+        don_vi_id=values["don_vi_id"], chuc_vu_id=values["chuc_vu_id"]
+    ).first():
+        return bad_request("Cặp đơn vị và chức vụ này đã có cấu hình.")
+    limit = GioiHanChucVuDonVi(**values)
+    db.session.add(limit)
+    try:
+        db.session.commit()
+    except IntegrityError:
+        db.session.rollback()
+        return bad_request("Cặp đơn vị và chức vụ này đã có cấu hình.")
+    return jsonify(position_limit_to_dict(limit)), 201
+
+
+@app.route("/api/gioi-han-chuc-vu-don-vi/<int:id>", methods=["PUT"])
+@role_required("admin")
+def position_limit_update(id):
+    limit = GioiHanChucVuDonVi.query.get_or_404(id)
+    GioiHanChucVuDonVi.query.filter_by(id=id).with_for_update().first()
+    values, error, field = parse_position_limit(request.get_json(silent=True) or {}, limit)
+    if error:
+        return bad_request(error, field)
+    duplicate = GioiHanChucVuDonVi.query.filter(
+        GioiHanChucVuDonVi.don_vi_id == values["don_vi_id"],
+        GioiHanChucVuDonVi.chuc_vu_id == values["chuc_vu_id"],
+        GioiHanChucVuDonVi.id != id,
+    ).first()
+    if duplicate:
+        return bad_request("Cặp đơn vị và chức vụ này đã có cấu hình.")
+    for field_name, value in values.items():
+        setattr(limit, field_name, value)
+    try:
+        db.session.commit()
+    except IntegrityError:
+        db.session.rollback()
+        return bad_request("Cặp đơn vị và chức vụ này đã có cấu hình.")
+    return jsonify(position_limit_to_dict(limit))
+
+
+@app.route("/api/gioi-han-chuc-vu-don-vi/<int:id>", methods=["DELETE"])
+@role_required("admin")
+def position_limit_delete(id):
+    limit = GioiHanChucVuDonVi.query.get_or_404(id)
+    db.session.delete(limit)
     db.session.commit()
     return "", 204
 
@@ -426,38 +764,6 @@ def can_bo_xuat_docx(id):
         download_name=ten_file,
         mimetype="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
     )
-
-# ---------------------------------------------------------------- khởi tạo CSDL + tài khoản/đơn vị mẫu
-@app.cli.command("init-db")
-def init_db():
-    """Chạy: flask --app app init-db"""
-    db.create_all()
-
-    if not TaiKhoan.query.filter_by(ten_dang_nhap="admin").first():
-        tk = TaiKhoan(ten_dang_nhap="admin", ho_ten="Quản trị hệ thống", vai_tro="admin")
-        tk.set_password("admin123")
-        db.session.add(tk)
-
-    if not DonVi.query.first():
-        so = DonVi(ma_don_vi="SNNMT", ten_don_vi="Sở Nông nghiệp và Môi trường", loai_don_vi="Sở")
-        db.session.add(so)
-        db.session.flush()
-        for ma, ten, loai in [
-            ("VP", "Văn phòng Sở", "Phòng"),
-            ("TCCB", "Phòng Tổ chức cán bộ", "Phòng"),
-            ("CCTL", "Chi cục Thủy lợi", "Chi cục"),
-            ("CCMT", "Chi cục Bảo vệ Môi trường", "Chi cục"),
-            ("CCKL", "Chi cục Kiểm lâm", "Chi cục"),
-        ]:
-            db.session.add(DonVi(ma_don_vi=ma, ten_don_vi=ten, loai_don_vi=loai, don_vi_cha_id=so.id))
-
-    db.session.commit()
-    print("Đã khởi tạo CSDL, tài khoản admin/admin123 và đơn vị mẫu.")
-
-
-with app.app_context():
-    db.create_all()
-
 
 if __name__ == "__main__":
     app.run(debug=True, port=5000)

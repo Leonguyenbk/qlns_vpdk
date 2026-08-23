@@ -53,7 +53,7 @@ export default function DanhSach() {
   return (
     <Layout>
       <div className="page-title">Tra cứu nhân sự</div>
-      <div className="page-sub">Danh sách cán bộ, công chức, viên chức toàn Sở và các đơn vị trực thuộc.</div>
+      <div className="page-sub">Danh sách viên chức và người lao động thuộc Văn phòng Đăng ký đất đai.</div>
 
       <div className="stat-row">
         <div className="stat"><div className="num">{dsCanBo.length}</div><div className="label">Kết quả</div></div>
@@ -65,7 +65,7 @@ export default function DanhSach() {
           <form onSubmit={handleSubmit}>
             <input
               type="text"
-              placeholder="Tìm theo họ tên, số hiệu CB, CCCD, chức vụ..."
+              placeholder="Tìm theo họ tên, mã nhân sự, CCCD, chức vụ..."
               value={q}
               onChange={(e) => setQ(e.target.value)}
               style={{ minWidth: 280 }}

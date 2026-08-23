@@ -118,7 +118,7 @@ export default function Form() {
               options={[['', '— Chọn đơn vị —'], ...donViList.map((dv) => [dv.id, dv.ten_don_vi])]}
               keyed
             />
-            <FInput label="Số hiệu cán bộ" value={form.so_hieu_can_bo} onChange={(v) => setField('so_hieu_can_bo', v)} />
+            <FInput label="Mã nhân sự" value={form.so_hieu_can_bo} onChange={(v) => setField('so_hieu_can_bo', v)} />
             <FSelect
               label="Trạng thái"
               value={form.trang_thai}
@@ -137,7 +137,7 @@ export default function Form() {
               keyed
             />
             <FInput label="Lý luận chính trị" value={form.ly_luan_chinh_tri} onChange={(v) => setField('ly_luan_chinh_tri', v)} />
-            <FInput label="Ngạch công chức" value={form.ngach_cong_chuc} onChange={(v) => setField('ngach_cong_chuc', v)} />
+            <FInput label="Ngạch/lương" value={form.ngach_cong_chuc} onChange={(v) => setField('ngach_cong_chuc', v)} />
             <FInput label="Bậc lương" value={form.bac_luong} onChange={(v) => setField('bac_luong', v)} />
             <FInput label="Hệ số lương" type="number" step="0.01" value={form.he_so_luong} onChange={(v) => setField('he_so_luong', v)} />
           </Section>

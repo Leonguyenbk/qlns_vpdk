@@ -5,6 +5,7 @@ import DanhSach from './pages/DanhSach'
 import ChiTiet from './pages/ChiTiet'
 import DonVi from './pages/DonVi'
 import ChucVuPage from './pages/ChucVu'
+import GioiHanChucVu from './pages/GioiHanChucVu'
 import Form from './pages/Form'
 
 function PrivateRoute({ children }) {
@@ -24,6 +25,7 @@ export default function App() {
           <Route path="/can-bo/:id/sua" element={<PrivateRoute><Form /></PrivateRoute>} />
           <Route path="/don-vi" element={<PrivateRoute><DonVi /></PrivateRoute>} />
           <Route path="/chuc-vu" element={<PrivateRoute><ChucVuPage /></PrivateRoute>} />
+          <Route path="/gioi-han-chuc-vu" element={<PrivateRoute><GioiHanChucVu /></PrivateRoute>} />
         </Routes>
       </BrowserRouter>
     </AuthProvider>

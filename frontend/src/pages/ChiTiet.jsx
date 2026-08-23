@@ -80,7 +80,7 @@ export default function ChiTiet() {
           <Field label="Học hàm/học vị cao nhất" value={cb.hoc_ham_hoc_vi_cao_nhat} />
           <Field label="Chức vụ" value={cb.chuc_vu_ten} />
           <Field label="Lý luận chính trị" value={cb.ly_luan_chinh_tri} />
-          <Field label="Ngạch công chức" value={cb.ngach_cong_chuc} />
+          <Field label="Ngạch/lương" value={cb.ngach_cong_chuc} />
           <Field label="Bậc lương / Hệ số" value={cb.bac_luong && `${cb.bac_luong} / ${cb.he_so_luong ?? ''}`} />
         </Section>
 
