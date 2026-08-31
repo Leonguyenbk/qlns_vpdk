@@ -1,3 +1,33 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+.pytest_cache/
+.coverage
+htmlcov/
+instance/
+*.sqlite
+*.db
+
+# Node
+node_modules/
+dist/
+.vite/
+
+# Env & secrets
+.env
 backend/.env
-**/__pycache__/
-*.pyc
+frontend/.env
+!.env.example
+!**/.env.example
+
+# IDE / OS
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+
+# Local handoff/session transcripts
+2026-*-hy-xy-dng-hon-chnh-mt-d-n-web-qun-l-nh.txt
