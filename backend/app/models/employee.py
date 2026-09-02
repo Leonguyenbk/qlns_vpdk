@@ -54,10 +54,31 @@ class Employee(TimestampMixin, db.Model):
     is_deleted: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
+    # --- Hồ sơ mở rộng (nguồn: biểu thống kê viên chức / NLĐ "Phụ lục 4") ---
+    place_of_origin: Mapped[str | None] = mapped_column(String(255))       # Quê quán
+    identity_issued_date: Mapped[date | None] = mapped_column(Date)        # Ngày cấp CCCD
+    identity_issued_place: Mapped[str | None] = mapped_column(String(255))  # Nơi cấp CCCD
+    job_grade_code: Mapped[str | None] = mapped_column(String(30), index=True)  # Ngạch/CDNN (mã)
+    job_grade_name: Mapped[str | None] = mapped_column(String(150))        # Tên ngạch
+    job_duties: Mapped[str | None] = mapped_column(Text)                   # Nhiệm vụ đang đảm nhận
+    tenure_date: Mapped[date | None] = mapped_column(Date)                 # Ngày vào biên chế
+    contract_type: Mapped[str | None] = mapped_column(String(50))         # Loại hợp đồng (gốc)
+    education_level: Mapped[str | None] = mapped_column(String(20))        # Trình độ cao nhất
+    education_major: Mapped[str | None] = mapped_column(String(255))      # Ngành đào tạo (cao nhất)
+    education_mode: Mapped[str | None] = mapped_column(String(50))        # Hệ đào tạo (cao nhất)
+    foreign_language_cert: Mapped[str | None] = mapped_column(String(100))  # Chứng chỉ ngoại ngữ
+    it_cert: Mapped[str | None] = mapped_column(String(100))              # Chứng chỉ tin học
+
     assignments: Mapped[list["EmployeeAssignment"]] = relationship(
         "EmployeeAssignment",
         back_populates="employee",
         order_by="EmployeeAssignment.start_date.desc()",
+    )
+    education: Mapped[list["EmployeeEducation"]] = relationship(
+        "EmployeeEducation",
+        back_populates="employee",
+        cascade="all, delete-orphan",
+        order_by="EmployeeEducation.is_highest.desc()",
     )
 
     # --- Đơn vị / chức vụ hiện tại lấy từ phân công chính đang hiệu lực ---
@@ -87,6 +108,20 @@ class Employee(TimestampMixin, db.Model):
             "deleted_at": _iso(self.deleted_at),
             "created_at": _iso(self.created_at),
             "updated_at": _iso(self.updated_at),
+            # Hồ sơ mở rộng
+            "place_of_origin": self.place_of_origin,
+            "identity_issued_date": _iso(self.identity_issued_date),
+            "identity_issued_place": self.identity_issued_place,
+            "job_grade_code": self.job_grade_code,
+            "job_grade_name": self.job_grade_name,
+            "job_duties": self.job_duties,
+            "tenure_date": _iso(self.tenure_date),
+            "contract_type": self.contract_type,
+            "education_level": self.education_level,
+            "education_major": self.education_major,
+            "education_mode": self.education_mode,
+            "foreign_language_cert": self.foreign_language_cert,
+            "it_cert": self.it_cert,
         }
         # Trường nhạy cảm chỉ hiển thị khi có quyền employee.view_sensitive
         data["identity_number"] = self.identity_number if include_sensitive else None
@@ -100,6 +135,9 @@ class Employee(TimestampMixin, db.Model):
                         "id": current.unit.id,
                         "code": current.unit.code,
                         "name": current.unit.name,
+                        "path": current.unit.display_path,
+                        "group_name": current.unit.group_name,   # cột Phòng / Chi nhánh
+                        "section_name": current.unit.section_name,  # cột Bộ phận (có thể null)
                     }
                     if current.unit
                     else None
@@ -171,7 +209,14 @@ class EmployeeAssignment(TimestampMixin, db.Model):
             "decision_date": _iso(self.decision_date),
             "note": self.note,
             "created_by": self.created_by,
-            "unit": {"id": self.unit.id, "code": self.unit.code, "name": self.unit.name}
+            "unit": {
+                "id": self.unit.id,
+                "code": self.unit.code,
+                "name": self.unit.name,
+                "path": self.unit.display_path,
+                "group_name": self.unit.group_name,
+                "section_name": self.unit.section_name,
+            }
             if self.unit
             else None,
             "position": {
@@ -184,3 +229,48 @@ class EmployeeAssignment(TimestampMixin, db.Model):
             "created_at": _iso(self.created_at),
             "updated_at": _iso(self.updated_at),
         }
+
+
+class EmployeeEducation(TimestampMixin, db.Model):
+    """Bằng cấp / trình độ đào tạo của nhân sự (một người có thể nhiều bằng)."""
+
+    __tablename__ = "employee_education"
+    __table_args__ = (Index("ix_employee_education_employee_id", "employee_id"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    employee_id: Mapped[int] = mapped_column(
+        ForeignKey("employees.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    level: Mapped[str | None] = mapped_column(String(20))       # ĐH / Ths / CĐ / TC / TS
+    major: Mapped[str | None] = mapped_column(String(255))      # Ngành đào tạo
+    mode: Mapped[str | None] = mapped_column(String(50))        # Hệ: Chính quy / VLVH / Từ xa
+    institution: Mapped[str | None] = mapped_column(String(255))
+    is_highest: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+
+    employee: Mapped["Employee"] = relationship("Employee", back_populates="education")
+
+    def to_dict(self) -> dict:
+        return {
+            "id": self.id,
+            "employee_id": self.employee_id,
+            "level": self.level,
+            "major": self.major,
+            "mode": self.mode,
+            "institution": self.institution,
+            "is_highest": self.is_highest,
+        }
+
+
+class JobGrade(TimestampMixin, db.Model):
+    """Danh mục ngạch / chức danh nghề nghiệp (mã -> tên). Import tự tạo mã mới, tên có thể bổ sung sau."""
+
+    __tablename__ = "job_grades"
+    __table_args__ = (UniqueConstraint("code", name="uq_job_grades_code"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    code: Mapped[str] = mapped_column(String(30), nullable=False, index=True)
+    name: Mapped[str | None] = mapped_column(String(150))
+    category: Mapped[str | None] = mapped_column(String(30))  # "Viên chức" / "Hợp đồng"
+
+    def to_dict(self) -> dict:
+        return {"id": self.id, "code": self.code, "name": self.name, "category": self.category}

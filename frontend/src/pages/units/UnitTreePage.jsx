@@ -194,7 +194,7 @@ export default function UnitTreePage() {
                 .filter((u) => editing === "new" || u.id !== editing?.id)
                 .map((u) => (
                   <option key={u.id} value={u.id}>
-                    {u.code} – {u.name}
+                    {u.path || `${u.code} – ${u.name}`}
                   </option>
                 ))}
             </Select>

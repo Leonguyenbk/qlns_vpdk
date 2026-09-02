@@ -29,6 +29,22 @@ export default function EmployeeEditPage() {
     recruitment_date: data.recruitment_date || "",
     status: data.status,
     notes: data.notes || "",
+    // Đơn vị / chức vụ của phân công chính (sửa tại chỗ)
+    unit_id: data.current_unit?.id ?? "",
+    position_id: data.current_position?.id ?? "",
+    // Hồ sơ mở rộng
+    place_of_origin: data.place_of_origin || "",
+    identity_issued_date: data.identity_issued_date || "",
+    identity_issued_place: data.identity_issued_place || "",
+    job_grade_code: data.job_grade_code || "",
+    job_duties: data.job_duties || "",
+    tenure_date: data.tenure_date || "",
+    contract_type: data.contract_type || "",
+    education_level: data.education_level || "",
+    education_major: data.education_major || "",
+    education_mode: data.education_mode || "",
+    foreign_language_cert: data.foreign_language_cert || "",
+    it_cert: data.it_cert || "",
   };
 
   const onSubmit = async (values) => {
@@ -47,7 +63,7 @@ export default function EmployeeEditPage() {
     <div className="mx-auto max-w-4xl">
       <PageHeader
         title={`Chỉnh sửa: ${data.full_name}`}
-        subtitle="Chỉnh sửa hồ sơ không thay đổi đơn vị/chức vụ. Dùng chức năng Chuyển đơn vị để điều chuyển."
+        subtitle="Sửa được cả chức vụ và đơn vị của phân công hiện tại. Điều chuyển kèm quyết định thì dùng chức năng Chuyển đơn vị."
         actions={<Button variant="secondary" onClick={() => navigate(-1)}>Quay lại</Button>}
       />
       <EmployeeForm

@@ -44,6 +44,20 @@ _PROFILE_FIELDS = {
     "status",
     "avatar_url",
     "notes",
+    # hồ sơ mở rộng (nguồn: biểu "Phụ lục 4")
+    "place_of_origin",
+    "identity_issued_date",
+    "identity_issued_place",
+    "job_grade_code",
+    "job_grade_name",
+    "job_duties",
+    "tenure_date",
+    "contract_type",
+    "education_level",
+    "education_major",
+    "education_mode",
+    "foreign_language_cert",
+    "it_cert",
 }
 
 
@@ -102,6 +116,18 @@ def _validate_profile(data: dict, *, partial: bool) -> dict:
         if f in data:
             out[f] = clean_str(data.get(f))
 
+    # Hồ sơ mở rộng (nguồn: biểu "Phụ lục 4")
+    for f in ("identity_issued_date", "tenure_date"):
+        if f in data:
+            out[f] = parse_date(data.get(f), f)
+    for f in (
+        "place_of_origin", "identity_issued_place", "job_grade_code", "job_grade_name",
+        "job_duties", "contract_type", "education_level", "education_major",
+        "education_mode", "foreign_language_cert", "it_cert",
+    ):
+        if f in data:
+            out[f] = clean_str(data.get(f))
+
     return out
 
 
@@ -129,7 +155,7 @@ def list_employees(args, *, actor, scope) -> dict:
         status=clean_str(args.get("status")),
         employment_type=clean_str(args.get("employment_type")),
         include_deleted=str(args.get("include_deleted", "")).lower() in ("1", "true", "yes"),
-        sort=args.get("sort", "updated_at"),
+        sort=args.get("sort") or "hierarchy",
         order=args.get("order", "desc"),
         page=page,
         page_size=page_size,
@@ -247,6 +273,24 @@ def update_employee(employee_id: int, data: dict, *, actor, scope, meta: dict) -
     for f in _PROFILE_FIELDS:
         if f in payload:
             setattr(emp, f, payload[f])
+
+    # Sửa đơn vị / chức vụ của phân công chính ngay tại chỗ (không tạo lượt chuyển mới).
+    new_unit_id = _to_int(data.get("unit_id"))
+    new_position_id = _to_int(data.get("position_id"))
+    if current is not None and (new_unit_id or new_position_id):
+        target_unit_id = new_unit_id or current.unit_id
+        target_position_id = new_position_id or current.position_id
+        if target_unit_id != current.unit_id:
+            _assert_scope(actor, scope, target_unit_id, action="sửa")
+            u = db.session.get(OrganizationUnit, target_unit_id)
+            if u is None or not u.is_active:
+                raise ValidationError("Đơn vị không tồn tại hoặc đã ngừng hoạt động.")
+        if target_position_id != current.position_id:
+            p = db.session.get(Position, target_position_id)
+            if p is None or not p.is_active:
+                raise ValidationError("Chức vụ không tồn tại hoặc đã ngừng hoạt động.")
+        current.unit_id = target_unit_id
+        current.position_id = target_position_id
 
     db.session.flush()
     record_audit(
@@ -442,12 +486,104 @@ def transfer_employee(employee_id: int, data: dict, *, actor, scope, meta: dict)
     return data_out
 
 
+_STATUS_VI = {
+    "WORKING": "Đang làm việc", "ON_LEAVE": "Nghỉ phép", "RETIRED": "Nghỉ hưu",
+    "RESIGNED": "Đã nghỉ việc", "TRANSFERRED": "Đã chuyển công tác", "INACTIVE": "Ngừng hoạt động",
+}
+_EMPTYPE_VI = {
+    "OFFICIAL": "Viên chức", "CONTRACT": "Hợp đồng lao động",
+    "PROBATION": "Thử việc", "COLLABORATOR": "Cộng tác viên", "SECONDED": "Biệt phái",
+}
+
+
+def export_employees(args, *, actor, scope):
+    """Xuất danh sách nhân sự ra Excel theo bố cục "Phụ lục 4". Trả về BytesIO."""
+    from datetime import date as _date
+
+    from ..exports.phu_luc_4 import build_workbook
+
+    unit_id = _to_int(args.get("unit_id"))
+    position_id = _to_int(args.get("position_id"))
+    status = clean_str(args.get("status"))
+    employment_type = clean_str(args.get("employment_type"))
+    keyword = clean_str(args.get("keyword") or args.get("q"))
+    include_deleted = str(args.get("include_deleted", "")).lower() in ("1", "true", "yes")
+
+    rows = repo.list_for_export(
+        scope=scope, keyword=keyword, unit_id=unit_id, position_id=position_id,
+        status=status, employment_type=employment_type, include_deleted=include_deleted,
+    )
+
+    units = db.session.query(OrganizationUnit).all()
+    by_id = {u.id: u for u in units}
+
+    notes = []
+    if keyword:
+        notes.append(f'từ khoá "{keyword}"')
+    if unit_id and unit_id in by_id:
+        notes.append(f"đơn vị: {by_id[unit_id].display_path}")
+    if position_id:
+        p = db.session.get(Position, position_id)
+        if p:
+            notes.append(f"chức vụ: {p.name}")
+    if status:
+        notes.append(f"trạng thái: {_STATUS_VI.get(status, status)}")
+    if employment_type:
+        notes.append(f"loại: {_EMPTYPE_VI.get(employment_type, employment_type)}")
+    if include_deleted:
+        notes.append("gồm cả hồ sơ đã xoá")
+
+    as_of_raw = clean_str(args.get("as_of"))
+    try:
+        as_of = _date.fromisoformat(as_of_raw) if as_of_raw else None
+    except ValueError:
+        as_of = None
+
+    return build_workbook(
+        rows, by_id, as_of=as_of,
+        include_identity=_can_view_sensitive(actor),
+        filter_note=" · ".join(notes) if notes else None,
+    )
+
+
 def dashboard(*, actor, scope) -> dict:
     counts = repo.dashboard_counts(scope)
-    unit_names = {
-        u.id: u.name
-        for u in db.session.query(OrganizationUnit).all()
-    }
+    direct = counts["by_unit"]  # {unit_id: số người phân công thẳng vào đơn vị đó}
+
+    units = db.session.query(OrganizationUnit).all()
+    by_id = {u.id: u for u in units}
+    children_of: dict[int | None, list] = {}
+    for u in units:
+        children_of.setdefault(u.parent_id, []).append(u)
+    for lst in children_of.values():
+        lst.sort(key=lambda x: (x.sort_index if x.sort_index is not None else 1_000_000, x.name))
+
+    def _kids(u):
+        # Văn phòng tỉnh (HEAD_OFFICE): chỉ gộp các phòng/ban của nó, KHÔNG gộp chi nhánh
+        # (chi nhánh là mục cấp cao nhất riêng).
+        ch = children_of.get(u.id, [])
+        if u.unit_type == "HEAD_OFFICE":
+            ch = [c for c in ch if c.unit_type != "BRANCH"]
+        return ch
+
+    def subtree_count(u) -> int:
+        return direct.get(u.id, 0) + sum(subtree_count(c) for c in _kids(u))
+
+    def node(u) -> dict | None:
+        total = subtree_count(u)
+        if total == 0:
+            return None
+        kids = [n for n in (node(c) for c in _kids(u)) if n]
+        own = direct.get(u.id, 0)  # người phân công thẳng vào đơn vị này
+        if own and kids:
+            kids.append({"id": -u.id, "name": "(Trực thuộc)", "count": own, "children": []})
+        return {"id": u.id, "name": u.name, "count": total, "children": kids}
+
+    # Cấp cao nhất: Văn phòng tỉnh + từng chi nhánh (đứng ngang hàng)
+    tops = [u for u in units if u.unit_type in ("HEAD_OFFICE", "BRANCH")]
+    tops.sort(key=lambda x: (x.sort_index if x.sort_index is not None else 1_000_000, x.name))
+    by_unit_tree = [n for n in (node(u) for u in tops) if n]
+
     recent = (
         db.session.query(EmployeeAssignment)
         .filter(EmployeeAssignment.assignment_type == "TRANSFER")
@@ -460,13 +596,12 @@ def dashboard(*, actor, scope) -> dict:
         if not scope.is_global and a.unit_id not in scope.unit_ids:
             continue
         recent_out.append(a.to_dict())
+
     return {
         "total_working": counts["total_working"],
         "by_status": counts["by_status"],
-        "by_unit": [
-            {"unit_id": uid, "unit_name": unit_names.get(uid, "Không rõ"), "count": c}
-            for uid, c in counts["by_unit"].items()
-        ],
+        "units_with_staff": len([1 for c in direct.values() if c]),
+        "by_unit": by_unit_tree,
         "recent_transfers": recent_out,
     }
 

@@ -154,21 +154,54 @@ việc mật khẩu bị đặt lại ngoài ý muốn ở lần khởi động 
 
 ## 6. Chạy bằng Docker Compose
 
-Yêu cầu: Docker Desktop.
+Yêu cầu: Docker Desktop (hoặc Docker Engine + plugin compose).
+
+### 6.1. Chạy nhanh trên một máy bất kỳ (chỉ để xem giao diện)
 
 ```bash
-cd personnel-management
-cp .env.example .env            # bắt buộc đổi toàn bộ mật khẩu/secret mẫu
-docker compose up --build
+git clone https://github.com/Leonguyenbk/qlns_vpdk.git
+cd qlns_vpdk/personnel-management        # thư mục chứa docker-compose.yml
+cp .env.example .env                     # đổi toàn bộ mật khẩu/secret mẫu
+docker compose up --build                # lần đầu build ~vài phút
 ```
 
-- Frontend: <http://localhost:8080>
+- Frontend: <http://localhost:8080> — đăng nhập bằng `ADMIN_USERNAME` / `ADMIN_PASSWORD` trong `.env`
 - Backend API: <http://localhost:5000/api> · health: <http://localhost:5000/api/health>
 - MySQL: `localhost:3306`
 
-Container `backend` tự động: chờ MySQL healthy → `flask db upgrade` → seed dữ liệu mẫu (khi `SEED_ON_START=true`) → tạo tài khoản admin. Có `healthcheck` cho cả MySQL và backend.
+Container `backend` tự động: chờ MySQL healthy → `flask db upgrade` (gồm migration `0003` hồ sơ mở rộng, `0004` `sort_index`) → seed dữ liệu mẫu (khi `SEED_ON_START=true`) → tạo tài khoản admin → (tùy chọn) import "Phụ lục 4". Có `healthcheck` cho cả MySQL và backend.
 
-Dừng: `docker compose down` (giữ dữ liệu) · `docker compose down -v` (xóa dữ liệu).
+Dừng: `docker compose down` (giữ dữ liệu) · `docker compose down -v` (xóa sạch DB).
+
+### 6.2. Nạp dữ liệu nhân sự thật ("Phụ lục 4")
+
+File Excel thật **không** nằm trong repo (chứa CCCD, địa chỉ). Có 2 cách nạp:
+
+**Cách A — tự động lúc khởi động:**
+
+```bash
+mkdir -p backend/data
+cp "/đường/dẫn/Phụ lục 4.xlsx" backend/data/pl4.xlsx
+# trong .env:
+#   SEED_ON_START=false
+#   IMPORT_PHULUC4=/data/pl4.xlsx
+docker compose up --build
+```
+
+**Cách B — chạy tay khi container đã lên:**
+
+```bash
+docker compose cp "Phụ lục 4.xlsx" backend:/data/pl4.xlsx
+docker compose exec backend flask --app wsgi import-phuluc4 /data/pl4.xlsx --dry-run   # xem trước
+docker compose exec backend flask --app wsgi import-phuluc4 /data/pl4.xlsx --commit    # ghi thật
+docker compose exec backend flask --app wsgi reindex-units
+```
+
+Import là **idempotent theo CCCD** (chạy lại chỉ cập nhật, không nhân đôi). Chi tiết cột/thứ bậc/enum: `backend/docs/IMPORT_PHU_LUC_4.md`.
+
+### 6.3. Xuất Excel
+
+Trang **Danh sách nhân sự** có nút **"Xuất Excel (Phụ lục 4)"** — tạo file `.xlsx` đúng bố cục nguồn (font Times New Roman), tôn trọng bộ lọc đang áp dụng; không lọc thì xuất toàn bộ theo phạm vi đơn vị của tài khoản.
 
 ---
 

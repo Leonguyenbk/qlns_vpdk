@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import logging
 
+import click
 from flask import Flask, jsonify
 from sqlalchemy import text
 
@@ -134,3 +135,28 @@ def _register_cli(app: Flask) -> None:
         from scripts.create_admin import run_create_admin
 
         run_create_admin()
+
+    @app.cli.command("import-phuluc4")
+    @click.argument("path")
+    @click.option("--sheet", default=None, help="Tên sheet (mặc định: sheet đầu tiên).")
+    @click.option("--dry-run/--commit", default=True, help="Mặc định dry-run; --commit để ghi DB.")
+    @click.option("--as-of", default=None, help="Ngày chốt số liệu YYYY-MM-DD (mặc định hôm nay).")
+    def import_phuluc4_command(path, sheet, dry_run, as_of):
+        """Nhập danh sách viên chức/NLĐ từ file Excel "Phụ lục 4" vào bảng employees."""
+        from datetime import date
+
+        from app.imports.phu_luc_4 import import_workbook
+
+        as_of_date = date.fromisoformat(as_of) if as_of else None
+        report = import_workbook(path, sheet=sheet, dry_run=dry_run, as_of=as_of_date)
+        click.echo(report.render())
+
+    @app.cli.command("reindex-units")
+    def reindex_units_command():
+        """Đánh lại organization_units.sort_index (thứ tự cây) để sắp xếp nhân sự."""
+        from app.extensions import db
+        from app.services.org_index import reindex_units
+
+        n = reindex_units()
+        db.session.commit()
+        click.echo(f"Đã đánh lại sort_index cho {n} đơn vị.")

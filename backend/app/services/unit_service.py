@@ -8,6 +8,7 @@ from ..models import OrganizationUnit
 from ..models.enums import UNIT_TYPES
 from ..repositories import unit_repository as repo
 from .audit_service import record_audit
+from .org_index import reindex_units
 
 
 def _check_no_cycle(unit_id: int, new_parent_id: int | None) -> None:
@@ -118,6 +119,7 @@ def create_unit(data: dict, *, actor, meta: dict) -> dict:
         new_values=unit.to_dict(),
         **meta,
     )
+    reindex_units()
     db.session.commit()
     return unit.to_dict(include_relations=True)
 
@@ -151,6 +153,7 @@ def update_unit(unit_id: int, data: dict, *, actor, meta: dict) -> dict:
         new_values=unit.to_dict(),
         **meta,
     )
+    reindex_units()
     db.session.commit()
     return unit.to_dict(include_relations=True)
 
@@ -189,5 +192,6 @@ def deactivate_unit(unit_id: int, *, actor, meta: dict) -> dict:
         new_values=None if hard_deleted else unit.to_dict(),
         **meta,
     )
+    reindex_units()
     db.session.commit()
     return {"hard_deleted": hard_deleted, "message": message}

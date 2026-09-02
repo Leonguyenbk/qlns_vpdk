@@ -4,7 +4,7 @@ from __future__ import annotations
 from sqlalchemy import or_, select
 
 from ..extensions import db
-from ..models import Employee, EmployeeAssignment
+from ..models import Employee, EmployeeAssignment, OrganizationUnit, Position
 
 _SORT_MAP = {
     "full_name": Employee.full_name,
@@ -40,6 +40,55 @@ def _current_unit_subquery():
     )
 
 
+def list_for_export(
+    *,
+    scope,
+    keyword: str | None = None,
+    unit_id: int | None = None,
+    position_id: int | None = None,
+    status: str | None = None,
+    employment_type: str | None = None,
+    include_deleted: bool = False,
+) -> list[Employee]:
+    """Toàn bộ nhân sự khớp bộ lọc (không phân trang), sắp theo cơ cấu tổ chức."""
+    cur = _current_unit_subquery()
+    query = db.session.query(Employee).outerjoin(cur, cur.c.employee_id == Employee.id)
+    if not include_deleted:
+        query = query.filter(Employee.is_deleted.is_(False))
+    if not scope.is_global:
+        query = query.filter(cur.c.unit_id.in_(scope.unit_ids) if scope.unit_ids else db.false())
+    if keyword:
+        like = f"%{keyword.strip()}%"
+        query = query.filter(
+            or_(
+                Employee.employee_code.ilike(like),
+                Employee.full_name.ilike(like),
+                Employee.phone.ilike(like),
+            )
+        )
+    if unit_id:
+        query = query.filter(cur.c.unit_id == unit_id)
+    if position_id:
+        query = query.filter(cur.c.position_id == position_id)
+    if status:
+        query = query.filter(Employee.status == status)
+    if employment_type:
+        query = query.filter(Employee.employment_type == employment_type)
+
+    _BIG = 1_000_000_000
+    query = (
+        query.outerjoin(OrganizationUnit, OrganizationUnit.id == cur.c.unit_id)
+        .outerjoin(Position, Position.id == cur.c.position_id)
+        .order_by(
+            db.func.coalesce(OrganizationUnit.sort_index, _BIG).asc(),
+            db.func.coalesce(Position.level, _BIG).asc(),
+            Employee.full_name.asc(),
+            Employee.id.asc(),
+        )
+    )
+    return query.all()
+
+
 def search(
     *,
     scope,
@@ -49,7 +98,7 @@ def search(
     status: str | None = None,
     employment_type: str | None = None,
     include_deleted: bool = False,
-    sort: str = "updated_at",
+    sort: str = "hierarchy",
     order: str = "desc",
     page: int = 1,
     page_size: int = 20,
@@ -91,9 +140,23 @@ def search(
 
     total = query.order_by(None).count()
 
-    sort_col = _SORT_MAP.get(sort, Employee.updated_at)
-    sort_col = sort_col.desc() if order.lower() == "desc" else sort_col.asc()
-    query = query.order_by(sort_col, Employee.id.desc())
+    if sort not in _SORT_MAP:
+        # Mặc định: sắp theo cơ cấu tổ chức (đơn vị theo cây) rồi thứ hạng chức vụ.
+        _BIG = 1_000_000_000
+        query = (
+            query.outerjoin(OrganizationUnit, OrganizationUnit.id == cur.c.unit_id)
+            .outerjoin(Position, Position.id == cur.c.position_id)
+            .order_by(
+                db.func.coalesce(OrganizationUnit.sort_index, _BIG).asc(),
+                db.func.coalesce(Position.level, _BIG).asc(),
+                Employee.full_name.asc(),
+                Employee.id.asc(),
+            )
+        )
+    else:
+        sort_col = _SORT_MAP[sort]
+        sort_col = sort_col.desc() if order.lower() == "desc" else sort_col.asc()
+        query = query.order_by(sort_col, Employee.id.desc())
 
     rows = query.offset((page - 1) * page_size).limit(page_size).all()
     return rows, total

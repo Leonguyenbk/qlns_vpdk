@@ -13,6 +13,7 @@ import { ASSIGNMENT_TYPE_LABELS } from "../../lib/constants";
 import { PageHeader, Button, Card, FormField, Select, TextInput, Textarea } from "../../components/ui/primitives";
 import { LoadingState, ErrorState } from "../../components/ui/DataStates";
 import { ConfirmDialog } from "../../components/ui/Modal";
+import { UnitPicker } from "../../components/units/UnitPicker";
 
 export default function EmployeeTransferPage() {
   const { id } = useParams();
@@ -27,6 +28,8 @@ export default function EmployeeTransferPage() {
   const {
     register,
     handleSubmit,
+    setValue,
+    watch,
     formState: { errors },
   } = useForm({
     resolver: zodResolver(transferSchema),
@@ -66,7 +69,7 @@ export default function EmployeeTransferPage() {
       <Card className="mb-4 grid gap-2 md:grid-cols-2">
         <div className="text-sm">
           <span className="text-slate-500">Đơn vị hiện tại: </span>
-          <span className="font-medium">{emp.current_unit?.name || "—"}</span>
+          <span className="font-medium">{emp.current_unit?.path || emp.current_unit?.name || "—"}</span>
         </div>
         <div className="text-sm">
           <span className="text-slate-500">Chức vụ hiện tại: </span>
@@ -76,16 +79,17 @@ export default function EmployeeTransferPage() {
 
       <form onSubmit={handleSubmit((v) => send(v, false))} className="card space-y-4 p-5">
         <div className="grid gap-4 md:grid-cols-2">
-          <FormField label="Đơn vị mới" required error={errors.to_unit_id?.message}>
-            <Select {...register("to_unit_id")} error={errors.to_unit_id}>
-              <option value="">-- Chọn đơn vị --</option>
-              {units?.map((u) => (
-                <option key={u.id} value={u.id}>
-                  {u.code} – {u.name}
-                </option>
-              ))}
-            </Select>
-          </FormField>
+          <div className="md:col-span-2">
+            <FormField label="Đơn vị mới" required error={errors.to_unit_id?.message}>
+              <input type="hidden" {...register("to_unit_id")} />
+              <UnitPicker
+                units={units || []}
+                value={watch("to_unit_id")}
+                error={errors.to_unit_id ? " " : undefined}
+                onChange={(id) => setValue("to_unit_id", id, { shouldValidate: true })}
+              />
+            </FormField>
+          </div>
           <FormField label="Chức vụ mới" required error={errors.to_position_id?.message}>
             <Select {...register("to_position_id")} error={errors.to_position_id}>
               <option value="">-- Chọn chức vụ --</option>

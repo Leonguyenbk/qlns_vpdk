@@ -1,43 +1,305 @@
+@import "./fonts.css";
+@import "../tokens.css";
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
+/* ──────────────────────────────────────────────────────────────
+   Base — light admin dashboard: white surfaces on a very-light-gray canvas.
+   ────────────────────────────────────────────────────────────── */
 @layer base {
   html,
   body,
   #root {
     height: 100%;
   }
+  html,
   body {
-    @apply bg-slate-100 text-slate-800 antialiased;
+    overflow-x: clip;
+  }
+  body {
+    background: var(--color-canvas);
+    color: var(--color-ink-2);
+    font-family: var(--font-body);
+    font-size: var(--text-base);
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4 {
+    font-family: var(--font-display);
+    font-weight: var(--display-weight);
+    font-style: normal; /* headings are always roman */
+    color: var(--color-ink);
+    letter-spacing: var(--tracking-tight);
+  }
+
+  /* Tabular figures everywhere numbers stack (tables, dashboards, pagination) */
+  table,
+  .tabular {
+    font-variant-numeric: tabular-nums;
+  }
+
+  ::selection {
+    background: var(--color-accent);
+    color: var(--color-accent-ink);
+  }
+
+  :focus {
+    outline: none;
+  }
+  :focus-visible {
+    outline: 2px solid var(--color-focus);
+    outline-offset: 2px;
+    border-radius: inherit;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
   }
 }
 
+/* ──────────────────────────────────────────────────────────────
+   Components — same class names the pages already use, re-voiced for Cobalt.
+   ────────────────────────────────────────────────────────────── */
 @layer components {
+  /* Mono machine-readout label — eyebrows, meta, codes, kbd hints */
+  .eyebrow {
+    font-family: var(--font-mono);
+    font-size: var(--text-xs);
+    font-weight: 500;
+    letter-spacing: var(--tracking-label);
+    text-transform: uppercase;
+    color: var(--color-muted);
+  }
+  .mono {
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* ── Buttons — 6px radius, one cobalt primary, instant focus, 1px press ── */
   .btn {
-    @apply inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition
-      focus:outline-none focus:ring-2 focus:ring-offset-1 disabled:cursor-not-allowed disabled:opacity-50;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-xs);
+    min-height: 2.25rem;
+    padding: 0.5rem 0.875rem;
+    border-radius: var(--radius-pill);
+    border: var(--border-hairline) solid transparent;
+    font-family: var(--font-body);
+    font-size: var(--text-sm);
+    font-weight: 500;
+    white-space: nowrap;
+    cursor: pointer;
+    transition: background-color var(--dur-short) var(--ease-out),
+      border-color var(--dur-short) var(--ease-out),
+      color var(--dur-short) var(--ease-out), transform var(--dur-instant) var(--ease-out);
   }
+  .btn:active {
+    transform: translateY(1px);
+  }
+  .btn:disabled,
+  .btn[aria-disabled="true"] {
+    opacity: 0.5;
+    cursor: not-allowed;
+    transform: none;
+  }
+
   .btn-primary {
-    @apply btn bg-brand-600 text-white hover:bg-brand-700 focus:ring-brand-500;
+    background-image: var(--gradient-brand-h);
+    background-color: var(--color-accent);
+    color: var(--color-accent-ink);
+    border-color: transparent;
+    transition: box-shadow var(--dur-short) var(--ease-out),
+      transform var(--dur-short) var(--ease-out), filter var(--dur-short) var(--ease-out);
   }
+  .btn-primary:not(:disabled):hover {
+    transform: translateY(-1px);
+    box-shadow: var(--shadow-btn);
+    filter: brightness(1.06);
+  }
+  .btn-primary:not(:disabled):active {
+    transform: translateY(0);
+  }
+
   .btn-secondary {
-    @apply btn border border-slate-300 bg-white text-slate-700 hover:bg-slate-50 focus:ring-brand-500;
+    background: var(--color-paper);
+    color: var(--color-ink-2);
+    border-color: var(--color-rule-2);
   }
+  .btn-secondary:not(:disabled):hover {
+    background: var(--color-paper-2);
+    border-color: #c7d2fe;
+    color: var(--color-accent-text);
+  }
+
   .btn-danger {
-    @apply btn bg-red-600 text-white hover:bg-red-700 focus:ring-red-500;
+    background: var(--color-danger);
+    color: var(--color-accent-ink);
+    border-color: var(--color-danger);
   }
+  .btn-danger:not(:disabled):hover {
+    background: var(--color-danger-strong);
+    border-color: var(--color-danger-strong);
+  }
+
+  .btn-ghost {
+    background: transparent;
+    color: var(--color-neutral);
+    border-color: transparent;
+  }
+  .btn-ghost:not(:disabled):hover {
+    background: var(--color-paper-3);
+    color: var(--color-ink);
+  }
+
+  /* ── Inputs — border-width constant across every state; ring in a reserved slot ── */
   .input {
-    @apply w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm
-      focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 disabled:bg-slate-100;
+    display: block;
+    width: 100%;
+    min-height: 2.25rem;
+    padding: 0.5rem 0.75rem;
+    border: var(--border-hairline) solid var(--color-rule-2);
+    border-radius: var(--radius-input);
+    background: var(--color-paper);
+    color: var(--color-ink);
+    font-family: var(--font-body);
+    font-size: var(--text-sm);
+    box-shadow: 0 0 0 0 transparent; /* reserved slot — soft focus halo, no geometry shift */
+    transition: border-color var(--dur-short) var(--ease-out),
+      box-shadow var(--dur-short) var(--ease-out),
+      background-color var(--dur-short) var(--ease-out);
   }
+  .input::placeholder {
+    color: var(--color-muted);
+  }
+  @media (hover: hover) {
+    .input:hover:not(:disabled):not(:focus) {
+      background: var(--color-paper-2);
+    }
+  }
+  .input:focus-visible {
+    outline: none;
+    border-color: var(--color-focus);
+    box-shadow: 0 0 0 3px var(--color-focus-ring);
+  }
+  .input:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+    background: var(--color-paper-2);
+  }
+  .input[aria-invalid="true"] {
+    border-color: var(--color-danger);
+  }
+  textarea.input {
+    min-height: 6rem;
+    resize: vertical;
+    line-height: 1.55;
+  }
+  select.input {
+    cursor: pointer;
+  }
+
   .label {
-    @apply mb-1 block text-sm font-medium text-slate-700;
+    display: block;
+    margin-bottom: var(--space-2xs);
+    font-family: var(--font-body);
+    font-size: var(--text-sm);
+    font-weight: 500;
+    color: var(--color-ink-2);
   }
+
+  /* ── Card — one hairline, one containment layer, no drop shadow ── */
   .card {
-    @apply rounded-xl border border-slate-200 bg-white shadow-sm;
+    background: var(--color-paper);
+    border: var(--border-hairline) solid var(--color-rule);
+    border-radius: var(--radius-card);
+    box-shadow: var(--shadow-card);
   }
+
+  /* ── Badge — hairline chip; colour always rides with a word ── */
   .badge {
-    @apply inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    padding: 0.125rem 0.5rem;
+    border-radius: var(--radius-pill);
+    border: var(--border-hairline) solid var(--color-rule-2);
+    background: var(--color-paper);
+    color: var(--color-neutral);
+    font-size: var(--text-xs);
+    font-weight: 500;
+    line-height: 1.5;
+    white-space: nowrap;
+  }
+  .badge-ok {
+    border-color: transparent;
+    background: var(--color-ok-quiet);
+    color: var(--color-ok-text);
+  }
+  .badge-warn {
+    border-color: transparent;
+    background: var(--color-warn-quiet);
+    color: var(--color-warn-text);
+  }
+  .badge-danger {
+    border-color: transparent;
+    background: var(--color-danger-quiet);
+    color: var(--color-danger-text);
+  }
+  .badge-info {
+    border-color: transparent;
+    background: var(--color-accent-quiet);
+    color: var(--color-accent-text);
+  }
+  .badge-neutral {
+    border-color: transparent;
+    background: var(--color-paper-3);
+    color: var(--color-neutral);
+  }
+
+  /* Typographic link — cobalt underline grows on hover */
+  .link {
+    color: var(--color-accent);
+    text-decoration: none;
+    background-image: linear-gradient(currentColor, currentColor);
+    background-size: 0% 1px;
+    background-position: 0 100%;
+    background-repeat: no-repeat;
+    transition: background-size var(--dur-short) var(--ease-out);
+  }
+  .link:hover {
+    background-size: 100% 1px;
+  }
+
+  /* One-shot reveal for a page's first paint (dashboard) */
+  .reveal {
+    opacity: 0;
+    transform: translateY(8px);
+    transition: opacity var(--dur-reveal) var(--ease-out),
+      transform var(--dur-reveal) var(--ease-out);
+  }
+  .reveal.is-in {
+    opacity: 1;
+    transform: none;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .reveal {
+      opacity: 1;
+      transform: none;
+    }
   }
 }

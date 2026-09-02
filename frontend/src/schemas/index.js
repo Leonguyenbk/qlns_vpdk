@@ -51,6 +51,21 @@ export const employeeSchema = z.object({
     .enum(["WORKING", "ON_LEAVE", "RETIRED", "RESIGNED", "TRANSFERRED", "INACTIVE"])
     .optional(),
   notes: z.string().trim().optional().or(z.literal("")),
+  // Chức vụ của phân công chính — chỉ dùng ở chế độ sửa
+  position_id: z.coerce.number().int().positive().optional().or(z.literal("")),
+  // Hồ sơ mở rộng (nguồn: biểu "Phụ lục 4")
+  place_of_origin: z.string().trim().optional().or(z.literal("")),
+  identity_issued_date: z.string().optional().or(z.literal("")),
+  identity_issued_place: z.string().trim().optional().or(z.literal("")),
+  job_grade_code: z.string().trim().optional().or(z.literal("")),
+  job_duties: z.string().trim().optional().or(z.literal("")),
+  tenure_date: z.string().optional().or(z.literal("")),
+  contract_type: z.string().trim().optional().or(z.literal("")),
+  education_level: z.string().trim().optional().or(z.literal("")),
+  education_major: z.string().trim().optional().or(z.literal("")),
+  education_mode: z.string().trim().optional().or(z.literal("")),
+  foreign_language_cert: z.string().trim().optional().or(z.literal("")),
+  it_cert: z.string().trim().optional().or(z.literal("")),
 });
 
 export const employeeCreateSchema = employeeSchema.extend({

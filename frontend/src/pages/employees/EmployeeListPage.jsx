@@ -7,6 +7,7 @@ import { usePositions } from "../../hooks/usePositions";
 import { useCan } from "../../components/Can";
 import { PERMISSIONS, EMPLOYEE_STATUS_LABELS, EMPLOYEE_STATUS_BADGE } from "../../lib/constants";
 import { apiErrorMessage } from "../../lib/api";
+import { downloadFile } from "../../lib/download";
 import { formatDate } from "../../lib/format";
 import { PageHeader, Button, Badge, Avatar, TextInput, Select } from "../../components/ui/primitives";
 import { Table, Pagination } from "../../components/ui/Table";
@@ -20,14 +21,15 @@ const DEFAULT_FILTERS = {
   status: "",
   page: 1,
   page_size: 10,
-  sort: "updated_at",
-  order: "desc",
+  sort: "hierarchy",
+  order: "asc",
   include_deleted: "",
 };
 
 export default function EmployeeListPage() {
   const [filters, setFilters] = useState(DEFAULT_FILTERS);
   const [pendingDelete, setPendingDelete] = useState(null);
+  const [exporting, setExporting] = useState(false);
   const navigate = useNavigate();
   const { can } = useCan();
 
@@ -36,6 +38,18 @@ export default function EmployeeListPage() {
     Object.keys(p).forEach((k) => p[k] === "" && delete p[k]);
     return p;
   }, [filters]);
+
+  const onExport = async () => {
+    setExporting(true);
+    try {
+      const { page, page_size, sort, order, ...f } = params; // eslint-disable-line no-unused-vars
+      await downloadFile("/employees/export", { params: f, fallbackName: "Phu luc 4.xlsx" });
+    } catch (err) {
+      toast.error(apiErrorMessage(err, "Xuất Excel thất bại"));
+    } finally {
+      setExporting(false);
+    }
+  };
 
   const { data, isLoading, isError, error, refetch, isFetching } = useEmployees(params);
   const { data: units } = useUnits({ only_active: true });
@@ -82,7 +96,16 @@ export default function EmployeeListPage() {
         </div>
       ),
     },
-    { key: "current_unit", header: "Đơn vị", render: (r) => r.current_unit?.name || "—" },
+    {
+      key: "unit_group",
+      header: "Phòng / Chi nhánh",
+      render: (r) => r.current_unit?.group_name || "—",
+    },
+    {
+      key: "unit_section",
+      header: "Bộ phận",
+      render: (r) => r.current_unit?.section_name || "—",
+    },
     { key: "current_position", header: "Chức vụ", render: (r) => r.current_position?.name || "—" },
     {
       key: "status",
@@ -151,9 +174,14 @@ export default function EmployeeListPage() {
         title="Danh sách nhân sự"
         subtitle="Danh sách được lọc theo phạm vi đơn vị của tài khoản"
         actions={
-          can(PERMISSIONS.EMPLOYEE_CREATE) && (
-            <Button onClick={() => navigate("/employees/new")}>+ Thêm nhân sự</Button>
-          )
+          <>
+            <Button variant="secondary" onClick={onExport} disabled={exporting}>
+              {exporting ? "Đang xuất…" : "Xuất Excel (Phụ lục 4)"}
+            </Button>
+            {can(PERMISSIONS.EMPLOYEE_CREATE) && (
+              <Button onClick={() => navigate("/employees/new")}>+ Thêm nhân sự</Button>
+            )}
+          </>
         }
       />
 
@@ -167,7 +195,7 @@ export default function EmployeeListPage() {
           <option value="">Tất cả đơn vị</option>
           {units?.map((u) => (
             <option key={u.id} value={u.id}>
-              {u.name}
+              {u.path || u.name}
             </option>
           ))}
         </Select>
@@ -202,6 +230,7 @@ export default function EmployeeListPage() {
             setFilter({ sort, order });
           }}
         >
+          <option value="hierarchy:asc">Theo cơ cấu tổ chức</option>
           <option value="updated_at:desc">Mới cập nhật</option>
           <option value="full_name:asc">Tên A→Z</option>
           <option value="full_name:desc">Tên Z→A</option>

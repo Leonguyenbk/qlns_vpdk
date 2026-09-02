@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from .audit import AuditLog
-from .employee import Employee, EmployeeAssignment
+from .employee import Employee, EmployeeAssignment, EmployeeEducation, JobGrade
 from .organization import OrganizationUnit
 from .position import Position, UnitPositionLimit
 from .rbac import Permission, Role, UserUnitScope, role_permissions, user_roles
@@ -13,6 +13,8 @@ __all__ = [
     "AuditLog",
     "Employee",
     "EmployeeAssignment",
+    "EmployeeEducation",
+    "JobGrade",
     "OrganizationUnit",
     "Position",
     "UnitPositionLimit",

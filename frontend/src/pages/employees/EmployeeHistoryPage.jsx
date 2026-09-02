@@ -13,7 +13,8 @@ export default function EmployeeHistoryPage() {
   const { data, isLoading, isError, error, refetch } = useEmployeeAssignments(id);
 
   const columns = [
-    { key: "unit", header: "Đơn vị", render: (r) => r.unit?.name },
+    { key: "unit_group", header: "Phòng / Chi nhánh", render: (r) => r.unit?.group_name || r.unit?.name },
+    { key: "unit_section", header: "Bộ phận", render: (r) => r.unit?.section_name || "—" },
     { key: "position", header: "Chức vụ", render: (r) => r.position?.name },
     {
       key: "assignment_type",

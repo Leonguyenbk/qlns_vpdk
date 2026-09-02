@@ -9,3 +9,5 @@ htmlcov/
 .env
 tests/
 .git/
+data/
+instance/

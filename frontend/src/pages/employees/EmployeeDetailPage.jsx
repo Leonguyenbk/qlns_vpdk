@@ -87,7 +87,7 @@ export default function EmployeeDetailPage() {
             </Badge>
           </p>
           <p className="mt-1 text-sm text-slate-600">
-            {data.current_unit?.name || "Chưa phân công"}
+            {data.current_unit?.path || data.current_unit?.name || "Chưa phân công"}
             {data.current_position ? ` – ${data.current_position.name}` : ""}
           </p>
         </div>
@@ -107,6 +107,9 @@ export default function EmployeeDetailPage() {
         </Card>
         <Card>
           <h3 className="mb-2 font-semibold text-slate-800">Thông tin công tác</h3>
+          <Row label="Phòng / Chi nhánh">{data.current_unit?.group_name || "—"}</Row>
+          <Row label="Bộ phận">{data.current_unit?.section_name || "—"}</Row>
+          <Row label="Chức vụ">{data.current_position?.name || "—"}</Row>
           <Row label="Chức danh chuyên môn">{data.professional_title}</Row>
           <Row label="Loại nhân sự">{EMPLOYMENT_TYPE_LABELS[data.employment_type] || "—"}</Row>
           <Row label="Ngày tuyển dụng">{formatDate(data.recruitment_date)}</Row>
@@ -125,7 +128,8 @@ export default function EmployeeDetailPage() {
           {(data.assignments || []).slice(0, 5).map((a) => (
             <li key={a.id} className="flex flex-wrap items-center justify-between gap-2 py-2">
               <span>
-                <span className="font-medium text-slate-800">{a.unit?.name}</span> · {a.position?.name}{" "}
+                <span className="font-medium text-slate-800">{a.unit?.path || a.unit?.name}</span> ·{" "}
+                {a.position?.name}{" "}
                 <Badge className="ml-1 bg-slate-100 text-slate-600">
                   {ASSIGNMENT_TYPE_LABELS[a.assignment_type] || a.assignment_type}
                 </Badge>

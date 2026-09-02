@@ -1,7 +1,9 @@
 """Route hồ sơ nhân sự, quá trình công tác và chuyển đơn vị."""
 from __future__ import annotations
 
-from flask import Blueprint, request
+from datetime import date
+
+from flask import Blueprint, request, send_file
 
 from ...common.responses import paginated, success
 from ...permissions import constants as perms
@@ -26,6 +28,20 @@ def list_employees():
 def dashboard():
     actor, scope = actor_and_scope()
     return success(employee_service.dashboard(actor=actor, scope=scope))
+
+
+@bp.get("/export")
+@require_permission(perms.EMPLOYEE_VIEW)
+def export_employees():
+    actor, scope = actor_and_scope()
+    buf = employee_service.export_employees(request.args, actor=actor, scope=scope)
+    fname = f"Phu luc 4 - {date.today().strftime('%Y%m%d')}.xlsx"
+    return send_file(
+        buf,
+        mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        as_attachment=True,
+        download_name=fname,
+    )
 
 
 @bp.post("")

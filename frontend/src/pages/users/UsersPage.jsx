@@ -7,7 +7,7 @@ import { useCan } from "../../components/Can";
 import { PERMISSIONS } from "../../lib/constants";
 import { apiErrorMessage } from "../../lib/api";
 import { formatDateTime } from "../../lib/format";
-import { PageHeader, Button, Badge, Card, FormField, Select, TextInput } from "../../components/ui/primitives";
+import { PageHeader, Button, Badge, Card, FormField, Select, TextInput, PasswordInput } from "../../components/ui/primitives";
 import { Table, Pagination } from "../../components/ui/Table";
 import { LoadingState, ErrorState, EmptyState } from "../../components/ui/DataStates";
 import { Modal } from "../../components/ui/Modal";
@@ -200,8 +200,7 @@ function CreateUser({ roles, onClose }) {
           <TextInput value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
         </FormField>
         <FormField label="Mật khẩu" required hint="Tối thiểu 8 ký tự">
-          <TextInput
-            type="password"
+          <PasswordInput
             value={form.password}
             onChange={(e) => setForm({ ...form, password: e.target.value })}
           />

@@ -1,0 +1,3 @@
+# Thư mục này để đặt file Excel "Phụ lục 4" thật khi triển khai.
+# File .xlsx trong đây bị .gitignore bỏ qua (chứa dữ liệu cá nhân).
+# docker-compose mount nó vào /data trong container backend.

@@ -50,6 +50,11 @@ class EmployeeBaseSchema(ApiSchema):
     nullable_fields = {
         "date_of_birth", "gender", "identity_number", "phone", "email", "address",
         "professional_title", "employment_type", "recruitment_date", "avatar_url", "notes",
+        # hồ sơ mở rộng
+        "place_of_origin", "identity_issued_date", "identity_issued_place",
+        "job_grade_code", "job_grade_name", "job_duties", "tenure_date", "contract_type",
+        "education_level", "education_major", "education_mode",
+        "foreign_language_cert", "it_cert",
     }
 
     employee_code = fields.String()
@@ -69,6 +74,21 @@ class EmployeeBaseSchema(ApiSchema):
     avatar_url = fields.String(allow_none=True)
     notes = fields.String(allow_none=True)
 
+    # --- Hồ sơ mở rộng (nguồn: biểu "Phụ lục 4") ---
+    place_of_origin = fields.String(allow_none=True)
+    identity_issued_date = fields.Date(allow_none=True)
+    identity_issued_place = fields.String(allow_none=True)
+    job_grade_code = fields.String(allow_none=True)
+    job_grade_name = fields.String(allow_none=True)
+    job_duties = fields.String(allow_none=True)
+    tenure_date = fields.Date(allow_none=True)
+    contract_type = fields.String(allow_none=True)
+    education_level = fields.String(allow_none=True)
+    education_major = fields.String(allow_none=True)
+    education_mode = fields.String(allow_none=True)
+    foreign_language_cert = fields.String(allow_none=True)
+    it_cert = fields.String(allow_none=True)
+
 
 class EmployeeCreateSchema(EmployeeBaseSchema):
     employee_code = fields.String(required=True, error_messages=required)
@@ -87,7 +107,11 @@ class EmployeeCreateSchema(EmployeeBaseSchema):
 
 
 class EmployeeUpdateSchema(EmployeeBaseSchema):
-    pass
+    # Cho phép sửa cả đơn vị / chức vụ của phân công chính (cập nhật tại chỗ).
+    unit_id = fields.Integer(allow_none=True, strict=False)
+    position_id = fields.Integer(allow_none=True, strict=False)
+
+    nullable_fields = EmployeeBaseSchema.nullable_fields | {"unit_id", "position_id"}
 
 
 class TransferSchema(ApiSchema):

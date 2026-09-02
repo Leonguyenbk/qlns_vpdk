@@ -37,5 +37,15 @@ if [ "${CREATE_ADMIN_ON_START:-true}" = "true" ]; then
   flask --app wsgi create-admin || true
 fi
 
+if [ -n "${IMPORT_PHULUC4:-}" ]; then
+  if [ -f "${IMPORT_PHULUC4}" ]; then
+    echo "[entrypoint] Import 'Phụ lục 4' từ ${IMPORT_PHULUC4} (idempotent theo CCCD)..."
+    flask --app wsgi import-phuluc4 "${IMPORT_PHULUC4}" --commit || true
+    flask --app wsgi reindex-units || true
+  else
+    echo "[entrypoint] IMPORT_PHULUC4=${IMPORT_PHULUC4} nhưng không thấy file, bỏ qua."
+  fi
+fi
+
 echo "[entrypoint] Khởi động ứng dụng: $*"
 exec "$@"

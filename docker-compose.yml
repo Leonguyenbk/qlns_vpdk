@@ -40,6 +40,11 @@ services:
       ADMIN_RESET_PASSWORD: ${ADMIN_RESET_PASSWORD:-false}
       ADMIN_EMAIL: ${ADMIN_EMAIL:-admin@example.com}
       ADMIN_FULL_NAME: ${ADMIN_FULL_NAME:-Quản trị hệ thống}
+      # Tùy chọn: import "Phụ lục 4" lúc khởi động. Đặt file thật vào ./backend/data/
+      # rồi set IMPORT_PHULUC4=/data/<tên file>.xlsx trong .env (mặc định: bỏ qua).
+      IMPORT_PHULUC4: ${IMPORT_PHULUC4:-}
+    volumes:
+      - ./backend/data:/data
     ports:
       - "${BACKEND_PORT:-5000}:5000"
 

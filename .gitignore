@@ -31,3 +31,17 @@ Thumbs.db
 
 # Local handoff/session transcripts
 2026-*-hy-xy-dng-hon-chnh-mt-d-n-web-qun-l-nh.txt
+
+# Reference media (không đẩy lên git)
+*.mp4
+*.mov
+
+# Tooling artifacts
+frontend/.hallmark/
+
+# Dữ liệu nhân sự thật – KHÔNG commit (chứa CCCD, địa chỉ...)
+# Đặt file "Phụ lục 4" thật vào backend/data/ để import lúc chạy, không lên git.
+Phụ lục 4*.xlsx
+Phu luc 4*.xlsx
+backend/data/*.xlsx
+!backend/data/.gitkeep

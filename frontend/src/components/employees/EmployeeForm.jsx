@@ -9,6 +9,7 @@ import {
   GENDER_LABELS,
 } from "../../lib/constants";
 import { Button, FormField, Select, TextInput, Textarea } from "../ui/primitives";
+import { UnitPicker } from "../units/UnitPicker";
 
 export function EmployeeForm({ mode, defaultValues, onSubmit, submitting }) {
   const isCreate = mode === "create";
@@ -18,6 +19,8 @@ export function EmployeeForm({ mode, defaultValues, onSubmit, submitting }) {
   const {
     register,
     handleSubmit,
+    setValue,
+    watch,
     formState: { errors },
   } = useForm({
     resolver: zodResolver(isCreate ? employeeCreateSchema : employeeSchema),
@@ -98,28 +101,29 @@ export function EmployeeForm({ mode, defaultValues, onSubmit, submitting }) {
             </FormField>
           )}
 
+          <div className="md:col-span-2">
+            <FormField label="Đơn vị công tác" required={isCreate} error={errors.unit_id?.message}>
+              <input type="hidden" {...register("unit_id")} />
+              <UnitPicker
+                units={units || []}
+                value={watch("unit_id")}
+                error={errors.unit_id ? " " : undefined}
+                onChange={(id) => setValue("unit_id", id, { shouldValidate: true })}
+              />
+            </FormField>
+          </div>
+          <FormField label="Chức vụ / chức danh" required={isCreate} error={errors.position_id?.message}>
+            <Select {...register("position_id")} error={errors.position_id}>
+              <option value="">-- Chọn chức vụ --</option>
+              {positions?.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.name}
+                </option>
+              ))}
+            </Select>
+          </FormField>
           {isCreate && (
             <>
-              <FormField label="Đơn vị công tác" required error={errors.unit_id?.message}>
-                <Select {...register("unit_id")} error={errors.unit_id}>
-                  <option value="">-- Chọn đơn vị --</option>
-                  {units?.map((u) => (
-                    <option key={u.id} value={u.id}>
-                      {u.code} – {u.name}
-                    </option>
-                  ))}
-                </Select>
-              </FormField>
-              <FormField label="Chức vụ" required error={errors.position_id?.message}>
-                <Select {...register("position_id")} error={errors.position_id}>
-                  <option value="">-- Chọn chức vụ --</option>
-                  {positions?.map((p) => (
-                    <option key={p.id} value={p.id}>
-                      {p.name}
-                    </option>
-                  ))}
-                </Select>
-              </FormField>
               <FormField label="Số quyết định" error={errors.decision_number?.message}>
                 <TextInput {...register("decision_number")} />
               </FormField>
@@ -132,6 +136,50 @@ export function EmployeeForm({ mode, defaultValues, onSubmit, submitting }) {
         <div className="mt-4">
           <FormField label="Ghi chú" error={errors.notes?.message}>
             <Textarea {...register("notes")} />
+          </FormField>
+        </div>
+      </section>
+
+      <section className="card p-5">
+        <h3 className="mb-4 font-semibold text-slate-800">Hồ sơ mở rộng</h3>
+        <div className="grid gap-4 md:grid-cols-2">
+          <FormField label="Quê quán" error={errors.place_of_origin?.message}>
+            <TextInput {...register("place_of_origin")} />
+          </FormField>
+          <FormField label="Nơi cấp CCCD" error={errors.identity_issued_place?.message}>
+            <TextInput {...register("identity_issued_place")} />
+          </FormField>
+          <FormField label="Ngày cấp CCCD" error={errors.identity_issued_date?.message}>
+            <TextInput type="date" {...register("identity_issued_date")} />
+          </FormField>
+          <FormField label="Ngày vào biên chế" error={errors.tenure_date?.message}>
+            <TextInput type="date" {...register("tenure_date")} />
+          </FormField>
+          <FormField label="Loại hợp đồng" error={errors.contract_type?.message}>
+            <TextInput {...register("contract_type")} />
+          </FormField>
+          <FormField label="Ngạch / CDNN" error={errors.job_grade_code?.message}>
+            <TextInput {...register("job_grade_code")} />
+          </FormField>
+          <FormField label="Trình độ" error={errors.education_level?.message}>
+            <TextInput {...register("education_level")} />
+          </FormField>
+          <FormField label="Ngành đào tạo" error={errors.education_major?.message}>
+            <TextInput {...register("education_major")} />
+          </FormField>
+          <FormField label="Hệ đào tạo" error={errors.education_mode?.message}>
+            <TextInput {...register("education_mode")} />
+          </FormField>
+          <FormField label="Chứng chỉ ngoại ngữ" error={errors.foreign_language_cert?.message}>
+            <TextInput {...register("foreign_language_cert")} />
+          </FormField>
+          <FormField label="Chứng chỉ tin học" error={errors.it_cert?.message}>
+            <TextInput {...register("it_cert")} />
+          </FormField>
+        </div>
+        <div className="mt-4">
+          <FormField label="Nhiệm vụ đang đảm nhận" error={errors.job_duties?.message}>
+            <Textarea {...register("job_duties")} />
           </FormField>
         </div>
       </section>

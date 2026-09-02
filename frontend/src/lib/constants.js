@@ -13,12 +13,12 @@ export const EMPLOYEE_STATUS_LABELS = {
 };
 
 export const EMPLOYEE_STATUS_BADGE = {
-  WORKING: "bg-green-100 text-green-700",
-  ON_LEAVE: "bg-amber-100 text-amber-700",
-  RETIRED: "bg-slate-100 text-slate-600",
-  RESIGNED: "bg-red-100 text-red-700",
-  TRANSFERRED: "bg-blue-100 text-blue-700",
-  INACTIVE: "bg-slate-100 text-slate-500",
+  WORKING: "badge-ok",
+  ON_LEAVE: "badge-warn",
+  RETIRED: "badge-neutral",
+  RESIGNED: "badge-danger",
+  TRANSFERRED: "badge-info",
+  INACTIVE: "badge-neutral",
 };
 
 export const EMPLOYMENT_TYPE_LABELS = {
