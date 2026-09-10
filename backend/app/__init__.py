@@ -53,6 +53,10 @@ def create_app(config_name: str | None = None) -> Flask:
 
         g.pop("current_user", None)
 
+    from .modules.goiso import configure_goiso
+
+    configure_goiso(app)
+
     from .modules import register_blueprints
 
     register_blueprints(app)

@@ -19,7 +19,7 @@ Nguồn gốc & kế hoạch hợp nhất: **[docs/MERGE_ANALYSIS.md](docs/MERGE
 |---|---|---|
 | P1 | Phân tích 2 codebase, chốt kiến trúc | ✅ xong |
 | P2 | Dựng khung platform từ backend nhân sự, chạy cổng riêng | ✅ xong (backend + test) |
-| P3 | Đưa goiso vào `modules/goiso` (giữ SQLite tạm) + lớp tương thích | ⏳ |
+| P3 | Đưa goiso vào `modules/goiso` (giữ SQLite tạm) + lớp tương thích | ✅ xong |
 | P4 | Chuẩn hoá module nhân sự trong cấu trúc mới + test nghiệp vụ | ⏳ |
 | P5 | Gộp tài khoản/đăng nhập, permission `GOISO_*`, cookie SSO cho trang Jinja | ⏳ |
 | P6 | Đơn vị dùng chung; chuyển bảng goiso sang MySQL (`goiso_*`) có script + log | ⏳ |

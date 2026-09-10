@@ -1,0 +1,925 @@
+# NOTE (Phase 3): Blueprint TƯƠNG THÍCH của hệ gọi số (goiso).
+# Chuyển từ goiso_kios/server/app.py — chỉ đổi Flask->Blueprint và import nội bộ
+# sang tương đối. GIỮ NGUYÊN mọi đường dẫn cũ + trang Jinja. Không đổi hành vi.
+"""Máy chủ Flask ĐA CHI NHÁNH: API bốc số / gọi số + giao diện web + SSE realtime.
+
+Chạy (dev):   python app.py            (http://0.0.0.0:5000, tự reload nếu GOISO_DEBUG=1)
+Chạy (thật):  waitress-serve --listen=127.0.0.1:5000 --threads=32 app:app
+
+Mỗi chi nhánh có mã `code` (vd 'bmt'):
+  Trang:  /b/<code>/display   /b/<code>/counter   /b/<code>/display/simple
+  API:    /api/b/<code>/...
+  Quản trị tổng:  /admin   (+ /api/admin/...)
+"""
+import functools
+import hashlib
+import json
+import os
+import queue as queuelib
+import sqlite3
+import threading
+import time
+
+from flask import (Blueprint, Response, abort, g, jsonify, redirect, render_template,
+                   request, session, stream_with_context, url_for)
+
+from . import legacy_db as db
+from . import queue_logic as ql
+from . import booking_logic as bk
+from . import tts as tts_engine
+
+bp = Blueprint("goiso", __name__, template_folder="templates")
+
+DEBUG = bool(os.environ.get("GOISO_DEBUG"))
+BASE_URL = os.environ.get("GOISO_BASE_URL", "").rstrip("/")
+TURNSTILE_SITE_KEY = os.environ.get("TURNSTILE_SITE_KEY", "")
+
+
+def _server_version():
+    here = os.path.dirname(os.path.abspath(__file__))
+    for p in (os.path.join(here, "VERSION"), os.path.join(here, "..", "VERSION")):
+        try:
+            with open(p, encoding="utf-8") as f:
+                v = f.read().strip()
+            if v:
+                return v
+        except OSError:
+            continue
+    return "0.0.0"
+
+
+SERVER_VERSION = _server_version()
+
+
+def _client_ip():
+    return (request.headers.get("CF-Connecting-IP")
+            or (request.headers.get("X-Forwarded-For", "").split(",")[0].strip())
+            or request.remote_addr or "")
+
+# db.init_db() được gọi từ app.modules.goiso.configure_goiso() sau khi .env đã nạp
+# (tránh tạo file SQLite lạc chỗ khi import lúc chạy test).
+
+# ----------------------------------------------------------------- SSE hub (theo chi nhánh)
+_subscribers = {}  # branch_id -> set[Queue]
+_sub_lock = threading.Lock()
+
+
+def broadcast(branch_id, event: dict):
+    data = json.dumps(event, ensure_ascii=False)
+    with _sub_lock:
+        subs = _subscribers.get(branch_id)
+        if not subs:
+            return
+        dead = []
+        for q in subs:
+            try:
+                q.put_nowait(data)
+            except queuelib.Full:
+                dead.append(q)
+        for q in dead:
+            subs.discard(q)
+
+
+def push_snapshot(branch_id):
+    broadcast(branch_id, ql.snapshot(branch_id))
+
+
+# ----------------------------------------------------------------- decorators
+def resolve_branch(view):
+    @functools.wraps(view)
+    def wrapper(code, *args, **kwargs):
+        branch = db.get_branch(code)
+        if not branch or not branch["active"]:
+            if request.path.startswith("/api/"):
+                return jsonify(error="Chi nhánh không tồn tại hoặc đã ngừng hoạt động."), 404
+            return "Chi nhánh không tồn tại.", 404
+        g.branch = branch
+        return view(*args, **kwargs)
+    return wrapper
+
+
+def require_branch_key(view):
+    @functools.wraps(view)
+    def wrapper(*args, **kwargs):
+        if not DEBUG:
+            sent = request.headers.get("X-Branch-Key", "")
+            import secrets as _s
+            if not sent or not _s.compare_digest(sent, g.branch["api_key"]):
+                return jsonify(error="Sai hoặc thiếu khoá chi nhánh (X-Branch-Key)."), 401
+        return view(*args, **kwargs)
+    return wrapper
+
+
+def current_user():
+    uid = session.get("uid")
+    if not uid:
+        return None
+    u = db.get_user(uid)
+    return u if (u and u["active"]) else None
+
+
+def _need_login_response(msg="Cần đăng nhập."):
+    if request.path.startswith("/api/"):
+        return jsonify(error=msg), 401
+    nxt = request.full_path.rstrip("?") or request.path
+    return redirect(url_for("goiso.page_login", next=nxt))
+
+
+def login_required(view):
+    @functools.wraps(view)
+    def wrapper(*args, **kwargs):
+        u = current_user()
+        if not u:
+            return _need_login_response()
+        g.user = u
+        return view(*args, **kwargs)
+    return wrapper
+
+
+def admin_required(view):
+    @functools.wraps(view)
+    def wrapper(*args, **kwargs):
+        u = current_user()
+        if not u:
+            return _need_login_response("Chưa đăng nhập quản trị.")
+        if u["role"] != "admin":
+            if request.path.startswith("/api/"):
+                return jsonify(error="Chỉ quản trị viên."), 403
+            return "Chỉ quản trị viên mới truy cập được trang này.", 403
+        g.user = u
+        return view(*args, **kwargs)
+    return wrapper
+
+
+def counter_guard(view):
+    """Yêu cầu đăng nhập; nhân viên chỉ thao tác trên chi nhánh của mình."""
+    @functools.wraps(view)
+    def wrapper(*args, **kwargs):
+        u = current_user()
+        if not u:
+            return _need_login_response()
+        if u["role"] != "admin" and u["branch_id"] != g.branch["id"]:
+            if request.path.startswith("/api/"):
+                return jsonify(error="Bạn không thuộc chi nhánh này."), 403
+            return "Bạn không có quyền truy cập chi nhánh này.", 403
+        g.user = u
+        return view(*args, **kwargs)
+    return wrapper
+
+
+def _tpl_ctx(branch):
+    """Context cho template: extra của chi nhánh + ten_chi_nhanh lấy từ branch."""
+    extra = db.get_extra(branch["id"])
+    extra["ten_chi_nhanh"] = branch["full_name"]
+    return extra
+
+
+@bp.app_errorhandler(sqlite3.OperationalError)
+def _db_locked(e):
+    msg = str(e)
+    if "locked" in msg or "busy" in msg:
+        text = ("CSDL đang bị một chương trình khác khoá (thường là DB Browser "
+                "for SQLite / SQLiteStudio đang mở file hethong_v2.db). "
+                "Hãy đóng chương trình đó rồi thử lại.")
+        code = 503
+    else:
+        text = "Lỗi CSDL: " + msg
+        code = 500
+    if request.path.startswith("/api/"):
+        return jsonify(error=text), code
+    return text, code
+
+
+# ----------------------------------------------------------------- SSE stream
+@bp.route("/api/b/<code>/stream")
+@resolve_branch
+def stream():
+    branch_id = g.branch["id"]
+
+    def gen():
+        q = queuelib.Queue(maxsize=64)
+        with _sub_lock:
+            _subscribers.setdefault(branch_id, set()).add(q)
+        try:
+            yield "retry: 3000\n\n"
+            yield f"data: {json.dumps(ql.snapshot(branch_id), ensure_ascii=False)}\n\n"
+            last_beat = time.time()
+            while True:
+                try:
+                    data = q.get(timeout=10)
+                    yield f"data: {data}\n\n"
+                except queuelib.Empty:
+                    pass
+                if time.time() - last_beat > 10:
+                    yield ": ping\n\n"
+                    last_beat = time.time()
+        finally:
+            with _sub_lock:
+                subs = _subscribers.get(branch_id)
+                if subs:
+                    subs.discard(q)
+
+    resp = Response(stream_with_context(gen()), mimetype="text/event-stream")
+    resp.headers["Cache-Control"] = "no-cache"
+    resp.headers["X-Accel-Buffering"] = "no"
+    # KHÔNG đặt header "Connection" ở đây: đó là hop-by-hop header, waitress (PEP 3333)
+    # sẽ ném AssertionError. Keep-alive do máy chủ/Cloudflare tự quản lý.
+    return resp
+
+
+# ----------------------------------------------------------------- trang web
+@bp.route("/")
+@login_required
+def index():
+    u = g.user
+    if u["role"] != "admin":
+        b = db.get_branch_by_id(u["branch_id"])
+        if b:
+            return redirect(f"/b/{b['code']}/counter")
+    return render_template("index.html", branches=db.list_branches(active_only=True), me=u)
+
+
+def _screen_ctx():
+    """Đọc ?screen=<id>. Trả về (screen_name, screen_counters).
+    404 nếu id có gửi nhưng không khớp màn hình nào của chi nhánh."""
+    sid = request.args.get("screen", "").strip()
+    if not sid:
+        return "", []
+    sc = db.resolve_screen(g.branch["id"], sid)
+    if not sc:
+        abort(404, description="Màn hình không tồn tại.")
+    return sc["name"], sc["counters"]
+
+
+@bp.route("/b/<code>/man-hinh")
+@resolve_branch
+@counter_guard
+def page_screens_pick():
+    """Trang cho nhân viên chọn màn hình hiển thị (đầy đủ / theo khu)."""
+    return render_template("screens_pick.html", extra=_tpl_ctx(g.branch), branch=g.branch,
+                           screens=db.get_screens(g.branch["id"]), me=g.user)
+
+
+@bp.route("/b/<code>/display")
+@resolve_branch
+@counter_guard
+def page_display():
+    name, counters = _screen_ctx()
+    return render_template("display.html", extra=_tpl_ctx(g.branch), branch=g.branch,
+                           layout=request.args.get("layout", "landscape"),
+                           screen_name=name, screen_counters=counters)
+
+
+@bp.route("/b/<code>/display/simple")
+@resolve_branch
+@counter_guard
+def page_display_simple():
+    _screen_ctx()  # chỉ để 404 nếu ?screen sai
+    return render_template("display_simple.html", extra=_tpl_ctx(g.branch), branch=g.branch)
+
+
+@bp.route("/b/<code>/cho")
+@resolve_branch
+def page_board():
+    """Bảng chờ online công khai (không đăng nhập, không phát tiếng)."""
+    name, counters = _screen_ctx()
+    return render_template("board.html", extra=_tpl_ctx(g.branch), branch=g.branch,
+                           screen_name=name, screen_counters=counters)
+
+
+@bp.route("/b/<code>/counter")
+@resolve_branch
+@counter_guard
+def page_counter():
+    counters = db.get_json_config("counters", {}, g.branch["id"]) or {}
+    active = [
+        {"id": k, **v}
+        for k, v in sorted(counters.items(), key=lambda kv: kv[1].get("display_order", 99))
+        if v.get("active", True)
+    ]
+    return render_template("counter.html", extra=_tpl_ctx(g.branch), branch=g.branch,
+                           counters=active, me=g.user)
+
+
+@bp.route("/admin")
+@admin_required
+def page_admin():
+    return render_template("admin.html", me=g.user)
+
+
+# ----------------------------------------------------------------- đăng nhập
+@bp.route("/login")
+def page_login():
+    if current_user():
+        u = current_user()
+        if u["role"] == "admin":
+            return redirect(url_for("goiso.page_admin"))
+        b = db.get_branch_by_id(u["branch_id"])
+        if b:
+            return redirect(f"/b/{b['code']}/counter")
+    return render_template("login.html")
+
+
+@bp.post("/api/login")
+def api_login():
+    body = request.get_json(silent=True) or {}
+    u = db.verify_login(body.get("username", ""), body.get("password", ""))
+    if not u:
+        return jsonify(error="Sai tên đăng nhập hoặc mật khẩu."), 401
+    session.clear()
+    session["uid"] = u["id"]
+    session["role"] = u["role"]
+    session.permanent = True
+    if u["role"] == "admin":
+        nxt = "/admin"
+    else:
+        b = db.get_branch_by_id(u["branch_id"])
+        nxt = f"/b/{b['code']}/counter" if b else "/"
+    return jsonify(ok=True, role=u["role"], full_name=u["full_name"], next=nxt)
+
+
+@bp.post("/api/logout")
+def api_logout():
+    session.clear()
+    return jsonify(ok=True)
+
+
+@bp.get("/api/me")
+def api_me():
+    u = current_user()
+    return jsonify(u or {})
+
+
+@bp.route("/dat-lich")
+def page_booking():
+    return render_template("booking.html", turnstile_site_key=TURNSTILE_SITE_KEY)
+
+
+@bp.route("/lich-hen/<token>")
+def page_booking_lookup(token):
+    return render_template("booking_lookup.html", token=token)
+
+
+# ----------------------------------------------------------------- API cấp số (kiosk)
+@bp.post("/api/b/<code>/ticket")
+@resolve_branch
+@require_branch_key
+def api_ticket():
+    body = request.get_json(silent=True) or request.form
+    prefix = (body.get("prefix") or "").strip().upper()
+    if not prefix:
+        return jsonify(error="Thiếu mã dịch vụ."), 400
+    try:
+        ticket = ql.issue_ticket(
+            g.branch["id"], prefix,
+            fullname=body.get("fullname", ""),
+            cccd=body.get("cccd", ""),
+            phone=body.get("phone", ""),
+        )
+    except ql.QueueError as e:
+        return jsonify(error=str(e)), 409
+    push_snapshot(g.branch["id"])
+    return jsonify(ticket)
+
+
+@bp.get("/api/b/<code>/state")
+@resolve_branch
+def api_state():
+    return jsonify(ql.snapshot(g.branch["id"]))
+
+
+@bp.get("/api/b/<code>/tts")
+@resolve_branch
+def api_tts():
+    """Đọc số bằng giọng tiếng Việt phía máy chủ -> trả file mp3."""
+    text = request.args.get("text", "")
+    voice = request.args.get("voice", "") or db.get_extra(g.branch["id"]).get("tts_voice", "")
+    if not tts_engine.available():
+        return jsonify(error="Máy chủ chưa cài edge-tts."), 503
+    try:
+        path = tts_engine.get_or_make(text, voice)
+    except ValueError as e:
+        return jsonify(error=str(e)), 400
+    except Exception:  # noqa: BLE001
+        return jsonify(error="Không tạo được âm thanh."), 502
+    from flask import send_file
+    resp = send_file(path, mimetype="audio/mpeg", conditional=True)
+    resp.headers["Cache-Control"] = "public, max-age=86400"
+    return resp
+
+
+@bp.post("/api/b/<code>/checkin")
+@resolve_branch
+@require_branch_key
+def api_checkin():
+    body = request.get_json(silent=True) or {}
+    try:
+        ticket = bk.checkin(g.branch["id"], body.get("code", ""))
+    except bk.BookingError as e:
+        return jsonify(error=str(e)), 409
+    except ql.QueueError as e:
+        return jsonify(error=str(e)), 409
+    push_snapshot(g.branch["id"])
+    return jsonify(ticket)
+
+
+@bp.get("/api/b/<code>/config/public")
+@resolve_branch
+def api_config_public():
+    """Cấu hình công khai cho kiosk / màn hình (không có mật khẩu)."""
+    branch_id = g.branch["id"]
+    services = db.get_json_config("services", {}, branch_id) or {}
+    day = db.today_str()
+    with db.get_conn() as conn:
+        issued = {
+            r["prefix"]: r["c"]
+            for r in conn.execute(
+                "SELECT prefix, COUNT(*) c FROM queue WHERE branch_id=? AND date_record=? GROUP BY prefix",
+                (branch_id, day),
+            )
+        }
+    svc_out = {}
+    for k, v in services.items():
+        if not v.get("active", True):
+            continue
+        limit = int(v.get("daily_limit") or 0)
+        used = issued.get(k, 0)
+        svc_out[k] = {
+            "name": v.get("name", k),
+            "short": db.short_label(v, k),
+            "color": v.get("color", "#0b5fa5"),
+            "daily_limit": limit,
+            "issued_today": used,
+            "sold_out": bool(limit and used >= limit),
+        }
+    extra = db.get_extra(branch_id)
+    return jsonify({
+        "branch": {"code": g.branch["code"], "name": g.branch["name"],
+                   "full_name": g.branch["full_name"]},
+        "services": svc_out,
+        "extra": {
+            "ten_co_quan": extra.get("ten_co_quan", ""),
+            "ten_chi_nhanh": g.branch["full_name"],
+            "link_qr": extra.get("link_qr", ""),
+            "qr_enabled": extra.get("qr_enabled", False),
+            "lock_time_enabled": extra.get("lock_time_enabled", False),
+            "lock_message": extra.get("lock_message", ""),
+            "time_slots": extra.get("time_slots", []),
+            "voice_rate": extra.get("voice_rate", 0.95),
+            "voice_repeat": extra.get("voice_repeat", 2),
+            "voice_template": extra.get("voice_template", "Xin mời số thứ tự {so}, đến quầy số {quay}"),
+            "spotlight_seconds": extra.get("spotlight_seconds", 20),
+            "tts_mode": extra.get("tts_mode", "server"),
+            "tts_voice": extra.get("tts_voice", "vi-VN-HoaiMyNeural"),
+            "footer_credit": extra.get("footer_credit", ""),
+        },
+        "time_open": ql.within_time_lock(branch_id),
+    })
+
+
+# ----------------------------------------------------------------- API quầy
+def _staff():
+    return (getattr(g, "user", None) or {}).get("full_name", "")
+
+
+@bp.get("/api/b/<code>/counter/<path:counter_id>/view")
+@resolve_branch
+@counter_guard
+def api_counter_view(counter_id):
+    return jsonify(ql.counter_view(g.branch["id"], counter_id))
+
+
+@bp.post("/api/b/<code>/counter/<path:counter_id>/login")
+@resolve_branch
+@counter_guard
+def api_counter_login(counter_id):
+    ql.set_counter_status(g.branch["id"], counter_id, "active", staff_name=_staff())
+    push_snapshot(g.branch["id"])
+    return jsonify(ql.counter_view(g.branch["id"], counter_id))
+
+
+@bp.post("/api/b/<code>/counter/<path:counter_id>/next")
+@resolve_branch
+@counter_guard
+def api_counter_next(counter_id):
+    try:
+        called = ql.call_next(g.branch["id"], counter_id, staff_name=_staff())
+    except ql.QueueError as e:
+        return jsonify(error=str(e)), 409
+    broadcast(g.branch["id"], {"type": "call", **called})
+    push_snapshot(g.branch["id"])
+    return jsonify(called)
+
+
+@bp.post("/api/b/<code>/counter/<path:counter_id>/recall")
+@resolve_branch
+@counter_guard
+def api_counter_recall(counter_id):
+    try:
+        called = ql.recall(g.branch["id"], counter_id)
+    except ql.QueueError as e:
+        return jsonify(error=str(e)), 409
+    broadcast(g.branch["id"], {"type": "call", **called})
+    return jsonify(called)
+
+
+@bp.post("/api/b/<code>/counter/<path:counter_id>/done")
+@resolve_branch
+@counter_guard
+def api_counter_done(counter_id):
+    try:
+        ql.finish_current(g.branch["id"], counter_id)
+    except ql.QueueError as e:
+        return jsonify(error=str(e)), 409
+    push_snapshot(g.branch["id"])
+    return jsonify(ql.counter_view(g.branch["id"], counter_id))
+
+
+@bp.post("/api/b/<code>/counter/<path:counter_id>/missed")
+@resolve_branch
+@counter_guard
+def api_counter_missed(counter_id):
+    try:
+        ql.mark_missed(g.branch["id"], counter_id)
+    except ql.QueueError as e:
+        return jsonify(error=str(e)), 409
+    push_snapshot(g.branch["id"])
+    return jsonify(ql.counter_view(g.branch["id"], counter_id))
+
+
+@bp.post("/api/b/<code>/counter/<path:counter_id>/call")
+@resolve_branch
+@counter_guard
+def api_counter_call_specific(counter_id):
+    body = request.get_json(silent=True) or {}
+    try:
+        called = ql.call_specific(
+            g.branch["id"], counter_id, body.get("full_no", ""), staff_name=_staff(),
+        )
+    except ql.QueueError as e:
+        return jsonify(error=str(e)), 409
+    broadcast(g.branch["id"], {"type": "call", **called})
+    push_snapshot(g.branch["id"])
+    return jsonify(called)
+
+
+@bp.post("/api/b/<code>/counter/<path:counter_id>/status")
+@resolve_branch
+@counter_guard
+def api_counter_status(counter_id):
+    body = request.get_json(silent=True) or {}
+    try:
+        r = ql.set_counter_status(g.branch["id"], counter_id, (body.get("status") or "").strip())
+    except ql.QueueError as e:
+        return jsonify(error=str(e)), 409
+    push_snapshot(g.branch["id"])
+    return jsonify(r)
+
+
+# ----------------------------------------------------------------- API admin
+@bp.get("/api/admin/users")
+@admin_required
+def api_admin_users():
+    return jsonify(users=db.list_users(), branches=db.list_branches())
+
+
+@bp.post("/api/admin/users")
+@admin_required
+def api_admin_users_write():
+    body = request.get_json(silent=True) or {}
+    action = body.get("action", "")
+    uname = (body.get("username") or "").strip().lower()
+    try:
+        if action == "create":
+            u = db.create_user(uname, body.get("full_name", ""), body.get("password", ""),
+                               role=body.get("role", "staff"),
+                               branch_code=body.get("branch_code"))
+            return jsonify(ok=True, user=u)
+        if action == "update":
+            u = db.update_user(uname,
+                               full_name=body.get("full_name"),
+                               password=body.get("password") or None,
+                               branch_code=body.get("branch_code"),
+                               role=body.get("role"),
+                               active=body.get("active"))
+            return jsonify(ok=True, user=u)
+        if action == "delete":
+            db.delete_user(uname)
+            return jsonify(ok=True)
+    except ValueError as e:
+        return jsonify(error=str(e)), 400
+    return jsonify(error="action không hợp lệ."), 400
+
+
+@bp.get("/api/admin/branches")
+@admin_required
+def api_admin_branches():
+    return jsonify(branches=db.list_branches())
+
+
+@bp.post("/api/admin/branches")
+@admin_required
+def api_admin_branches_write():
+    body = request.get_json(silent=True) or {}
+    action = body.get("action", "")
+    code = (body.get("code") or "").strip().lower()
+    try:
+        if action == "create":
+            b = db.create_branch(code, body.get("name", ""), body.get("full_name", ""),
+                                 body.get("address", ""))
+            return jsonify(ok=True, branch=b)
+        if action == "update":
+            b = db.update_branch(code, **{k: body[k] for k in
+                                         ("name", "full_name", "address", "active", "display_order")
+                                         if k in body})
+            return jsonify(ok=True, branch=b)
+        if action == "delete":
+            db.delete_branch(code)
+            return jsonify(ok=True)
+        if action in ("regen_key", "regen_display_token"):
+            field = "api_key" if action == "regen_key" else "display_token"
+            token = db.regen_branch_field(code, field)
+            return jsonify(ok=True, field=field, value=token)
+    except ValueError as e:
+        return jsonify(error=str(e)), 400
+    return jsonify(error="action không hợp lệ."), 400
+
+
+@bp.get("/api/admin/b/<code>/config")
+@admin_required
+@resolve_branch
+def api_admin_get_config():
+    bid = g.branch["id"]
+    return jsonify({
+        "branch": g.branch,
+        "services": db.get_json_config("services", {}, bid),
+        "counters": db.get_json_config("counters", {}, bid),
+        "screens": db.get_screens(bid),
+        "extra": db.get_extra(bid),
+        "booking": db.get_booking_config(bid),
+    })
+
+
+@bp.post("/api/admin/b/<code>/config")
+@admin_required
+@resolve_branch
+def api_admin_set_config():
+    bid = g.branch["id"]
+    body = request.get_json(silent=True) or {}
+    if "services" in body:
+        db.set_json_config("services", body["services"], bid)
+    if "counters" in body:
+        db.set_json_config("counters", body["counters"], bid)
+    if "screens" in body:
+        # chuẩn hoá id (slug, không rỗng, không trùng) + bỏ màn hình không tên
+        clean = [sc for sc in db.get_screens_from_list(body["screens"]) if sc["name"]]
+        db.set_json_config("screens", clean, bid)
+    if "extra" in body:
+        merged = db.get_json_config("extra", {}, bid) or {}
+        merged.update(body["extra"])
+        db.set_json_config("extra", merged, bid)
+    if "booking" in body:
+        merged = db.get_json_config("booking", {}, bid) or {}
+        merged.update(body["booking"])
+        db.set_json_config("booking", merged, bid)
+    push_snapshot(bid)
+    return jsonify(ok=True)
+
+
+@bp.get("/api/admin/stats")
+@admin_required
+def api_admin_stats():
+    which = request.args.get("branch", "all")
+    day = db.today_str()
+    branches = db.list_branches() if which == "all" else [db.get_branch(which)]
+    branches = [b for b in branches if b]
+    if not branches:
+        return jsonify(error="Không có chi nhánh."), 404
+
+    with db.get_conn() as conn:
+        out = []
+        for b in branches:
+            bid = b["id"]
+            by_service = [
+                {"prefix": r["prefix"], "issued": r["issued"], "done": r["done"] or 0,
+                 "missed": r["missed"] or 0, "waiting": r["waiting"] or 0}
+                for r in conn.execute(
+                    """SELECT prefix, COUNT(*) issued,
+                              SUM(status='done') done, SUM(status='missed') missed,
+                              SUM(status='waiting') waiting
+                       FROM queue WHERE branch_id=? AND date_record=?
+                       GROUP BY prefix ORDER BY prefix""",
+                    (bid, day),
+                )
+            ]
+            avg_wait = conn.execute(
+                """SELECT AVG((julianday(time_start) - julianday(time_issue)) * 86400.0)
+                   FROM queue WHERE branch_id=? AND date_record=?
+                     AND time_start IS NOT NULL AND time_issue IS NOT NULL""",
+                (bid, day),
+            ).fetchone()[0]
+            total = conn.execute(
+                "SELECT COALESCE(count,0) FROM visitor_stats WHERE branch_id=? AND date_record=?",
+                (bid, day),
+            ).fetchone()
+            out.append({
+                "code": b["code"], "name": b["name"],
+                "today_total": total[0] if total else 0,
+                "avg_wait_seconds": round(avg_wait) if avg_wait else 0,
+                "by_service": by_service,
+            })
+        visitors = []
+        if which != "all":
+            visitors = [
+                {"date": r["date_record"], "count": r["count"]}
+                for r in conn.execute(
+                    "SELECT * FROM visitor_stats WHERE branch_id=? ORDER BY date_record DESC LIMIT 30",
+                    (branches[0]["id"],),
+                )
+            ]
+    return jsonify({"today": day, "scope": which, "branches": out, "visitors": visitors})
+
+
+@bp.get("/api/admin/b/<code>/appointments")
+@admin_required
+@resolve_branch
+def api_admin_appointments():
+    d = request.args.get("date", db.today_str())
+    with db.get_conn() as conn:
+        rows = [
+            {"code": r["code"], "token": r["token"], "prefix": r["prefix"],
+             "slot_start": r["slot_start"], "slot_end": r["slot_end"],
+             "status": r["status"], "citizen_name": r["citizen_name"],
+             "cccd": r["cccd"], "phone": r["phone"],
+             "created_at": r["created_at"], "checkin_at": r["checkin_at"]}
+            for r in conn.execute(
+                "SELECT * FROM appointments WHERE branch_id=? AND slot_date=? "
+                "ORDER BY slot_start, created_at",
+                (g.branch["id"], d),
+            )
+        ]
+    return jsonify({"date": d, "appointments": rows})
+
+
+@bp.post("/api/admin/b/<code>/appointments/cancel")
+@admin_required
+@resolve_branch
+def api_admin_appt_cancel():
+    body = request.get_json(silent=True) or {}
+    try:
+        bk.cancel(body.get("token", ""))
+    except bk.BookingError as e:
+        return jsonify(error=str(e)), 409
+    return jsonify(ok=True)
+
+
+@bp.post("/api/admin/b/<code>/reset-today")
+@admin_required
+@resolve_branch
+def api_admin_reset_today():
+    bid = g.branch["id"]
+    day = db.today_str()
+    with db.LOCK, db.get_conn() as conn:
+        conn.execute("DELETE FROM queue WHERE branch_id=? AND date_record=?", (bid, day))
+        conn.execute("DELETE FROM visitor_stats WHERE branch_id=? AND date_record=?", (bid, day))
+        conn.execute("UPDATE counters_status SET last_num='', status='offline' WHERE branch_id=?", (bid,))
+        conn.execute(
+            "UPDATE appointments SET status='cancelled' "
+            "WHERE branch_id=? AND slot_date=? AND status='booked'",
+            (bid, day),
+        )
+    push_snapshot(bid)
+    return jsonify(ok=True)
+
+
+# ----------------------------------------------------------------- API kiosk / thiết bị
+@bp.get("/api/ping")
+def api_ping():
+    """Xác nhận đây là GoSo Server (dùng cho Configurator 'Kiểm tra kết nối')."""
+    return jsonify(ok=True, service="goso-kiosk-server",
+                   server_version=SERVER_VERSION, time=db.now_str())
+
+
+@bp.get("/api/branches")
+def api_branches():
+    """Danh sách chi nhánh đang hoạt động (công khai, cho Configurator chọn chi nhánh)."""
+    return jsonify(branches=[
+        {"id": b["id"], "code": b["code"], "name": b["name"], "full_name": b["full_name"]}
+        for b in db.list_branches(active_only=True)
+    ])
+
+
+@bp.get("/api/kiosk/version")
+def api_kiosk_version():
+    """Bản kiosk mới nhất áp dụng cho (chi nhánh / thiết bị). v1: 1 bản chung, có
+    đường mở rộng rollout theo branch_code về sau."""
+    rel = db.get_kiosk_release(request.args.get("branch_code") or None)
+    return jsonify(rel)
+
+
+@bp.post("/api/b/<code>/heartbeat")
+@resolve_branch
+@require_branch_key
+def api_kiosk_heartbeat():
+    body = request.get_json(silent=True) or {}
+    did = (body.get("device_id") or "").strip()
+    if not did:
+        return jsonify(error="Thiếu device_id."), 400
+    try:
+        dev = db.upsert_device(
+            did, branch_code=g.branch["code"],
+            name=body.get("name", ""), version=body.get("version", ""),
+            printer=body.get("printer", ""), paper_mm=int(body.get("paper_mm") or 80),
+            status=body.get("status", "online"),
+            update_status=body.get("update_status", ""),
+        )
+    except (ValueError, TypeError) as e:
+        return jsonify(error=str(e)), 400
+    return jsonify(ok=True, device=dev,
+                   release=db.get_kiosk_release(g.branch["code"]))
+
+
+@bp.get("/api/admin/devices")
+@admin_required
+def api_admin_devices():
+    return jsonify(devices=db.list_devices(), release=db.get_kiosk_release())
+
+
+@bp.post("/api/admin/kiosk-release")
+@admin_required
+def api_admin_set_kiosk_release():
+    b = request.get_json(silent=True) or {}
+    rel = db.set_kiosk_release(
+        version=b.get("version"), download_url=b.get("download_url"),
+        sha256=b.get("sha256"), mandatory=b.get("mandatory"),
+        release_notes=b.get("release_notes"),
+        min_supported_version=b.get("min_supported_version"),
+    )
+    return jsonify(ok=True, release=rel)
+
+
+# ----------------------------------------------------------------- API đặt lịch online (công khai)
+@bp.get("/api/booking/branches")
+def api_booking_branches():
+    return jsonify(branches=bk.public_branches())
+
+
+@bp.get("/api/booking/<code>/slots")
+@resolve_branch
+def api_booking_slots():
+    try:
+        slots = bk.list_slots(g.branch["id"], request.args.get("date", ""),
+                              (request.args.get("prefix", "") or "").upper())
+    except bk.BookingError as e:
+        return jsonify(error=str(e)), 400
+    return jsonify({"slots": slots})
+
+
+@bp.post("/api/booking/<code>/book")
+@resolve_branch
+def api_booking_book():
+    body = request.get_json(silent=True) or {}
+    ip = _client_ip()
+    if not bk.rate_limit_ok(ip):
+        return jsonify(error="Bạn đã đặt quá nhiều lần trong 1 giờ. Vui lòng thử lại sau."), 429
+    if not bk.verify_turnstile(g.branch["id"], body.get("turnstile_token", ""), ip):
+        return jsonify(error="Xác thực chống spam thất bại. Vui lòng tải lại trang."), 400
+    try:
+        appt = bk.create_appointment(
+            g.branch["id"], (body.get("prefix", "") or "").upper(),
+            body.get("slot_date", ""), body.get("slot_start", ""),
+            body.get("citizen_name", ""), body.get("cccd", ""), body.get("phone", ""),
+            ip=ip,
+        )
+    except bk.BookingError as e:
+        return jsonify(error=str(e)), 409
+    return jsonify(appt)
+
+
+@bp.get("/api/booking/appt/<token>")
+def api_booking_appt(token):
+    try:
+        return jsonify(bk.appointment_view(token))
+    except bk.BookingError as e:
+        return jsonify(error=str(e)), 404
+
+
+@bp.post("/api/booking/appt/<token>/cancel")
+def api_booking_appt_cancel(token):
+    try:
+        return jsonify(bk.cancel(token))
+    except bk.BookingError as e:
+        return jsonify(error=str(e)), 409
+
+
+# ----------------------------------------------------------------- sweeper nền
+def _sweeper():
+    while True:
+        time.sleep(300)
+        try:
+            bk.expire_stale()
+        except Exception:  # noqa: BLE001
+            pass
+
+
+threading.Thread(target=_sweeper, daemon=True).start()

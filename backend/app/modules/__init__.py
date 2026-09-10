@@ -15,3 +15,8 @@ def register_blueprints(app: Flask) -> None:
 
     for bp in (auth_bp, employees_bp, units_bp, positions_bp, users_bp, roles_bp, audit_bp):
         app.register_blueprint(bp)
+
+    # --- Module Goiso (Phase 3): blueprint tương thích, giữ nguyên đường dẫn cũ ---
+    from .goiso.legacy_app import bp as goiso_compat_bp
+
+    app.register_blueprint(goiso_compat_bp)
