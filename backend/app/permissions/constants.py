@@ -28,6 +28,11 @@ ROLE_MANAGE = "role.manage"
 # --- Nhật ký ---
 AUDIT_VIEW = "audit.view"
 
+# --- Nhóm quyền Gọi số / Kiosk (module goiso) ---
+GOISO_VIEW = "goiso.view"        # xem hàng đợi, màn hình, bảng chờ, thống kê
+GOISO_COUNTER = "goiso.counter"  # trực một cửa/quầy: gọi số, gọi lại, bỏ qua, hoàn thành
+GOISO_ADMIN = "goiso.admin"      # cấu hình dịch vụ/quầy/màn hình, chi nhánh, thiết bị, đặt lịch
+
 
 PERMISSION_DEFINITIONS: list[tuple[str, str]] = [
     (EMPLOYEE_VIEW, "Xem danh sách và hồ sơ nhân sự"),
@@ -47,6 +52,9 @@ PERMISSION_DEFINITIONS: list[tuple[str, str]] = [
     (ROLE_VIEW, "Xem vai trò và quyền"),
     (ROLE_MANAGE, "Quản lý vai trò và quyền"),
     (AUDIT_VIEW, "Xem nhật ký thao tác"),
+    (GOISO_VIEW, "Gọi số: xem hàng đợi, màn hình, bảng chờ, thống kê"),
+    (GOISO_COUNTER, "Gọi số: trực một cửa/quầy (gọi, gọi lại, bỏ qua, hoàn thành)"),
+    (GOISO_ADMIN, "Gọi số: cấu hình dịch vụ/quầy/màn hình, chi nhánh, thiết bị, đặt lịch"),
 ]
 
 ALL_PERMISSIONS = [code for code, _ in PERMISSION_DEFINITIONS]
@@ -57,6 +65,11 @@ ROLE_SYSTEM_ADMIN = "SYSTEM_ADMIN"
 ROLE_HR_ADMIN = "HR_ADMIN"
 ROLE_UNIT_MANAGER = "UNIT_MANAGER"
 ROLE_VIEWER = "VIEWER"
+
+# Vai trò module Gọi số
+ROLE_GOISO_ADMIN = "GOISO_ADMIN"                # quản trị gọi số toàn hệ thống
+ROLE_GOISO_BRANCH_ADMIN = "GOISO_BRANCH_ADMIN"  # quản trị gọi số trong phạm vi chi nhánh được cấp
+ROLE_GOISO_COUNTER = "GOISO_COUNTER"            # được giao TRỰC MỘT CỬA/QUẦY, vào trang gọi số
 
 ROLE_DEFINITIONS: dict[str, dict] = {
     ROLE_SYSTEM_ADMIN: {
@@ -108,5 +121,26 @@ ROLE_DEFINITIONS: dict[str, dict] = {
             UNIT_VIEW,
             POSITION_VIEW,
         ],
+    },
+    ROLE_GOISO_ADMIN: {
+        "name": "Quản trị Gọi số",
+        "description": "Toàn quyền module gọi số: cấu hình dịch vụ/quầy/màn hình, "
+        "chi nhánh, thiết bị kiosk, đặt lịch trên toàn hệ thống.",
+        "is_system": True,
+        "permissions": [GOISO_VIEW, GOISO_COUNTER, GOISO_ADMIN, UNIT_VIEW],
+    },
+    ROLE_GOISO_BRANCH_ADMIN: {
+        "name": "Quản trị Gọi số chi nhánh",
+        "description": "Quản trị gọi số trong phạm vi chi nhánh được phân công "
+        "(cấu hình dịch vụ/quầy/màn hình, trực quầy). Phạm vi giới hạn theo đơn vị.",
+        "is_system": True,
+        "permissions": [GOISO_VIEW, GOISO_COUNTER, GOISO_ADMIN],
+    },
+    ROLE_GOISO_COUNTER: {
+        "name": "Nhân viên Gọi số (trực cửa)",
+        "description": "Được giao trực một cửa/quầy: vào trang gọi số, gọi số, gọi lại, "
+        "bỏ qua, hoàn thành. Chỉ thao tác trong chi nhánh được phân công.",
+        "is_system": True,
+        "permissions": [GOISO_VIEW, GOISO_COUNTER],
     },
 }

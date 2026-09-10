@@ -31,6 +31,11 @@ class User(TimestampMixin, db.Model):
     full_name: Mapped[str] = mapped_column(String(255), nullable=False)
     email: Mapped[str | None] = mapped_column(String(120), unique=True)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    # Cầu nối tạm sang hệ gọi số: mã chi nhánh goiso mà tài khoản này trực (nếu có).
+    # Phase 6 sẽ thay bằng liên kết organization_units <-> goiso branch.
+    goiso_branch_code: Mapped[str | None] = mapped_column(String(50), index=True)
+    # Di trú mật khẩu goiso (sha256) -> Argon2 ở lần đăng nhập đầu. Xoá sau khi nâng cấp.
+    legacy_password_sha256: Mapped[str | None] = mapped_column(String(64))
     last_login_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
     # Chống brute-force
@@ -53,6 +58,16 @@ class User(TimestampMixin, db.Model):
         try:
             _ph.verify(self.password_hash, raw_password)
         except (VerifyMismatchError, VerificationError, InvalidHashError):
+            # Đường di trú: tài khoản chuyển từ hệ goiso còn hash sha256.
+            if self.legacy_password_sha256:
+                import hashlib
+                import hmac
+
+                digest = hashlib.sha256((raw_password or "").encode("utf-8")).hexdigest()
+                if hmac.compare_digest(digest, self.legacy_password_sha256):
+                    self.set_password(raw_password)  # nâng cấp sang Argon2
+                    self.legacy_password_sha256 = None
+                    return True
             return False
         # Nâng cấp hash nếu tham số thay đổi
         if _ph.check_needs_rehash(self.password_hash):
@@ -79,6 +94,7 @@ class User(TimestampMixin, db.Model):
             "full_name": self.full_name,
             "email": self.email,
             "employee_id": self.employee_id,
+            "goiso_branch_code": self.goiso_branch_code,
             "is_active": self.is_active,
             "last_login_at": _iso(self.last_login_at),
             "roles": [r.to_dict(include_permissions=False) for r in self.roles],

@@ -31,6 +31,20 @@ class BaseConfig:
     )
     JWT_ERROR_MESSAGE_KEY = "message"
 
+    # Token đọc từ HEADER (SPA nhân sự dùng Bearer) HOẶC COOKIE (trang Jinja goiso
+    # đăng nhập một lần cho cả platform — SSO cùng origin).
+    JWT_TOKEN_LOCATION = ["headers", "cookies"]
+    JWT_COOKIE_SAMESITE = "Lax"
+    # TODO(P8): bật JWT_COOKIE_CSRF_PROTECT + gửi header CSRF từ JS goiso.
+    JWT_COOKIE_CSRF_PROTECT = False
+    JWT_SESSION_COOKIE = False
+    JWT_ACCESS_COOKIE_PATH = "/"
+    JWT_REFRESH_COOKIE_PATH = "/"
+    JWT_COOKIE_SECURE = os.getenv("FLASK_ENV", "development").lower() == "production"
+    _cookie_domain = os.getenv("COOKIE_DOMAIN", "").strip()
+    if _cookie_domain:
+        JWT_COOKIE_DOMAIN = _cookie_domain
+
     # CORS
     CORS_ORIGINS = _split_csv(os.getenv("CORS_ORIGINS", "http://localhost:5173"))
 

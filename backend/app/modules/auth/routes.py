@@ -1,8 +1,19 @@
-"""Route xác thực."""
+"""Route xác thực (đăng nhập CHUNG cho cả platform).
+
+Trả token trong body (SPA nhân sự dùng Bearer) VÀ đặt cookie JWT (trang Jinja
+của module gọi số đọc cookie này -> đăng nhập một lần cho cả hai module).
+"""
 from __future__ import annotations
 
-from flask import Blueprint, request
-from flask_jwt_extended import get_jwt, get_jwt_identity, jwt_required
+from flask import Blueprint, make_response, request
+from flask_jwt_extended import (
+    get_jwt,
+    get_jwt_identity,
+    jwt_required,
+    set_access_cookies,
+    set_refresh_cookies,
+    unset_jwt_cookies,
+)
 
 from ...common.auth_context import current_user, get_request_meta
 from ...common.exceptions import ValidationError
@@ -14,13 +25,23 @@ from .._helpers import validated_json
 bp = Blueprint("auth", __name__, url_prefix="/api/auth")
 
 
+def _with_cookies(result: dict, message: str):
+    """Bọc phản hồi success() và gắn cookie JWT nếu có token trong result."""
+    resp = make_response(*success(result, message))
+    if result.get("access_token"):
+        set_access_cookies(resp, result["access_token"])
+    if result.get("refresh_token"):
+        set_refresh_cookies(resp, result["refresh_token"])
+    return resp
+
+
 @bp.post("/login")
 def login():
     data = validated_json(login_schema)
     result = auth_service.login(
         data.get("username", ""), data.get("password", ""), meta=get_request_meta()
     )
-    return success(result, "Đăng nhập thành công")
+    return _with_cookies(result, "Đăng nhập thành công")
 
 
 @bp.post("/refresh")
@@ -30,7 +51,7 @@ def refresh():
     result = auth_service.refresh(
         claims["jti"], get_jwt_identity(), meta=get_request_meta()
     )
-    return success(result, "Làm mới token thành công")
+    return _with_cookies(result, "Làm mới token thành công")
 
 
 @bp.post("/logout")
@@ -38,7 +59,9 @@ def refresh():
 def logout():
     claims = get_jwt()
     auth_service.logout(claims["jti"])
-    return success(None, "Đăng xuất thành công")
+    resp = make_response(*success(None, "Đăng xuất thành công"))
+    unset_jwt_cookies(resp)
+    return resp
 
 
 @bp.get("/me")

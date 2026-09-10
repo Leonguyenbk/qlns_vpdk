@@ -111,11 +111,31 @@ def require_branch_key(view):
 
 
 def current_user():
+    # 1) Ưu tiên JWT platform (cookie hoặc header) — đăng nhập CHUNG.
+    from .identity import current_platform_user_as_goiso
+
+    pu = current_platform_user_as_goiso()
+    if pu:
+        return pu
+    # 2) Dự phòng: phiên goiso cũ (SQLite users) trong thời gian chuyển tiếp.
     uid = session.get("uid")
     if not uid:
         return None
     u = db.get_user(uid)
     return u if (u and u["active"]) else None
+
+
+def _is_goiso_admin(u):
+    return u["role"] == "admin" or "goiso.admin" in (u.get("perms") or ())
+
+
+def _can_work_counter(u):
+    """Tài khoản platform phải có quyền goiso.counter; user goiso cũ giữ hành vi cũ."""
+    if _is_goiso_admin(u):
+        return True
+    if u.get("_platform"):
+        return "goiso.counter" in (u.get("perms") or ())
+    return True  # user goiso cũ (SQLite) — theo cơ chế role/branch phía dưới
 
 
 def _need_login_response(msg="Cần đăng nhập."):
@@ -142,9 +162,9 @@ def admin_required(view):
         u = current_user()
         if not u:
             return _need_login_response("Chưa đăng nhập quản trị.")
-        if u["role"] != "admin":
+        if not _is_goiso_admin(u):
             if request.path.startswith("/api/"):
-                return jsonify(error="Chỉ quản trị viên."), 403
+                return jsonify(error="Chỉ quản trị viên gọi số (goiso.admin)."), 403
             return "Chỉ quản trị viên mới truy cập được trang này.", 403
         g.user = u
         return view(*args, **kwargs)
@@ -152,13 +172,17 @@ def admin_required(view):
 
 
 def counter_guard(view):
-    """Yêu cầu đăng nhập; nhân viên chỉ thao tác trên chi nhánh của mình."""
+    """Yêu cầu đăng nhập + quyền trực quầy; nhân viên chỉ thao tác trên chi nhánh của mình."""
     @functools.wraps(view)
     def wrapper(*args, **kwargs):
         u = current_user()
         if not u:
             return _need_login_response()
-        if u["role"] != "admin" and u["branch_id"] != g.branch["id"]:
+        if not _can_work_counter(u):
+            if request.path.startswith("/api/"):
+                return jsonify(error="Bạn không được giao trực quầy (thiếu quyền goiso.counter)."), 403
+            return "Bạn không được giao trực quầy gọi số.", 403
+        if not _is_goiso_admin(u) and u["branch_id"] != g.branch["id"]:
             if request.path.startswith("/api/"):
                 return jsonify(error="Bạn không thuộc chi nhánh này."), 403
             return "Bạn không có quyền truy cập chi nhánh này.", 403
@@ -308,40 +332,88 @@ def page_admin():
 
 
 # ----------------------------------------------------------------- đăng nhập
+def _home_for(u):
+    """Đường về sau đăng nhập theo vai trò goiso."""
+    if _is_goiso_admin(u):
+        return "/admin"
+    code = u.get("branch_code")
+    if not code and u.get("branch_id"):
+        b = db.get_branch_by_id(u["branch_id"])
+        code = b["code"] if b else None
+    return f"/b/{code}/counter" if code else "/"
+
+
 @bp.route("/login")
 def page_login():
-    if current_user():
-        u = current_user()
-        if u["role"] == "admin":
-            return redirect(url_for("goiso.page_admin"))
-        b = db.get_branch_by_id(u["branch_id"])
-        if b:
-            return redirect(f"/b/{b['code']}/counter")
+    u = current_user()
+    if u:
+        return redirect(_home_for(u))
     return render_template("login.html")
 
 
 @bp.post("/api/login")
 def api_login():
+    """Đăng nhập CHUNG: xác thực qua platform, đặt cookie JWT, trả payload goiso."""
+    from flask import make_response
+    from flask_jwt_extended import set_access_cookies, set_refresh_cookies
+
+    from ...common.exceptions import AppError
+    from ...services import auth_service
+
     body = request.get_json(silent=True) or {}
-    u = db.verify_login(body.get("username", ""), body.get("password", ""))
-    if not u:
-        return jsonify(error="Sai tên đăng nhập hoặc mật khẩu."), 401
-    session.clear()
-    session["uid"] = u["id"]
-    session["role"] = u["role"]
-    session.permanent = True
-    if u["role"] == "admin":
-        nxt = "/admin"
-    else:
-        b = db.get_branch_by_id(u["branch_id"])
-        nxt = f"/b/{b['code']}/counter" if b else "/"
-    return jsonify(ok=True, role=u["role"], full_name=u["full_name"], next=nxt)
+    meta = {"ip_address": _client_ip(), "user_agent": request.headers.get("User-Agent", "")}
+    try:
+        result = auth_service.login(
+            body.get("username", ""), body.get("password", ""), meta=meta
+        )
+    except AppError as e:
+        return jsonify(error=e.message), e.status_code
+
+    info = result["user"]
+    role_codes = {r["code"] for r in info.get("roles", [])}
+    perms = set(info.get("permissions", []))
+    is_admin = bool({"SYSTEM_ADMIN", "GOISO_ADMIN"} & role_codes) or "goiso.admin" in perms
+    if not (is_admin or "goiso.counter" in perms or "goiso.view" in perms):
+        return jsonify(error="Tài khoản không có quyền truy cập hệ thống gọi số."), 403
+
+    u_shaped = {
+        "role": "admin" if is_admin else "staff",
+        "branch_code": info.get("goiso_branch_code"),
+        "branch_id": None,
+        "perms": perms,
+    }
+    session.clear()  # bỏ phiên goiso cũ nếu còn
+    resp = make_response(
+        jsonify(ok=True, role=u_shaped["role"], full_name=info["full_name"],
+                next=_home_for(u_shaped))
+    )
+    set_access_cookies(resp, result["access_token"])
+    set_refresh_cookies(resp, result["refresh_token"])
+    return resp
 
 
 @bp.post("/api/logout")
 def api_logout():
+    from flask import make_response
+    from flask_jwt_extended import (
+        get_jwt,
+        unset_jwt_cookies,
+        verify_jwt_in_request,
+    )
+
     session.clear()
-    return jsonify(ok=True)
+    try:
+        verify_jwt_in_request(refresh=True, optional=True)
+        jti = (get_jwt() or {}).get("jti")
+        if jti:
+            from ...services import auth_service
+
+            auth_service.logout(jti)
+    except Exception:  # noqa: BLE001
+        pass
+    resp = make_response(jsonify(ok=True))
+    unset_jwt_cookies(resp)
+    return resp
 
 
 @bp.get("/api/me")

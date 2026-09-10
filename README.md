@@ -21,7 +21,7 @@ Nguồn gốc & kế hoạch hợp nhất: **[docs/MERGE_ANALYSIS.md](docs/MERGE
 | P2 | Dựng khung platform từ backend nhân sự, chạy cổng riêng | ✅ xong (backend + test) |
 | P3 | Đưa goiso vào `modules/goiso` (giữ SQLite tạm) + lớp tương thích | ✅ xong |
 | P4 | Chuẩn hoá module nhân sự trong cấu trúc mới + test nghiệp vụ | ✅ xong |
-| P5 | Gộp tài khoản/đăng nhập, permission `GOISO_*`, cookie SSO cho trang Jinja | ⏳ |
+| P5 | Gộp đăng nhập (JWT chung + cookie SSO), quyền `GOISO_*`, vai trò trực quầy `GOISO_COUNTER`, di trú 12 tài khoản goiso | ✅ xong |
 | P6 | Đơn vị dùng chung; chuyển bảng goiso sang MySQL (`goiso_*`) có script + log | ⏳ |
 | P7 | Portal React (chọn ứng dụng theo quyền) + màn quản trị goiso trong SPA | ⏳ |
 | P8 | Triển khai: 1 Waitress, NSSM, nginx, Cloudflare Tunnel domain mới, docs | ⏳ |
@@ -61,4 +61,4 @@ set FLASK_ENV=testing && .venv\Scripts\pytest -q
 
 - Hai hệ cũ vẫn giữ nguyên tại `D:\DEPLOY\qlns_vpdk` và `D:\QUANGTUAN\goiso_kios` làm nguồn + phương án lùi cho tới khi platform chạy thật ổn.
 - `backend/.env` **không** commit. CSDL thật (chứa CCCD) không đưa lên git.
-- Phase 2 tạm trỏ `DATABASE_URL` vào CSDL nhân sự đang chạy; Phase 6 tách CSDL `qlns_platform` riêng.
+- Từ Phase 5, dev dùng CSDL SQLite riêng (`backend/instance/platform_dev.db`) — hoàn toàn tách khỏi CSDL nhân sự đang chạy. Phase 6 chuyển sang MySQL `qlns_platform`.
