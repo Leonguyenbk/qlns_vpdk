@@ -3,12 +3,12 @@ from __future__ import annotations
 
 from flask import Blueprint, request
 
-from ...common.auth_context import require_permission
-from ...common.responses import success
-from ...permissions import constants as perms
-from ...services import position_service
-from ...schemas import position_create_schema, position_update_schema
-from .._helpers import actor_and_scope, audit_meta, validated_json
+from ....common.auth_context import require_permission
+from ....common.responses import success
+from ....permissions import constants as perms
+from ....services import position_service
+from ....schemas import position_create_schema, position_update_schema
+from ..._helpers import actor_and_scope, audit_meta, validated_json
 
 bp = Blueprint("positions", __name__, url_prefix="/api/positions")
 

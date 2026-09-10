@@ -3,18 +3,18 @@ from __future__ import annotations
 
 from flask import Blueprint, request
 
-from ...common.auth_context import require_permission
-from ...common.responses import paginated, success
-from ...permissions import constants as perms
-from ...services import user_service
-from ...schemas import (
+from ....common.auth_context import require_permission
+from ....common.responses import paginated, success
+from ....permissions import constants as perms
+from ....services import user_service
+from ....schemas import (
     reset_password_schema,
     user_create_schema,
     user_roles_schema,
     user_scopes_schema,
     user_update_schema,
 )
-from .._helpers import actor_and_scope, audit_meta, validated_json
+from ..._helpers import actor_and_scope, audit_meta, validated_json
 
 bp = Blueprint("users", __name__, url_prefix="/api/users")
 

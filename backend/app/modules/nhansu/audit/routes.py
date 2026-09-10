@@ -3,13 +3,13 @@ from __future__ import annotations
 
 from flask import Blueprint, request
 
-from ...common.auth_context import require_permission
-from ...common.responses import paginated
-from ...common.utils import clean_str, parse_pagination
-from ...extensions import db
-from ...models import AuditLog
-from ...permissions import constants as perms
-from .._helpers import actor_and_scope
+from ....common.auth_context import require_permission
+from ....common.responses import paginated
+from ....common.utils import clean_str, parse_pagination
+from ....extensions import db
+from ....models import AuditLog
+from ....permissions import constants as perms
+from ..._helpers import actor_and_scope
 
 bp = Blueprint("audit", __name__, url_prefix="/api/audit-logs")
 
