@@ -26,14 +26,14 @@ def issue_ticket(branch_id, prefix, fullname="", cccd="", phone="",
     with db.LOCK, db.get_conn() as conn:
         limit = int(svc.get("daily_limit") or 0)
         issued_today = conn.execute(
-            "SELECT COUNT(*) FROM queue WHERE branch_id=? AND prefix=? AND date_record=?",
+            "SELECT COUNT(*) FROM goiso_queue WHERE branch_id=? AND prefix=? AND date_record=?",
             (branch_id, prefix, day),
         ).fetchone()[0]
         if limit and issued_today >= limit:
             raise QueueError("Đã hết lượt cấp số trong ngày cho dịch vụ này.")
 
         row = conn.execute(
-            "SELECT COALESCE(MAX(number), 0) FROM queue "
+            "SELECT COALESCE(MAX(number), 0) FROM goiso_queue "
             "WHERE branch_id=? AND prefix=? AND date_record=?",
             (branch_id, prefix, day),
         ).fetchone()
@@ -41,7 +41,7 @@ def issue_ticket(branch_id, prefix, fullname="", cccd="", phone="",
         now = db.now_str()
         sess = db.session_now()
         cur = conn.execute(
-            """INSERT INTO queue
+            """INSERT INTO goiso_queue
                  (branch_id, prefix, number, status, counter, staff_name, date_record,
                   fullname, cccd, session, phone, time_issue, source, priority, appointment_id)
                VALUES (?, ?, ?, 'waiting', '', '', ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
@@ -51,13 +51,13 @@ def issue_ticket(branch_id, prefix, fullname="", cccd="", phone="",
         ticket_id = cur.lastrowid
 
         conn.execute(
-            "INSERT INTO visitor_stats(branch_id, date_record, count) VALUES(?, ?, 1) "
+            "INSERT INTO goiso_visitor_stats(branch_id, date_record, count) VALUES(?, ?, 1) "
             "ON CONFLICT(branch_id, date_record) DO UPDATE SET count = count + 1",
             (branch_id, day),
         )
 
         waiting_ahead = conn.execute(
-            "SELECT COUNT(*) FROM queue WHERE branch_id=? AND prefix=? AND date_record=? "
+            "SELECT COUNT(*) FROM goiso_queue WHERE branch_id=? AND prefix=? AND date_record=? "
             "AND status='waiting' AND (priority > ? OR (priority = ? AND number < ?))",
             (branch_id, prefix, day, int(priority or 0), int(priority or 0), number),
         ).fetchone()[0]
@@ -131,13 +131,13 @@ def call_next(branch_id, counter_id, staff_name=""):
     now = db.now_str()
     with db.LOCK, db.get_conn() as conn:
         conn.execute(
-            "UPDATE queue SET status='done', time_done=? "
+            "UPDATE goiso_queue SET status='done', time_done=? "
             "WHERE branch_id=? AND counter=? AND date_record=? AND status='serving'",
             (now, branch_id, counter_id, day),
         )
         placeholders = ",".join("?" * len(prefixes))
         nxt = conn.execute(
-            f"""SELECT * FROM queue
+            f"""SELECT * FROM goiso_queue
                 WHERE branch_id=? AND date_record=? AND status='waiting'
                   AND prefix IN ({placeholders})
                 ORDER BY priority DESC, id ASC LIMIT 1""",
@@ -146,7 +146,7 @@ def call_next(branch_id, counter_id, staff_name=""):
         if nxt is None:
             raise QueueError("Không còn số nào đang chờ.")
         conn.execute(
-            "UPDATE queue SET status='serving', counter=?, staff_name=?, time_start=? WHERE id=?",
+            "UPDATE goiso_queue SET status='serving', counter=?, staff_name=?, time_start=? WHERE id=?",
             (counter_id, staff_name, now, nxt["id"]),
         )
         fno = db.full_no(nxt["prefix"], nxt["number"])
@@ -159,7 +159,7 @@ def recall(branch_id, counter_id):
     day = db.today_str()
     with db.get_conn() as conn:
         row = conn.execute(
-            "SELECT * FROM queue WHERE branch_id=? AND counter=? AND date_record=? "
+            "SELECT * FROM goiso_queue WHERE branch_id=? AND counter=? AND date_record=? "
             "AND status='serving' ORDER BY time_start DESC LIMIT 1",
             (branch_id, counter_id, day),
         ).fetchone()
@@ -173,7 +173,7 @@ def finish_current(branch_id, counter_id):
     now = db.now_str()
     with db.LOCK, db.get_conn() as conn:
         n = conn.execute(
-            "UPDATE queue SET status='done', time_done=? "
+            "UPDATE goiso_queue SET status='done', time_done=? "
             "WHERE branch_id=? AND counter=? AND date_record=? AND status='serving'",
             (now, branch_id, counter_id, day),
         ).rowcount
@@ -187,7 +187,7 @@ def mark_missed(branch_id, counter_id):
     now = db.now_str()
     with db.LOCK, db.get_conn() as conn:
         n = conn.execute(
-            "UPDATE queue SET status='missed', time_done=? "
+            "UPDATE goiso_queue SET status='missed', time_done=? "
             "WHERE branch_id=? AND counter=? AND date_record=? AND status='serving'",
             (now, branch_id, counter_id, day),
         ).rowcount
@@ -210,7 +210,7 @@ def call_specific(branch_id, counter_id, full_no_str, staff_name=""):
         raise QueueError("Số không hợp lệ. Ví dụ: A-25")
     with db.LOCK, db.get_conn() as conn:
         row = conn.execute(
-            "SELECT * FROM queue WHERE branch_id=? AND date_record=? AND prefix=? AND number=?",
+            "SELECT * FROM goiso_queue WHERE branch_id=? AND date_record=? AND prefix=? AND number=?",
             (branch_id, day, prefix, num),
         ).fetchone()
         if row is None:
@@ -218,12 +218,12 @@ def call_specific(branch_id, counter_id, full_no_str, staff_name=""):
         if row["status"] == "done":
             raise QueueError(f"Số {prefix}-{num:03d} đã xử lý xong.")
         conn.execute(
-            "UPDATE queue SET status='done', time_done=? "
+            "UPDATE goiso_queue SET status='done', time_done=? "
             "WHERE branch_id=? AND counter=? AND date_record=? AND status='serving'",
             (now, branch_id, counter_id, day),
         )
         conn.execute(
-            "UPDATE queue SET status='serving', counter=?, staff_name=?, time_start=? WHERE id=?",
+            "UPDATE goiso_queue SET status='serving', counter=?, staff_name=?, time_start=? WHERE id=?",
             (counter_id, staff_name, now, row["id"]),
         )
         fno = db.full_no(row["prefix"], row["number"])
@@ -236,7 +236,7 @@ def set_counter_status(branch_id, counter_id, status, staff_name=None):
         raise QueueError("Trạng thái không hợp lệ.")
     with db.LOCK, db.get_conn() as conn:
         cur = conn.execute(
-            "SELECT staff_name, last_num FROM counters_status WHERE branch_id=? AND counter_id=?",
+            "SELECT staff_name, last_num FROM goiso_counters_status WHERE branch_id=? AND counter_id=?",
             (branch_id, counter_id),
         ).fetchone()
         keep_staff = staff_name if staff_name is not None else (cur["staff_name"] if cur else "")
@@ -247,7 +247,7 @@ def set_counter_status(branch_id, counter_id, status, staff_name=None):
 
 def _touch_counter(conn, branch_id, counter_id, staff_name, last_num, status="active"):
     conn.execute(
-        """INSERT INTO counters_status(branch_id, counter_id, staff_name, status, last_num, last_update)
+        """INSERT INTO goiso_counters_status(branch_id, counter_id, staff_name, status, last_num, last_update)
            VALUES(?, ?, ?, ?, ?, ?)
            ON CONFLICT(branch_id, counter_id) DO UPDATE SET
              staff_name=excluded.staff_name, status=excluded.status,
@@ -257,7 +257,7 @@ def _touch_counter(conn, branch_id, counter_id, staff_name, last_num, status="ac
 
 
 def _row_to_call(conn, row_id, is_recall=False):
-    r = conn.execute("SELECT * FROM queue WHERE id=?", (row_id,)).fetchone()
+    r = conn.execute("SELECT * FROM goiso_queue WHERE id=?", (row_id,)).fetchone()
     services = db.get_json_config("services", {}, r["branch_id"]) or {}
     svc = services.get(r["prefix"], {})
     return {
@@ -288,20 +288,20 @@ def snapshot(branch_id):
         status_rows = {
             row["counter_id"]: row
             for row in conn.execute(
-                "SELECT * FROM counters_status WHERE branch_id=?", (branch_id,)
+                "SELECT * FROM goiso_counters_status WHERE branch_id=?", (branch_id,)
             )
         }
         serving = {
             row["counter"]: row
             for row in conn.execute(
-                "SELECT * FROM queue WHERE branch_id=? AND date_record=? AND status='serving'",
+                "SELECT * FROM goiso_queue WHERE branch_id=? AND date_record=? AND status='serving'",
                 (branch_id, day),
             )
         }
         waiting_counts = {
             row["prefix"]: row["c"]
             for row in conn.execute(
-                "SELECT prefix, COUNT(*) c FROM queue "
+                "SELECT prefix, COUNT(*) c FROM goiso_queue "
                 "WHERE branch_id=? AND date_record=? AND status='waiting' GROUP BY prefix",
                 (branch_id, day),
             )
@@ -315,14 +315,14 @@ def snapshot(branch_id):
                 "time_start": row["time_start"],
             }
             for row in conn.execute(
-                "SELECT * FROM queue WHERE branch_id=? AND date_record=? "
+                "SELECT * FROM goiso_queue WHERE branch_id=? AND date_record=? "
                 "AND status IN ('serving','done','missed') AND time_start IS NOT NULL "
                 "ORDER BY time_start DESC LIMIT ?",
                 (branch_id, day, recent_n),
             )
         ]
         row = conn.execute(
-            "SELECT count FROM visitor_stats WHERE branch_id=? AND date_record=?",
+            "SELECT count FROM goiso_visitor_stats WHERE branch_id=? AND date_record=?",
             (branch_id, day),
         ).fetchone()
         today_total = row[0] if row else 0
@@ -381,11 +381,11 @@ def counter_view(branch_id, counter_id):
     services = db.get_json_config("services", {}, branch_id) or {}
     with db.get_conn() as conn:
         st = conn.execute(
-            "SELECT * FROM counters_status WHERE branch_id=? AND counter_id=?",
+            "SELECT * FROM goiso_counters_status WHERE branch_id=? AND counter_id=?",
             (branch_id, counter_id),
         ).fetchone()
         serving = conn.execute(
-            "SELECT * FROM queue WHERE branch_id=? AND counter=? AND date_record=? "
+            "SELECT * FROM goiso_queue WHERE branch_id=? AND counter=? AND date_record=? "
             "AND status='serving' ORDER BY time_start DESC LIMIT 1",
             (branch_id, counter_id, day),
         ).fetchone()
@@ -403,13 +403,13 @@ def counter_view(branch_id, counter_id):
                     "source": r["source"] or "kiosk",
                 }
                 for r in conn.execute(
-                    f"SELECT * FROM queue WHERE branch_id=? AND date_record=? AND status='waiting' "
+                    f"SELECT * FROM goiso_queue WHERE branch_id=? AND date_record=? AND status='waiting' "
                     f"AND prefix IN ({ph}) ORDER BY priority DESC, id ASC",
                     [branch_id, day, *prefixes],
                 )
             ]
             done_today = conn.execute(
-                "SELECT COUNT(*) FROM queue WHERE branch_id=? AND date_record=? AND counter=? "
+                "SELECT COUNT(*) FROM goiso_queue WHERE branch_id=? AND date_record=? AND counter=? "
                 "AND status IN ('done','missed')",
                 (branch_id, day, counter_id),
             ).fetchone()[0]
@@ -420,7 +420,7 @@ def counter_view(branch_id, counter_id):
                 "time_start": r["time_start"],
             }
             for r in conn.execute(
-                "SELECT * FROM queue WHERE branch_id=? AND date_record=? AND counter=? "
+                "SELECT * FROM goiso_queue WHERE branch_id=? AND date_record=? AND counter=? "
                 "AND status IN ('done','missed','serving') ORDER BY time_start DESC LIMIT 12",
                 (branch_id, day, counter_id),
             )

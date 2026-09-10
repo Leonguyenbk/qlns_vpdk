@@ -51,3 +51,6 @@ backend/data/*.xlsx
 *.db-shm
 backend/app/modules/goiso/tts_cache/
 backend/instance/
+
+backend/.env.*
+!backend/.env.example

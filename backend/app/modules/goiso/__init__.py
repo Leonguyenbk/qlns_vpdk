@@ -28,9 +28,4 @@ def configure_goiso(app: Flask) -> None:
     if cookie_domain:
         app.config["SESSION_COOKIE_DOMAIN"] = cookie_domain
 
-    # Khởi tạo schema SQLite goiso (idempotent — CREATE TABLE IF NOT EXISTS).
-    # Bỏ qua nếu không cấu hình GOISO_DB (ví dụ khi chạy test nhân sự).
-    if os.getenv("GOISO_DB"):
-        from . import legacy_db
-
-        legacy_db.init_db()
+    # Schema goiso_* do Alembic (0006_goiso_tables) quản lý — không cần init runtime.

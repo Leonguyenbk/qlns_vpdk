@@ -45,7 +45,7 @@ def _gen_code(conn, branch_id):
         code = "".join(secrets.choice(_CODE_ALPHABET) for _ in range(8))
         code = code[:4] + "-" + code[4:]
         hit = conn.execute(
-            "SELECT 1 FROM appointments WHERE branch_id=? AND code=?", (branch_id, code)
+            "SELECT 1 FROM goiso_appointments WHERE branch_id=? AND code=?", (branch_id, code)
         ).fetchone()
         if not hit:
             return code
@@ -79,7 +79,7 @@ def list_slots(branch_id, slot_date, prefix):
         taken = {
             r["slot_start"]: r["c"]
             for r in conn.execute(
-                "SELECT slot_start, COUNT(*) c FROM appointments "
+                "SELECT slot_start, COUNT(*) c FROM goiso_appointments "
                 "WHERE branch_id=? AND slot_date=? AND prefix=? AND status IN ('booked','checked_in') "
                 "GROUP BY slot_start",
                 (branch_id, slot_date, prefix),
@@ -132,7 +132,7 @@ def create_appointment(branch_id, prefix, slot_date, slot_start,
 
     with db.LOCK, db.get_conn() as conn:
         used = conn.execute(
-            "SELECT COUNT(*) FROM appointments WHERE branch_id=? AND slot_date=? AND prefix=? "
+            "SELECT COUNT(*) FROM goiso_appointments WHERE branch_id=? AND slot_date=? AND prefix=? "
             "AND slot_start=? AND status IN ('booked','checked_in')",
             (branch_id, slot_date, prefix, slot_start),
         ).fetchone()[0]
@@ -141,7 +141,7 @@ def create_appointment(branch_id, prefix, slot_date, slot_start,
 
         if max_active:
             open_cnt = conn.execute(
-                "SELECT COUNT(*) FROM appointments WHERE branch_id=? AND cccd=? AND status='booked'",
+                "SELECT COUNT(*) FROM goiso_appointments WHERE branch_id=? AND cccd=? AND status='booked'",
                 (branch_id, cccd),
             ).fetchone()[0]
             if open_cnt >= max_active:
@@ -152,7 +152,7 @@ def create_appointment(branch_id, prefix, slot_date, slot_start,
         code = _gen_code(conn, branch_id)
         token = db.gen_token(24)
         cur = conn.execute(
-            """INSERT INTO appointments
+            """INSERT INTO goiso_appointments
                  (branch_id, prefix, slot_date, slot_start, slot_end, code, token,
                   citizen_name, cccd, phone, status, created_at, ip)
                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'booked', ?, ?)""",
@@ -167,7 +167,7 @@ def create_appointment(branch_id, prefix, slot_date, slot_start,
 # --------------------------------------------------------------------- tra cứu
 def appointment_view(token):
     with db.get_conn() as conn:
-        r = conn.execute("SELECT * FROM appointments WHERE token=?", (token,)).fetchone()
+        r = conn.execute("SELECT * FROM goiso_appointments WHERE token=?", (token,)).fetchone()
     if r is None:
         raise BookingError("Không tìm thấy lịch hẹn.")
     branch = db.get_branch_by_id(r["branch_id"])
@@ -176,7 +176,7 @@ def appointment_view(token):
     q_no = None
     if r["queue_id"]:
         with db.get_conn() as conn:
-            qr = conn.execute("SELECT prefix, number FROM queue WHERE id=?", (r["queue_id"],)).fetchone()
+            qr = conn.execute("SELECT prefix, number FROM goiso_queue WHERE id=?", (r["queue_id"],)).fetchone()
         if qr:
             q_no = db.full_no(qr["prefix"], qr["number"])
     return {
@@ -195,12 +195,12 @@ def appointment_view(token):
 
 def cancel(token):
     with db.LOCK, db.get_conn() as conn:
-        r = conn.execute("SELECT status FROM appointments WHERE token=?", (token,)).fetchone()
+        r = conn.execute("SELECT status FROM goiso_appointments WHERE token=?", (token,)).fetchone()
         if r is None:
             raise BookingError("Không tìm thấy lịch hẹn.")
         if r["status"] != "booked":
             raise BookingError("Lịch hẹn không ở trạng thái có thể huỷ.")
-        conn.execute("UPDATE appointments SET status='cancelled' WHERE token=?", (token,))
+        conn.execute("UPDATE goiso_appointments SET status='cancelled' WHERE token=?", (token,))
     return {"ok": True}
 
 
@@ -220,7 +220,7 @@ def checkin(branch_id, code_or_token):
 
     with db.LOCK, db.get_conn() as conn:
         r = conn.execute(
-            "SELECT * FROM appointments WHERE branch_id=? AND (code=? OR token=?)",
+            "SELECT * FROM goiso_appointments WHERE branch_id=? AND (code=? OR token=?)",
             (branch_id, key_code, key),
         ).fetchone()
         if r is None:
@@ -250,7 +250,7 @@ def checkin(branch_id, code_or_token):
     )
     with db.LOCK, db.get_conn() as conn:
         conn.execute(
-            "UPDATE appointments SET status='checked_in', checkin_at=?, queue_id=? WHERE id=?",
+            "UPDATE goiso_appointments SET status='checked_in', checkin_at=?, queue_id=? WHERE id=?",
             (db.now_str(), ticket["id"], appt_id),
         )
     ticket["appointment_code"] = r["code"]
@@ -264,7 +264,7 @@ def expire_stale():
         grace = int(db.get_booking_config(b["id"]).get("checkin_grace_minutes", 15))
         with db.LOCK, db.get_conn() as conn:
             conn.execute(
-                """UPDATE appointments SET status='expired'
+                """UPDATE goiso_appointments SET status='expired'
                    WHERE branch_id=? AND status='booked'
                      AND datetime(slot_date || ' ' || slot_end, ?) < datetime('now','localtime')""",
                 (b["id"], f"+{grace} minutes"),

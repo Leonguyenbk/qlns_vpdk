@@ -16,7 +16,8 @@ import hashlib
 import json
 import os
 import queue as queuelib
-import sqlite3
+import sqlite3  # noqa: F401 (giữ cho tương thích)
+from sqlalchemy.exc import OperationalError as _SAOperationalError
 import threading
 import time
 
@@ -111,18 +112,10 @@ def require_branch_key(view):
 
 
 def current_user():
-    # 1) Ưu tiên JWT platform (cookie hoặc header) — đăng nhập CHUNG.
+    # Đăng nhập CHUNG: chỉ dùng JWT platform (cookie hoặc header).
     from .identity import current_platform_user_as_goiso
 
-    pu = current_platform_user_as_goiso()
-    if pu:
-        return pu
-    # 2) Dự phòng: phiên goiso cũ (SQLite users) trong thời gian chuyển tiếp.
-    uid = session.get("uid")
-    if not uid:
-        return None
-    u = db.get_user(uid)
-    return u if (u and u["active"]) else None
+    return current_platform_user_as_goiso()
 
 
 def _is_goiso_admin(u):
@@ -198,7 +191,7 @@ def _tpl_ctx(branch):
     return extra
 
 
-@bp.app_errorhandler(sqlite3.OperationalError)
+@bp.app_errorhandler(_SAOperationalError)
 def _db_locked(e):
     msg = str(e)
     if "locked" in msg or "busy" in msg:
@@ -506,7 +499,7 @@ def api_config_public():
         issued = {
             r["prefix"]: r["c"]
             for r in conn.execute(
-                "SELECT prefix, COUNT(*) c FROM queue WHERE branch_id=? AND date_record=? GROUP BY prefix",
+                "SELECT prefix, COUNT(*) c FROM goiso_queue WHERE branch_id=? AND date_record=? GROUP BY prefix",
                 (branch_id, day),
             )
         }
@@ -649,38 +642,25 @@ def api_counter_status(counter_id):
 
 
 # ----------------------------------------------------------------- API admin
+# Quản lý tài khoản đã HỢP NHẤT về platform (Phase 5). Endpoint cũ chỉ còn trỏ sang.
 @bp.get("/api/admin/users")
 @admin_required
 def api_admin_users():
-    return jsonify(users=db.list_users(), branches=db.list_branches())
+    return jsonify(
+        users=[],
+        branches=db.list_branches(),
+        moved="/api/users",
+        message="Quản lý tài khoản đã chuyển sang trang Quản trị hệ thống (/api/users).",
+    )
 
 
 @bp.post("/api/admin/users")
 @admin_required
 def api_admin_users_write():
-    body = request.get_json(silent=True) or {}
-    action = body.get("action", "")
-    uname = (body.get("username") or "").strip().lower()
-    try:
-        if action == "create":
-            u = db.create_user(uname, body.get("full_name", ""), body.get("password", ""),
-                               role=body.get("role", "staff"),
-                               branch_code=body.get("branch_code"))
-            return jsonify(ok=True, user=u)
-        if action == "update":
-            u = db.update_user(uname,
-                               full_name=body.get("full_name"),
-                               password=body.get("password") or None,
-                               branch_code=body.get("branch_code"),
-                               role=body.get("role"),
-                               active=body.get("active"))
-            return jsonify(ok=True, user=u)
-        if action == "delete":
-            db.delete_user(uname)
-            return jsonify(ok=True)
-    except ValueError as e:
-        return jsonify(error=str(e)), 400
-    return jsonify(error="action không hợp lệ."), 400
+    return jsonify(
+        error="Quản lý tài khoản đã chuyển sang platform. Dùng API /api/users.",
+        moved="/api/users",
+    ), 410
 
 
 @bp.get("/api/admin/branches")
@@ -779,19 +759,19 @@ def api_admin_stats():
                     """SELECT prefix, COUNT(*) issued,
                               SUM(status='done') done, SUM(status='missed') missed,
                               SUM(status='waiting') waiting
-                       FROM queue WHERE branch_id=? AND date_record=?
+                       FROM goiso_queue WHERE branch_id=? AND date_record=?
                        GROUP BY prefix ORDER BY prefix""",
                     (bid, day),
                 )
             ]
             avg_wait = conn.execute(
-                """SELECT AVG((julianday(time_start) - julianday(time_issue)) * 86400.0)
-                   FROM queue WHERE branch_id=? AND date_record=?
+                """SELECT AVG(TIMESTAMPDIFF(SECOND, time_issue, time_start))
+                   FROM goiso_queue WHERE branch_id=? AND date_record=?
                      AND time_start IS NOT NULL AND time_issue IS NOT NULL""",
                 (bid, day),
             ).fetchone()[0]
             total = conn.execute(
-                "SELECT COALESCE(count,0) FROM visitor_stats WHERE branch_id=? AND date_record=?",
+                "SELECT COALESCE(count,0) FROM goiso_visitor_stats WHERE branch_id=? AND date_record=?",
                 (bid, day),
             ).fetchone()
             out.append({
@@ -805,7 +785,7 @@ def api_admin_stats():
             visitors = [
                 {"date": r["date_record"], "count": r["count"]}
                 for r in conn.execute(
-                    "SELECT * FROM visitor_stats WHERE branch_id=? ORDER BY date_record DESC LIMIT 30",
+                    "SELECT * FROM goiso_visitor_stats WHERE branch_id=? ORDER BY date_record DESC LIMIT 30",
                     (branches[0]["id"],),
                 )
             ]
@@ -825,7 +805,7 @@ def api_admin_appointments():
              "cccd": r["cccd"], "phone": r["phone"],
              "created_at": r["created_at"], "checkin_at": r["checkin_at"]}
             for r in conn.execute(
-                "SELECT * FROM appointments WHERE branch_id=? AND slot_date=? "
+                "SELECT * FROM goiso_appointments WHERE branch_id=? AND slot_date=? "
                 "ORDER BY slot_start, created_at",
                 (g.branch["id"], d),
             )
@@ -852,11 +832,11 @@ def api_admin_reset_today():
     bid = g.branch["id"]
     day = db.today_str()
     with db.LOCK, db.get_conn() as conn:
-        conn.execute("DELETE FROM queue WHERE branch_id=? AND date_record=?", (bid, day))
-        conn.execute("DELETE FROM visitor_stats WHERE branch_id=? AND date_record=?", (bid, day))
-        conn.execute("UPDATE counters_status SET last_num='', status='offline' WHERE branch_id=?", (bid,))
+        conn.execute("DELETE FROM goiso_queue WHERE branch_id=? AND date_record=?", (bid, day))
+        conn.execute("DELETE FROM goiso_visitor_stats WHERE branch_id=? AND date_record=?", (bid, day))
+        conn.execute("UPDATE goiso_counters_status SET last_num='', status='offline' WHERE branch_id=?", (bid,))
         conn.execute(
-            "UPDATE appointments SET status='cancelled' "
+            "UPDATE goiso_appointments SET status='cancelled' "
             "WHERE branch_id=? AND slot_date=? AND status='booked'",
             (bid, day),
         )
