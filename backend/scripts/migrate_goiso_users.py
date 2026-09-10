@@ -71,9 +71,11 @@ def run(commit: bool) -> None:
                         notes.append(f"[skip] admin goiso '{uname}': chưa có tài khoản admin platform")
                         stats["skipped"] += 1
                         continue
-                    if role_admin not in target.roles:
+                    have = {ro.code for ro in target.roles}
+                    if ROLE_GOISO_ADMIN not in have:
+                        # Chỉ THÊM, giữ nguyên các vai trò sẵn có (vd SYSTEM_ADMIN).
                         target.roles.append(role_admin)
-                        notes.append(f"[admin] '{target.username}' += vai trò GOISO_ADMIN")
+                        notes.append(f"[admin] '{target.username}' += GOISO_ADMIN (giữ {sorted(have)})")
                         stats["updated"] += 1
                     else:
                         stats["skipped"] += 1

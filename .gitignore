@@ -54,3 +54,5 @@ backend/instance/
 
 backend/.env.*
 !backend/.env.example
+
+logs/

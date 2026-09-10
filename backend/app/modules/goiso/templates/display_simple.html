@@ -66,7 +66,7 @@ connectStream((ev) => {
   downSince = 0;
   if (ev.type === 'call') {
     $('#num').textContent = ev.full_no;
-    $('#num').style.color = ev.service_color || '#0b5fa5';
+    $('#num').style.color = ev.service_color || '#4f46e5';
     $('#cnt').textContent = 'QUẦY ' + ev.counter_no;
     $('#svc').textContent = ev.service_name || '';
     if (audioReady) {

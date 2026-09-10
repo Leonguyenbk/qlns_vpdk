@@ -1,19 +1,40 @@
-/* Lớp tinh chỉnh mỏng trên Tailwind — giữ tối giản, một màu nhấn. */
+/* Lớp tinh chỉnh mỏng trên Tailwind — đồng bộ với giao diện Quản lý nhân sự. */
 
 :root {
   --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --accent: #4f46e5;
+  --accent-rgb: 79, 70, 229;
+  --brand-gradient: linear-gradient(135deg, #2563eb 0%, #6d28d9 55%, #9333ea 100%);
 }
 
 html, body { overflow-x: clip; }
+body { font-family: 'Inter', system-ui, sans-serif; background: #f7f8fb; color: #1e293b; }
+
+/* Thanh tiêu đề dùng gradient thương hiệu (giống portal/nhân sự) */
+header.bg-gov { background-image: var(--brand-gradient); background-color: transparent; }
+
+/* Thẻ / bảng mềm hơn, viền nhạt, bo góc như hệ nhân sự */
+.card,
+section > .bg-white,
+.bg-white.rounded-xl,
+.bg-white.rounded-2xl {
+  border-color: #e2e8f0;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04), 0 8px 24px -12px rgba(15, 23, 42, 0.10);
+}
+table thead tr { background: #f8fafc; }
+
+/* Nút chính: gradient thương hiệu */
+.btn.bg-gov { background-image: var(--brand-gradient); background-color: transparent; border: 0; }
+.btn.bg-gov:hover { filter: brightness(1.06); }
 
 /* Số dạng bảng — canh cột đều, không nhảy khi đổi chữ số */
 .tnum { font-variant-numeric: tabular-nums; letter-spacing: -0.02em; }
 
 /* Nhấp nháy khi quầy vừa được gọi */
 @keyframes pulseCard {
-  0%   { box-shadow: 0 0 0 0 rgba(11, 95, 165, 0.55); }
-  70%  { box-shadow: 0 0 0 22px rgba(11, 95, 165, 0); }
-  100% { box-shadow: 0 0 0 0 rgba(11, 95, 165, 0); }
+  0%   { box-shadow: 0 0 0 0 rgba(79, 70, 229, 0.55); }
+  70%  { box-shadow: 0 0 0 22px rgba(79, 70, 229, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(79, 70, 229, 0); }
 }
 .pulse-card { animation: pulseCard 1.1s var(--ease-out) 3; }
 
@@ -38,7 +59,7 @@ html, body { overflow-x: clip; }
   transition: transform 0.08s var(--ease-out), background-color 0.15s var(--ease-out);
 }
 .btn:active { transform: translateY(1px); }
-.btn:focus-visible { outline: 3px solid #0b5fa5; outline-offset: 2px; }
+.btn:focus-visible { outline: 3px solid #4f46e5; outline-offset: 2px; }
 .btn[disabled] { opacity: 0.45; pointer-events: none; }
 
 /* Ẩn con trỏ trên màn hình hiển thị (tuỳ chọn qua ?nocursor=1) */
