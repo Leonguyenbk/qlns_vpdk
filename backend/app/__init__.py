@@ -63,6 +63,7 @@ def create_app(config_name: str | None = None) -> Flask:
 
     _register_health(app)
     _register_cli(app)
+    _register_spa(app)
 
     logging.getLogger("app").info("Ứng dụng khởi tạo với cấu hình: %s", config.__name__)
     return app
@@ -101,6 +102,41 @@ def _register_jwt_callbacks(app: Flask) -> None:
     @jwt.revoked_token_loader
     def _revoked_token(_h, _p):
         return _unauth_response("Token đã bị thu hồi.")
+
+
+def _register_spa(app: Flask) -> None:
+    """Phục vụ Portal React (frontend/dist) cho mọi đường dẫn không thuộc API,
+    không thuộc trang Jinja của goiso. Một tiến trình, một cổng."""
+    import os
+
+    from flask import send_from_directory
+
+    dist = os.path.abspath(
+        os.path.join(app.root_path, "..", "..", "frontend", "dist")
+    )
+    index_html = os.path.join(dist, "index.html")
+
+    def _spa_index():
+        if not os.path.exists(index_html):
+            return (
+                "Portal chưa được build. Chạy: cd frontend && npm ci && npm run build",
+                503,
+            )
+        return send_from_directory(dist, "index.html")
+
+    @app.get("/")
+    def _root():
+        return _spa_index()
+
+    @app.get("/<path:filename>")
+    def _spa_catch_all(filename):
+        # /api/* đã có blueprint xử lý; tới đây nghĩa là không khớp -> 404 JSON.
+        if filename.startswith("api/"):
+            return jsonify({"success": False, "message": "Not found"}), 404
+        candidate = os.path.join(dist, filename)
+        if os.path.isfile(candidate):
+            return send_from_directory(dist, filename)
+        return _spa_index()  # SPA fallback (client-side routing)
 
 
 def _register_health(app: Flask) -> None:

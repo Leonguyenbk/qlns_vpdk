@@ -1,9 +1,11 @@
 import { Navigate, Route, Routes } from "react-router-dom";
 import { Layout } from "./components/Layout";
 import { ProtectedRoute } from "./components/ProtectedRoute";
-import { PERMISSIONS } from "./lib/constants";
+import { PERMISSIONS, MODULE_PERMS } from "./lib/constants";
 
 import LoginPage from "./pages/LoginPage";
+import PortalPage from "./pages/PortalPage";
+import ChangePasswordPage from "./pages/ChangePasswordPage";
 import DashboardPage from "./pages/DashboardPage";
 import EmployeeListPage from "./pages/employees/EmployeeListPage";
 import EmployeeCreatePage from "./pages/employees/EmployeeCreatePage";
@@ -24,6 +26,17 @@ export default function App() {
     <Routes>
       <Route path="/login" element={<LoginPage />} />
 
+      {/* Cổng ứng dụng — trang đầu sau đăng nhập */}
+      <Route
+        path="/"
+        element={
+          <ProtectedRoute>
+            <PortalPage />
+          </ProtectedRoute>
+        }
+      />
+
+      {/* Module Nhân sự + Quản trị hệ thống — trong khung Layout */}
       <Route
         element={
           <ProtectedRoute>
@@ -32,13 +45,14 @@ export default function App() {
         }
       >
         <Route
-          index
+          path="nhan-su"
           element={
-            <ProtectedRoute permission={PERMISSIONS.EMPLOYEE_VIEW}>
+            <ProtectedRoute anyOf={MODULE_PERMS.NHANSU}>
               <DashboardPage />
             </ProtectedRoute>
           }
         />
+        <Route path="doi-mat-khau" element={<ChangePasswordPage />} />
 
         <Route
           path="employees"

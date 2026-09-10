@@ -64,4 +64,14 @@ export const PERMISSIONS = {
   ROLE_VIEW: "role.view",
   ROLE_MANAGE: "role.manage",
   AUDIT_VIEW: "audit.view",
+  GOISO_VIEW: "goiso.view",
+  GOISO_COUNTER: "goiso.counter",
+  GOISO_ADMIN: "goiso.admin",
+};
+
+// Nhóm quyền để cổng ứng dụng quyết định hiện thẻ module nào
+export const MODULE_PERMS = {
+  NHANSU: ["employee.view", "unit.view", "position.view"],
+  GOISO: ["goiso.view", "goiso.counter", "goiso.admin"],
+  ADMIN: ["user.view", "role.view", "audit.view"],
 };

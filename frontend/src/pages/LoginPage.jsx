@@ -17,7 +17,14 @@ export default function LoginPage() {
   const { login, isAuthenticated, loading } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
-  const from = location.state?.from?.pathname || "/";
+  const nextParam = new URLSearchParams(location.search).get("next") || "";
+  const from = nextParam || location.state?.from?.pathname || "/";
+  // Trang Jinja (goiso) không thuộc router SPA -> phải chuyển trang thật.
+  const isExternal = (p) => /^\/(b\/|admin|dat-lich|lich-hen)/.test(p);
+  const goAfterLogin = () => {
+    if (isExternal(from)) window.location.href = from;
+    else navigate(from, { replace: true });
+  };
 
   const [showPw, setShowPw] = useState(false);
   const [remember, setRemember] = useState(false);
@@ -47,7 +54,13 @@ export default function LoginPage() {
     setFocus("username");
   }, [setValue, setFocus]);
 
-  if (!loading && isAuthenticated) return <Navigate to={from} replace />;
+  if (!loading && isAuthenticated) {
+    if (isExternal(from)) {
+      window.location.href = from;
+      return null;
+    }
+    return <Navigate to={from} replace />;
+  }
 
   const onSubmit = async (values) => {
     setFormError("");
@@ -60,7 +73,7 @@ export default function LoginPage() {
         /* bỏ qua nếu localStorage không dùng được */
       }
       toast.success("Đăng nhập thành công");
-      navigate(from, { replace: true });
+      goAfterLogin();
     } catch (err) {
       setFormError(apiErrorMessage(err, "Tên đăng nhập hoặc mật khẩu không đúng."));
     }

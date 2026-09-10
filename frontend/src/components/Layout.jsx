@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Link, NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import clsx from "clsx";
 import { useAuth } from "../auth/AuthContext";
-import { PERMISSIONS } from "../lib/constants";
+import { PERMISSIONS, MODULE_PERMS } from "../lib/constants";
 import { Avatar } from "./ui/primitives";
 import { CommandPalette } from "./CommandPalette";
 import {
@@ -27,7 +27,10 @@ import {
 const NAV_GROUPS = [
   {
     title: null,
-    items: [{ to: "/", label: "Tổng quan", Icon: IconOverview, exact: true }],
+    items: [
+      { to: "/", label: "Cổng ứng dụng", Icon: IconChevronLeft, exact: true },
+      { to: "/nhan-su", label: "Tổng quan", Icon: IconOverview, exact: true },
+    ],
   },
   {
     title: "Quản lý",
@@ -49,6 +52,8 @@ const NAV_GROUPS = [
 
 const CRUMBS = {
   "": "Tổng quan",
+  "nhan-su": "Tổng quan",
+  "doi-mat-khau": "Đổi mật khẩu",
   employees: "Nhân sự",
   units: "Cơ cấu đơn vị",
   positions: "Chức vụ",
@@ -159,6 +164,15 @@ function UserMenu({ user, onLogout, collapsed }) {
             <p className="truncate text-sm font-medium text-ink">{user?.full_name}</p>
             <p className="truncate text-xs text-muted">{roles}</p>
           </div>
+          <Link
+            to="/doi-mat-khau"
+            role="menuitem"
+            onClick={() => setOpen(false)}
+            className="flex w-full items-center gap-2.5 px-4 py-2.5 text-left text-sm text-ink-2 transition-colors hover:bg-[#f1f5f9] hover:text-accent-text"
+          >
+            <IconKey size={16} />
+            Đổi mật khẩu
+          </Link>
           <button
             type="button"
             role="menuitem"
@@ -166,7 +180,7 @@ function UserMenu({ user, onLogout, collapsed }) {
               setOpen(false);
               onLogout();
             }}
-            className="flex w-full items-center gap-2.5 px-4 py-2.5 text-left text-sm text-ink-2 transition-colors hover:bg-[#f1f5f9] hover:text-accent-text"
+            className="flex w-full items-center gap-2.5 border-t border-rule px-4 py-2.5 text-left text-sm text-ink-2 transition-colors hover:bg-[#f1f5f9] hover:text-accent-text"
           >
             <IconLogout size={16} />
             Đăng xuất
@@ -288,6 +302,35 @@ export function Layout() {
               ))}
             </div>
           ))}
+
+          {hasAnyPermission(MODULE_PERMS.GOISO) && (
+            <div className="mt-3">
+              {!collapsed && (
+                <p className="px-6 pb-1.5 pt-1 text-[11px] font-semibold uppercase tracking-[0.08em] text-[#94a3b8]">
+                  Gọi số
+                </p>
+              )}
+              {(hasAnyPermission([PERMISSIONS.GOISO_ADMIN])
+                ? [{ href: "/admin", label: "Quản trị gọi số" }]
+                : []
+              )
+                .concat(
+                  hasAnyPermission([PERMISSIONS.GOISO_COUNTER]) && user?.goiso_branch_code
+                    ? [{ href: `/b/${user.goiso_branch_code}/counter`, label: "Bàn gọi số" }]
+                    : []
+                )
+                .map((it) => (
+                  <a
+                    key={it.href}
+                    href={it.href}
+                    className="mx-2.5 my-1 flex h-11 items-center gap-3 rounded-[10px] px-3 text-sm font-medium text-[#475569] transition-all hover:translate-x-0.5 hover:bg-[#f1f5f9] hover:text-accent-text"
+                  >
+                    <IconKey size={19} className="shrink-0 text-[#64748b]" />
+                    {!collapsed && <span className="truncate">{it.label}</span>}
+                  </a>
+                ))}
+            </div>
+          )}
         </nav>
 
         {/* Collapse toggle — desktop only */}

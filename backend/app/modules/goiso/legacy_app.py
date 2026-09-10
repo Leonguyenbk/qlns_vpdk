@@ -134,8 +134,10 @@ def _can_work_counter(u):
 def _need_login_response(msg="Cần đăng nhập."):
     if request.path.startswith("/api/"):
         return jsonify(error=msg), 401
+    from urllib.parse import quote
+
     nxt = request.full_path.rstrip("?") or request.path
-    return redirect(url_for("goiso.page_login", next=nxt))
+    return redirect(f"/login?next={quote(nxt, safe='')}")
 
 
 def login_required(view):
@@ -245,15 +247,7 @@ def stream():
 
 
 # ----------------------------------------------------------------- trang web
-@bp.route("/")
-@login_required
-def index():
-    u = g.user
-    if u["role"] != "admin":
-        b = db.get_branch_by_id(u["branch_id"])
-        if b:
-            return redirect(f"/b/{b['code']}/counter")
-    return render_template("index.html", branches=db.list_branches(active_only=True), me=u)
+# "/" và "/login" do Portal React (SPA) phục vụ — không đăng ký ở đây nữa.
 
 
 def _screen_ctx():
@@ -334,14 +328,6 @@ def _home_for(u):
         b = db.get_branch_by_id(u["branch_id"])
         code = b["code"] if b else None
     return f"/b/{code}/counter" if code else "/"
-
-
-@bp.route("/login")
-def page_login():
-    u = current_user()
-    if u:
-        return redirect(_home_for(u))
-    return render_template("login.html")
 
 
 @bp.post("/api/login")
