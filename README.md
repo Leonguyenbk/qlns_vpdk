@@ -1,64 +1,72 @@
 # Platform — Hệ thống hợp nhất Gọi số (goiso) + Quản lý nhân sự
 
-Hợp nhất hai hệ thống thành **một backend Flask + một tiến trình Waitress**, module hoá rõ ràng:
+Hai hệ thống gộp thành **một backend Flask + một tiến trình Waitress**, module hoá rõ ràng.
+Một cổng phục vụ tất cả: Portal React (SPA) + API JSON + các trang Jinja của kiosk.
 
 ```
-Platform
-├── Auth chung (JWT, RBAC, scope theo cây đơn vị)
-├── Module Nhân sự   (/api/employees, /api/units, /api/positions, ...)
-├── Module Goiso      (/api/goiso/*  + lớp tương thích /api/b, /api/booking, /api/ping, /api/kiosk)
-├── Admin chung       (/api/users, /api/roles, /api/audit-logs)
-└── Shared/Common     (response chuẩn, error handler, logging, permissions)
+Platform  (waitress :5050  ->  wsgi:app)
+├── /                     Portal React — chọn ứng dụng theo quyền
+├── /nhan-su, /employees… SPA Quản lý nhân sự
+├── /api/auth/*           Đăng nhập CHUNG (JWT + cookie SSO)
+├── /api/employees|units|positions|users|roles|audit-logs   Module Nhân sự
+├── /api/goiso/*          Module Gọi số (mới)
+├── /api/b/*, /api/booking/*, /api/ping, /api/kiosk/*        Tương thích kiosk (X-Branch-Key)
+└── /b/<cn>/counter|display|cho, /dat-lich, /admin           Trang Jinja gọi số
 ```
 
-Nguồn gốc & kế hoạch hợp nhất: **[docs/MERGE_ANALYSIS.md](docs/MERGE_ANALYSIS.md)**.
+## Tài liệu
+
+| | |
+|---|---|
+| [docs/MERGE_ANALYSIS.md](docs/MERGE_ANALYSIS.md) | Phân tích 2 hệ cũ + kiến trúc chốt + kế hoạch 8 phase |
+| [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | Sơ đồ + vai trò từng gói |
+| [docs/DATABASE.md](docs/DATABASE.md) | Một CSDL MySQL, bảng `goiso_*`, migration |
+| [docs/PERMISSIONS.md](docs/PERMISSIONS.md) | Quyền & vai trò; ai vào được trang gọi số |
+| [docs/MIGRATION.md](docs/MIGRATION.md) | Nạp dữ liệu hệ cũ (script có log) |
+| [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) | Triển khai + cắt chuyển tên miền + rollback |
 
 ## Trạng thái theo phase
 
 | Phase | Nội dung | Trạng thái |
 |---|---|---|
-| P1 | Phân tích 2 codebase, chốt kiến trúc | ✅ xong |
-| P2 | Dựng khung platform từ backend nhân sự, chạy cổng riêng | ✅ xong (backend + test) |
-| P3 | Đưa goiso vào `modules/goiso` (giữ SQLite tạm) + lớp tương thích | ✅ xong |
-| P4 | Chuẩn hoá module nhân sự trong cấu trúc mới + test nghiệp vụ | ✅ xong |
-| P5 | Gộp đăng nhập (JWT chung + cookie SSO), quyền `GOISO_*`, vai trò trực quầy `GOISO_COUNTER`, di trú 12 tài khoản goiso | ✅ xong |
-| P6 | Gộp CSDL: bảng `goiso_*` + đơn vị dùng chung trong MySQL, script di trú có log | ✅ xong |
-| P7 | Portal React (chọn ứng dụng theo quyền), một cổng phục vụ SPA + API + Jinja | ✅ xong |
-| P8 | Triển khai: 1 Waitress, NSSM, nginx, Cloudflare Tunnel domain mới, docs | ⏳ |
+| P1 | Phân tích 2 codebase, chốt kiến trúc | ✅ |
+| P2 | Dựng khung platform từ backend nhân sự | ✅ |
+| P3 | Đưa goiso vào `modules/goiso` + lớp tương thích | ✅ |
+| P4 | Gom module nhân sự vào `modules/nhansu` + test nghiệp vụ | ✅ |
+| P5 | Đăng nhập chung (JWT + cookie SSO), quyền `GOISO_*`, vai trò `GOISO_COUNTER`, di trú tài khoản | ✅ |
+| P6 | Gộp CSDL: bảng `goiso_*` + đơn vị dùng chung, script di trú có log | ✅ |
+| P7 | Portal React theo quyền; một cổng phục vụ SPA + API + Jinja | ✅ |
+| P8 | Script + tài liệu triển khai, runbook cắt chuyển | ✅ (chờ tên miền + thao tác Cloudflare) |
 
-## Chạy (development)
+## Chạy — development
 
 ```bash
 cd backend
 python -m venv .venv
 .venv\Scripts\pip install -r requirements.txt
-copy .env.example .env   # rồi sửa DATABASE_URL, SECRET_KEY, JWT_SECRET_KEY
-python app.py            # http://127.0.0.1:5000  (hoặc PORT trong môi trường)
+copy .env.example .env    # sửa DATABASE_URL, SECRET_KEY, JWT_SECRET_KEY
+.venv\Scripts\flask --app wsgi db upgrade
+python app.py             # http://127.0.0.1:5050
+
+cd ../frontend && npm ci && npm run build   # -> frontend/dist (backend tự phục vụ)
 ```
 
-## Chạy (production)
+## Chạy — production
 
-```bash
-waitress-serve --host=0.0.0.0 --port=5050 wsgi:app
-```
-
-Frontend (React SPA):
-
-```bash
-cd frontend
-npm ci
-npm run build     # -> frontend/dist  (nginx phục vụ, proxy /api & /b -> :5050)
+```powershell
+powershell -File scripts\deploy_platform.ps1 -Port 5050
+# tương đương: waitress-serve --host=0.0.0.0 --port=5050 --threads=48 wsgi:app
 ```
 
 ## Kiểm thử
 
 ```bash
 cd backend
-set FLASK_ENV=testing && .venv\Scripts\pytest -q
+set FLASK_ENV=testing && .venv\Scripts\pytest -q      # 43 test
 ```
 
 ## Lưu ý
 
-- Hai hệ cũ vẫn giữ nguyên tại `D:\DEPLOY\qlns_vpdk` và `D:\QUANGTUAN\goiso_kios` làm nguồn + phương án lùi cho tới khi platform chạy thật ổn.
-- `backend/.env` **không** commit. CSDL thật (chứa CCCD) không đưa lên git.
-- Từ Phase 5, dev dùng CSDL SQLite riêng (`backend/instance/platform_dev.db`) — hoàn toàn tách khỏi CSDL nhân sự đang chạy. Phase 6 chuyển sang MySQL `qlns_platform`.
+- Hai hệ cũ giữ nguyên tại `D:\DEPLOY\qlns_vpdk` và `D:\QUANGTUAN\goiso_kios` làm nguồn + đường lùi cho tới khi platform chạy thật ổn.
+- `backend/.env` **không** commit. CSDL thật (chứa CCCD) không lên git.
+- Runtime dùng một CSDL MySQL (bảng `goiso_*` cùng chỗ với bảng nhân sự). Test chạy SQLite in-memory.
