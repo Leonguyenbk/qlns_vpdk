@@ -289,6 +289,17 @@ def page_display_simple():
     return render_template("display_simple.html", extra=_tpl_ctx(g.branch), branch=g.branch)
 
 
+@bp.route("/cho")
+def page_board_index():
+    """Trang công khai: chọn 1 trong các chi nhánh để xem hàng chờ."""
+    return render_template(
+        "index.html",
+        branches=db.list_branches(active_only=True),
+        me=current_user(),
+        heading="Chọn chi nhánh để xem hàng chờ",
+    )
+
+
 @bp.route("/b/<code>/cho")
 @resolve_branch
 def page_board():

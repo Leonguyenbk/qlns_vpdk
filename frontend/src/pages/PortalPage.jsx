@@ -131,7 +131,13 @@ export default function PortalPage() {
           </div>
         )}
 
-        <div className="mt-10 text-sm">
+        <div className="mt-10 flex flex-wrap gap-x-6 gap-y-2 text-sm">
+          <a href="/cho" className="font-medium text-accent-text hover:underline">
+            Xem hàng chờ các chi nhánh
+          </a>
+          <a href="/dat-lich" className="font-medium text-accent-text hover:underline">
+            Đặt lịch hẹn online
+          </a>
           <Link to="/doi-mat-khau" className="font-medium text-accent-text hover:underline">
             Đổi mật khẩu
           </Link>
