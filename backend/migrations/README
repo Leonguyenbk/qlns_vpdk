@@ -1,0 +1,11 @@
+Thư mục migration của Flask-Migrate / Alembic.
+
+Lệnh thường dùng (chạy trong thư mục backend, đã kích hoạt virtualenv):
+
+    flask --app wsgi db upgrade            # áp dụng toàn bộ migration
+    flask --app wsgi db downgrade -1       # lùi 1 bước
+    flask --app wsgi db history            # xem lịch sử
+    flask --app wsgi db current            # revision hiện tại
+
+Các migration được viết tay để khởi tạo schema và seed vai trò / quyền, không
+phụ thuộc autogenerate.

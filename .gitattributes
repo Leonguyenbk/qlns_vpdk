@@ -1,0 +1,17 @@
+# Chuẩn hóa xuống dòng: mặc định để Git tự nhận diện text
+* text=auto eol=lf
+
+# Các file BẮT BUỘC dùng LF (chạy trong container Linux)
+*.sh            text eol=lf
+entrypoint.sh   text eol=lf
+Dockerfile      text eol=lf
+*.Dockerfile    text eol=lf
+nginx.conf      text eol=lf
+
+# Nhị phân – không đụng vào
+*.woff2  binary
+*.png    binary
+*.jpg    binary
+*.ico    binary
+*.xlsx   binary
+*.mp4    binary
