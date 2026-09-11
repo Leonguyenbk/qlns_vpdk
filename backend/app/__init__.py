@@ -105,8 +105,8 @@ def _register_jwt_callbacks(app: Flask) -> None:
 
 
 def _register_spa(app: Flask) -> None:
-    """Phục vụ Portal React (frontend/dist) cho mọi đường dẫn không thuộc API,
-    không thuộc trang Jinja của goiso. Một tiến trình, một cổng."""
+    """Phục vụ Portal React (frontend/dist) cho mọi đường dẫn không thuộc API.
+    Toàn bộ giao diện (kể cả gọi số) là route React — một tiến trình, một cổng."""
     import os
 
     from flask import send_from_directory

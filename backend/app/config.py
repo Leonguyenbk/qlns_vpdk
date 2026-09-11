@@ -31,8 +31,8 @@ class BaseConfig:
     )
     JWT_ERROR_MESSAGE_KEY = "message"
 
-    # Token đọc từ HEADER (SPA nhân sự dùng Bearer) HOẶC COOKIE (trang Jinja goiso
-    # đăng nhập một lần cho cả platform — SSO cùng origin).
+    # Token đọc từ HEADER (mọi SPA đều dùng Bearer) hoặc COOKIE (dự phòng, không
+    # còn gì phụ thuộc từ khi bỏ Jinja — giữ lại vô hại, không cần SSO cookie nữa).
     JWT_TOKEN_LOCATION = ["headers", "cookies"]
     JWT_COOKIE_SAMESITE = "Lax"
     # TODO(P8): bật JWT_COOKIE_CSRF_PROTECT + gửi header CSRF từ JS goiso.

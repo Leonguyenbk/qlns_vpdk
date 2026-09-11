@@ -1,17 +1,21 @@
 # Platform — Hệ thống hợp nhất Gọi số (goiso) + Quản lý nhân sự
 
-Hai hệ thống gộp thành **một backend Flask + một tiến trình Waitress**, module hoá rõ ràng.
-Một cổng phục vụ tất cả: Portal React (SPA) + API JSON + các trang Jinja của kiosk.
+Hai hệ thống gộp thành **một backend Flask (API thuần JSON) + một Portal React (SPA)**,
+chạy trên **một tiến trình Waitress**. Không còn Jinja/template phía server — toàn bộ
+giao diện (portal, nhân sự, quản trị, bàn gọi số, màn hình TV, bảng chờ, đặt lịch) đều
+là route React.
 
 ```
-Platform  (waitress :5050  ->  wsgi:app)
-├── /                     Portal React — chọn ứng dụng theo quyền
-├── /nhan-su, /employees… SPA Quản lý nhân sự
-├── /api/auth/*           Đăng nhập CHUNG (JWT + cookie SSO)
+Platform  (waitress :5000  ->  wsgi:app)
+├── /                                  Portal React — chọn ứng dụng theo quyền
+├── /nhan-su, /employees…              SPA Quản lý nhân sự
+├── /admin/*                           SPA Quản trị (tài khoản, vai trò, nhật ký, gọi số)
+├── /b/<cn>/counter|display|cho|man-hinh, /dat-lich, /lich-hen/<token>, /cho
+│                                       SPA Gọi số (kiosk/TV/bảng chờ/đặt lịch)
+├── /api/auth/*                        Đăng nhập CHUNG (JWT — Bearer + cookie)
 ├── /api/employees|units|positions|users|roles|audit-logs   Module Nhân sự
-├── /api/goiso/*          Module Gọi số (mới)
-├── /api/b/*, /api/booking/*, /api/ping, /api/kiosk/*        Tương thích kiosk (X-Branch-Key)
-└── /b/<cn>/counter|display|cho, /dat-lich, /admin           Trang Jinja gọi số
+├── /api/admin/*                       Quản trị gọi số (chi nhánh, dịch vụ, quầy, thống kê...)
+└── /api/b/*, /api/booking/*, /api/ping, /api/kiosk/*        API gọi số + tương thích kiosk vật lý (X-Branch-Key)
 ```
 
 ## Tài liệu
@@ -35,8 +39,9 @@ Platform  (waitress :5050  ->  wsgi:app)
 | P4 | Gom module nhân sự vào `modules/nhansu` + test nghiệp vụ | ✅ |
 | P5 | Đăng nhập chung (JWT + cookie SSO), quyền `GOISO_*`, vai trò `GOISO_COUNTER`, di trú tài khoản | ✅ |
 | P6 | Gộp CSDL: bảng `goiso_*` + đơn vị dùng chung, script di trú có log | ✅ |
-| P7 | Portal React theo quyền; một cổng phục vụ SPA + API + Jinja | ✅ |
+| P7 | Portal React theo quyền; một cổng phục vụ SPA + API | ✅ |
 | P8 | Script + tài liệu triển khai, runbook cắt chuyển | ✅ (chờ tên miền + thao tác Cloudflare) |
+| P9 | Bỏ hẳn Jinja: bàn gọi số/màn hình TV/bảng chờ/đặt lịch chuyển sang React (`frontend/src/pages/goiso/`); backend chỉ còn API JSON | ✅ |
 
 ## Chạy — development
 

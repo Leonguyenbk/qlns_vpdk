@@ -1,15 +1,11 @@
-# NOTE (Phase 3): Blueprint TƯƠNG THÍCH của hệ gọi số (goiso).
-# Chuyển từ goiso_kios/server/app.py — chỉ đổi Flask->Blueprint và import nội bộ
-# sang tương đối. GIỮ NGUYÊN mọi đường dẫn cũ + trang Jinja. Không đổi hành vi.
-"""Máy chủ Flask ĐA CHI NHÁNH: API bốc số / gọi số + giao diện web + SSE realtime.
+# NOTE: Blueprint API của hệ gọi số (goiso), chuyển từ goiso_kios/server/app.py.
+# Giữ nguyên mọi đường dẫn /api/* cũ (kiosk vật lý + frontend đều phụ thuộc).
+# Các route render trang (Jinja) đã bỏ hết — giao diện nay ở frontend/src/pages/goiso/.
+"""API bốc số / gọi số ĐA CHI NHÁNH + SSE realtime (JSON thuần, không render trang).
 
-Chạy (dev):   python app.py            (http://0.0.0.0:5000, tự reload nếu GOISO_DEBUG=1)
-Chạy (thật):  waitress-serve --listen=127.0.0.1:5000 --threads=32 app:app
-
-Mỗi chi nhánh có mã `code` (vd 'bmt'):
-  Trang:  /b/<code>/display   /b/<code>/counter   /b/<code>/display/simple
-  API:    /api/b/<code>/...
-  Quản trị tổng:  /admin   (+ /api/admin/...)
+Mỗi chi nhánh có mã `code` (vd 'bmt'): mọi API ở /api/b/<code>/..., quản trị ở
+/api/admin/...; giao diện tương ứng là frontend/src/pages/goiso/*.jsx (route
+/b/<code>/counter|display|cho|man-hinh) và frontend/src/pages/admin/ (route /admin).
 """
 import functools
 import hashlib
@@ -21,15 +17,14 @@ from sqlalchemy.exc import OperationalError as _SAOperationalError
 import threading
 import time
 
-from flask import (Blueprint, Response, abort, g, jsonify, redirect, render_template,
-                   request, session, stream_with_context, url_for)
+from flask import Blueprint, Response, g, jsonify, redirect, request, stream_with_context
 
 from . import legacy_db as db
 from . import queue_logic as ql
 from . import booking_logic as bk
 from . import tts as tts_engine
 
-bp = Blueprint("goiso", __name__, template_folder="templates")
+bp = Blueprint("goiso", __name__)
 
 DEBUG = bool(os.environ.get("GOISO_DEBUG"))
 BASE_URL = os.environ.get("GOISO_BASE_URL", "").rstrip("/")
@@ -123,12 +118,8 @@ def _is_goiso_admin(u):
 
 
 def _can_work_counter(u):
-    """Tài khoản platform phải có quyền goiso.counter; user goiso cũ giữ hành vi cũ."""
-    if _is_goiso_admin(u):
-        return True
-    if u.get("_platform"):
-        return "goiso.counter" in (u.get("perms") or ())
-    return True  # user goiso cũ (SQLite) — theo cơ chế role/branch phía dưới
+    """Phải là quản trị goiso hoặc có quyền goiso.counter."""
+    return _is_goiso_admin(u) or "goiso.counter" in (u.get("perms") or ())
 
 
 def _need_login_response(msg="Cần đăng nhập."):
@@ -186,13 +177,6 @@ def counter_guard(view):
     return wrapper
 
 
-def _tpl_ctx(branch):
-    """Context cho template: extra của chi nhánh + ten_chi_nhanh lấy từ branch."""
-    extra = db.get_extra(branch["id"])
-    extra["ten_chi_nhanh"] = branch["full_name"]
-    return extra
-
-
 @bp.app_errorhandler(_SAOperationalError)
 def _db_locked(e):
     msg = str(e)
@@ -247,185 +231,39 @@ def stream():
 
 
 # ----------------------------------------------------------------- trang web
-# "/" và "/login" do Portal React (SPA) phục vụ — không đăng ký ở đây nữa.
+# Toàn bộ giao diện (portal, bàn gọi số, màn hình, bảng chờ, đặt lịch...) giờ
+# do Portal React (SPA) phục vụ — backend chỉ còn API JSON (trạng thái +
+# thao tác). Các trang cũ (counter/display/board/booking/... và admin.html,
+# vốn là Jinja) đã được thay bằng frontend/src/pages/goiso/*.jsx và
+# frontend/src/pages/admin/*.
 
 
-def _screen_ctx():
-    """Đọc ?screen=<id>. Trả về (screen_name, screen_counters).
-    404 nếu id có gửi nhưng không khớp màn hình nào của chi nhánh."""
-    sid = request.args.get("screen", "").strip()
-    if not sid:
-        return "", []
-    sc = db.resolve_screen(g.branch["id"], sid)
-    if not sc:
-        abort(404, description="Màn hình không tồn tại.")
-    return sc["name"], sc["counters"]
+@bp.get("/api/b/<code>/screens")
+@resolve_branch
+def api_branch_screens():
+    """Danh sách 'màn hình theo khu' của chi nhánh — công khai, dùng để lọc
+    hiển thị ở màn hình TV / bảng chờ theo ?screen=<id>."""
+    return jsonify(screens=db.get_screens(g.branch["id"]))
 
 
-@bp.route("/b/<code>/man-hinh")
+@bp.get("/api/b/<code>/counters")
 @resolve_branch
 @counter_guard
-def page_screens_pick():
-    """Trang cho nhân viên chọn màn hình hiển thị (đầy đủ / theo khu)."""
-    return render_template("screens_pick.html", extra=_tpl_ctx(g.branch), branch=g.branch,
-                           screens=db.get_screens(g.branch["id"]), me=g.user)
-
-
-@bp.route("/b/<code>/display")
-@resolve_branch
-@counter_guard
-def page_display():
-    name, counters = _screen_ctx()
-    return render_template("display.html", extra=_tpl_ctx(g.branch), branch=g.branch,
-                           layout=request.args.get("layout", "landscape"),
-                           screen_name=name, screen_counters=counters)
-
-
-@bp.route("/b/<code>/display/simple")
-@resolve_branch
-@counter_guard
-def page_display_simple():
-    _screen_ctx()  # chỉ để 404 nếu ?screen sai
-    return render_template("display_simple.html", extra=_tpl_ctx(g.branch), branch=g.branch)
-
-
-@bp.route("/cho")
-def page_board_index():
-    """Trang công khai: chọn 1 trong các chi nhánh để xem hàng chờ."""
-    return render_template(
-        "index.html",
-        branches=db.list_branches(active_only=True),
-        me=current_user(),
-        heading="Chọn chi nhánh để xem hàng chờ",
-    )
-
-
-@bp.route("/b/<code>/cho")
-@resolve_branch
-def page_board():
-    """Bảng chờ online công khai (không đăng nhập, không phát tiếng)."""
-    name, counters = _screen_ctx()
-    return render_template("board.html", extra=_tpl_ctx(g.branch), branch=g.branch,
-                           screen_name=name, screen_counters=counters)
-
-
-@bp.route("/b/<code>/counter")
-@resolve_branch
-@counter_guard
-def page_counter():
+def api_branch_counters():
+    """Danh sách quầy đang bật của chi nhánh — cho màn "Vào ca" chọn quầy."""
     counters = db.get_json_config("counters", {}, g.branch["id"]) or {}
     active = [
         {"id": k, **v}
         for k, v in sorted(counters.items(), key=lambda kv: kv[1].get("display_order", 99))
         if v.get("active", True)
     ]
-    return render_template("counter.html", extra=_tpl_ctx(g.branch), branch=g.branch,
-                           counters=active, me=g.user)
+    return jsonify(counters=active)
 
 
-@bp.route("/goiso-admin-legacy")
-@admin_required
-def page_admin():
-    """Trang quản trị Jinja cũ — giữ lại làm dự phòng/tham chiếu.
-
-    Quản trị hợp nhất (nhân sự + gọi số) giờ ở Portal React tại /admin
-    (xem frontend/src/pages/admin/AdminPage.jsx). Trang này KHÔNG còn được
-    liên kết tới từ đâu trong hệ thống nhưng vẫn dùng được các API
-    /api/admin/* nếu cần đối chiếu."""
-    return render_template("admin.html", me=g.user)
-
-
-# ----------------------------------------------------------------- đăng nhập
-def _home_for(u):
-    """Đường về sau đăng nhập theo vai trò goiso."""
-    if _is_goiso_admin(u):
-        return "/admin"
-    code = u.get("branch_code")
-    if not code and u.get("branch_id"):
-        b = db.get_branch_by_id(u["branch_id"])
-        code = b["code"] if b else None
-    return f"/b/{code}/counter" if code else "/"
-
-
-@bp.post("/api/login")
-def api_login():
-    """Đăng nhập CHUNG: xác thực qua platform, đặt cookie JWT, trả payload goiso."""
-    from flask import make_response
-    from flask_jwt_extended import set_access_cookies, set_refresh_cookies
-
-    from ...common.exceptions import AppError
-    from ...services import auth_service
-
-    body = request.get_json(silent=True) or {}
-    meta = {"ip_address": _client_ip(), "user_agent": request.headers.get("User-Agent", "")}
-    try:
-        result = auth_service.login(
-            body.get("username", ""), body.get("password", ""), meta=meta
-        )
-    except AppError as e:
-        return jsonify(error=e.message), e.status_code
-
-    info = result["user"]
-    role_codes = {r["code"] for r in info.get("roles", [])}
-    perms = set(info.get("permissions", []))
-    is_admin = bool({"SYSTEM_ADMIN", "GOISO_ADMIN"} & role_codes) or "goiso.admin" in perms
-    if not (is_admin or "goiso.counter" in perms or "goiso.view" in perms):
-        return jsonify(error="Tài khoản không có quyền truy cập hệ thống gọi số."), 403
-
-    u_shaped = {
-        "role": "admin" if is_admin else "staff",
-        "branch_code": info.get("goiso_branch_code"),
-        "branch_id": None,
-        "perms": perms,
-    }
-    session.clear()  # bỏ phiên goiso cũ nếu còn
-    resp = make_response(
-        jsonify(ok=True, role=u_shaped["role"], full_name=info["full_name"],
-                next=_home_for(u_shaped))
-    )
-    set_access_cookies(resp, result["access_token"])
-    set_refresh_cookies(resp, result["refresh_token"])
-    return resp
-
-
-@bp.post("/api/logout")
-def api_logout():
-    from flask import make_response
-    from flask_jwt_extended import (
-        get_jwt,
-        unset_jwt_cookies,
-        verify_jwt_in_request,
-    )
-
-    session.clear()
-    try:
-        verify_jwt_in_request(refresh=True, optional=True)
-        jti = (get_jwt() or {}).get("jti")
-        if jti:
-            from ...services import auth_service
-
-            auth_service.logout(jti)
-    except Exception:  # noqa: BLE001
-        pass
-    resp = make_response(jsonify(ok=True))
-    unset_jwt_cookies(resp)
-    return resp
-
-
-@bp.get("/api/me")
-def api_me():
-    u = current_user()
-    return jsonify(u or {})
-
-
-@bp.route("/dat-lich")
-def page_booking():
-    return render_template("booking.html", turnstile_site_key=TURNSTILE_SITE_KEY)
-
-
-@bp.route("/lich-hen/<token>")
-def page_booking_lookup(token):
-    return render_template("booking_lookup.html", token=token)
+@bp.get("/api/booking/turnstile-key")
+def api_booking_turnstile_key():
+    """Site key Turnstile (public theo thiết kế) cho form đặt lịch React."""
+    return jsonify(site_key=TURNSTILE_SITE_KEY)
 
 
 # ----------------------------------------------------------------- API cấp số (kiosk)

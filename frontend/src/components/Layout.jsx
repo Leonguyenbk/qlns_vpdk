@@ -325,7 +325,7 @@ export function Layout() {
                 </p>
               )}
               {/* Quản trị gọi số nay ở trong trang Quản trị chung (/admin) ở trên.
-                 Chỉ còn link riêng tới bàn gọi số — trang Jinja fullscreen. */}
+                 Chỉ còn link riêng tới bàn gọi số — trang React toàn màn hình (không sidebar). */}
               {[{ href: `/b/${user.goiso_branch_code}/counter`, label: "Bàn gọi số" }].map((it) => (
                   <a
                     key={it.href}

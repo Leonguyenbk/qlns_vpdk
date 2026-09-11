@@ -57,15 +57,8 @@ def test_user_without_goiso_permission_cannot_work_counter(db, make_user):
     assert legacy_app._can_work_counter(shaped) is False
 
 
-def test_legacy_session_user_keeps_old_behaviour(db):
-    """User goiso cũ (SQLite, không có _platform) không bị chặn bởi cổng quyền mới."""
-    legacy = {"role": "staff", "branch_id": 15, "active": True}  # không có 'perms'/'_platform'
-    assert legacy_app._can_work_counter(legacy) is True
-    assert legacy_app._is_goiso_admin(legacy) is False
-
-
 def test_auth_login_sets_jwt_cookie(client, db, make_user):
-    """Đăng nhập chung đặt cookie access_token để trang Jinja goiso dùng SSO."""
+    """Đăng nhập chung đặt kèm cookie access_token (dự phòng, không có gì phụ thuộc)."""
     make_user("ssouser", role_code=ROLE_GOISO_COUNTER, scopes=())
     resp = client.post("/api/auth/login", json={"username": "ssouser", "password": "Password@123"})
     assert resp.status_code == 200

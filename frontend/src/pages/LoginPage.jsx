@@ -5,7 +5,7 @@ import { Navigate, useLocation, useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
 import { useAuth } from "../auth/AuthContext";
 import { loginSchema } from "../schemas";
-import { api, apiErrorMessage } from "../lib/api";
+import { apiErrorMessage } from "../lib/api";
 import { IconUser, IconLock, IconEye, IconEyeOff } from "../components/ui/icons";
 
 const REMEMBER_KEY = "qlns:remembered_username";
@@ -14,18 +14,12 @@ const PANEL_GRADIENT = "linear-gradient(135deg,#1d4ed8 0%,#6d28d9 55%,#9333ea 10
 const BUTTON_GRADIENT = "linear-gradient(135deg,#2563eb 0%,#9333ea 100%)";
 
 export default function LoginPage() {
-  const { login, logout, isAuthenticated, loading } = useAuth();
-  const [redirecting, setRedirecting] = useState(false);
+  const { login, isAuthenticated, loading } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const nextParam = new URLSearchParams(location.search).get("next") || "";
   const from = nextParam || location.state?.from?.pathname || "/";
-  // Trang Jinja (goiso) không thuộc router SPA -> phải chuyển trang thật.
-  const isExternal = (p) => /^\/(b\/|admin|dat-lich|lich-hen)/.test(p);
-  const goAfterLogin = () => {
-    if (isExternal(from)) window.location.href = from;
-    else navigate(from, { replace: true });
-  };
+  const goAfterLogin = () => navigate(from, { replace: true });
 
   const [showPw, setShowPw] = useState(false);
   const [remember, setRemember] = useState(false);
@@ -55,51 +49,10 @@ export default function LoginPage() {
     setFocus("username");
   }, [setValue, setFocus]);
 
-  // Đã đăng nhập sẵn (còn token trong localStorage) mà lại vào /login:
-  // - đích nội bộ  -> điều hướng SPA bình thường.
-  // - đích là trang Jinja (goiso) -> cookie JWT có thể đã mất (vd vừa mở lại
-  //   trình duyệt). Làm mới cookie rồi mới chuyển. Có bộ đếm chống VÒNG LẶP:
-  //   nếu quay lại đây quá 3 lần cho cùng một đích -> đăng xuất hẳn, hiện form.
-  useEffect(() => {
-    if (loading || !isAuthenticated) return;
-    if (!isExternal(from)) return;
-    const key = "login_bounce:" + from;
-    let n = 0;
-    try {
-      n = Number(sessionStorage.getItem(key) || 0);
-    } catch {
-      /* ignore */
-    }
-    if (n >= 3) {
-      try {
-        sessionStorage.removeItem(key);
-      } catch {
-        /* ignore */
-      }
-      logout(); // phiên hỏng -> xoá sạch, quay về form
-      return;
-    }
-    try {
-      sessionStorage.setItem(key, String(n + 1));
-    } catch {
-      /* ignore */
-    }
-    setRedirecting(true);
-    api
-      .post("/auth/refresh") // phát lại cookie JWT cho trang Jinja
-      .catch(() => {})
-      .finally(() => window.location.replace(from));
-  }, [loading, isAuthenticated, from, logout]);
-
-  if (!loading && isAuthenticated && !isExternal(from)) {
+  // Toàn bộ giao diện (kể cả bàn gọi số / màn hình / đặt lịch) đều là route SPA
+  // giờ, nên đã đăng nhập sẵn thì chỉ cần điều hướng nội bộ.
+  if (!loading && isAuthenticated) {
     return <Navigate to={from} replace />;
-  }
-  if (redirecting) {
-    return (
-      <div className="grid min-h-screen place-items-center bg-canvas text-sm text-muted">
-        Đang chuyển tới trang bạn yêu cầu…
-      </div>
-    );
   }
 
   const onSubmit = async (values) => {
@@ -109,9 +62,6 @@ export default function LoginPage() {
       try {
         if (remember) localStorage.setItem(REMEMBER_KEY, values.username);
         else localStorage.removeItem(REMEMBER_KEY);
-        Object.keys(sessionStorage)
-          .filter((k) => k.startsWith("login_bounce:"))
-          .forEach((k) => sessionStorage.removeItem(k));
       } catch {
         /* bỏ qua nếu localStorage không dùng được */
       }

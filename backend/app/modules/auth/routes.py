@@ -1,7 +1,8 @@
 """Route xác thực (đăng nhập CHUNG cho cả platform).
 
-Trả token trong body (SPA nhân sự dùng Bearer) VÀ đặt cookie JWT (trang Jinja
-của module gọi số đọc cookie này -> đăng nhập một lần cho cả hai module).
+Trả token trong body — mọi SPA (nhân sự + gọi số) đều dùng Bearer. Cookie JWT
+vẫn được đặt kèm (dự phòng, vô hại) nhưng không còn gì phụ thuộc nó từ khi
+các trang gọi số chuyển hết sang React.
 """
 from __future__ import annotations
 

@@ -27,6 +27,17 @@ import GoisoDevicesPage from "./pages/admin/goiso/DevicesPage";
 import ForbiddenPage from "./pages/ForbiddenPage";
 import NotFoundPage from "./pages/NotFoundPage";
 
+import BranchPickerPage from "./pages/goiso/BranchPickerPage";
+import BoardPage from "./pages/goiso/BoardPage";
+import DisplayPage from "./pages/goiso/DisplayPage";
+import DisplaySimplePage from "./pages/goiso/DisplaySimplePage";
+import ScreensPickPage from "./pages/goiso/ScreensPickPage";
+import CounterPage from "./pages/goiso/CounterPage";
+import BookingPage from "./pages/goiso/BookingPage";
+import BookingLookupPage from "./pages/goiso/BookingLookupPage";
+
+const GOISO_STAFF = [PERMISSIONS.GOISO_COUNTER, PERMISSIONS.GOISO_ADMIN];
+
 export default function App() {
   return (
     <Routes>
@@ -39,6 +50,44 @@ export default function App() {
         element={
           <ProtectedRoute>
             <PortalPage />
+          </ProtectedRoute>
+        }
+      />
+
+      {/* Gọi số — trang toàn màn hình riêng, KHÔNG dùng khung Layout (sidebar) */}
+      <Route path="/cho" element={<BranchPickerPage />} />
+      <Route path="/b/:code/cho" element={<BoardPage />} />
+      <Route path="/dat-lich" element={<BookingPage />} />
+      <Route path="/lich-hen/:token" element={<BookingLookupPage />} />
+      <Route
+        path="/b/:code/counter"
+        element={
+          <ProtectedRoute anyOf={GOISO_STAFF}>
+            <CounterPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/b/:code/man-hinh"
+        element={
+          <ProtectedRoute anyOf={GOISO_STAFF}>
+            <ScreensPickPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/b/:code/display"
+        element={
+          <ProtectedRoute anyOf={GOISO_STAFF}>
+            <DisplayPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/b/:code/display/simple"
+        element={
+          <ProtectedRoute anyOf={GOISO_STAFF}>
+            <DisplaySimplePage />
           </ProtectedRoute>
         }
       />

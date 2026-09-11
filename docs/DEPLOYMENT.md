@@ -1,6 +1,6 @@
 # DEPLOYMENT — Triển khai & cắt chuyển
 
-Một tiến trình Waitress phục vụ tất cả (SPA + API + trang Jinja goiso).
+Một tiến trình Waitress phục vụ tất cả (Portal React + toàn bộ giao diện gọi số + API JSON).
 Reverse proxy (Cloudflare Tunnel) chỉ chuyển hostname → cổng nội bộ.
 
 ## 0. Yêu cầu

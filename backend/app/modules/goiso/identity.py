@@ -1,11 +1,12 @@
 """Cầu nối danh tính: tài khoản platform (JWT) -> "user" theo hình dạng goiso.
 
-Trang Jinja và API cũ của goiso mong đợi dict user dạng:
+Các decorator/API cũ của goiso (admin_required, counter_guard...) mong đợi
+dict user dạng:
     {id, username, full_name, role in {"admin","staff"}, branch_id, branch_code,
      active, perms: [..], _platform: True}
 
-Phase 5: goiso đọc JWT (cookie hoặc header). Vẫn giữ đường phiên goiso cũ
-(SQLite users) làm dự phòng trong thời gian chuyển tiếp.
+goiso đọc JWT platform (header hoặc cookie) — không còn phiên riêng (session/SQLite
+users) từ khi tài khoản goiso được di trú vào bảng `users` chung.
 """
 from __future__ import annotations
 

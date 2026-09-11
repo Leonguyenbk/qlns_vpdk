@@ -17,8 +17,8 @@ function greeting() {
   return "Chào buổi tối";
 }
 
-/* Đích của module Gọi số theo quyền của tài khoản. Đây là trang Jinja (fullscreen),
- * nên điều hướng bằng chuyển trang thật (href) chứ không phải router. */
+/* Đích của module Gọi số theo quyền của tài khoản. Các trang này là route React
+ * toàn màn hình riêng (không sidebar) — điều hướng bằng href là đủ. */
 function goisoTarget(user, hasAny) {
   if (hasAny(["goiso.admin"])) return "/admin/goiso/branches";
   const code = user?.goiso_branch_code;
