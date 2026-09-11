@@ -25,6 +25,9 @@ const TABS = [
     label: "Gọi số · Thiết bị",
     anyOf: [PERMISSIONS.GOISO_ADMIN],
   },
+  { to: "kpi/ky-danh-gia", label: "KPI · Kỳ đánh giá", anyOf: [PERMISSIONS.KPI_PERIOD_MANAGE] },
+  { to: "kpi/bo-tieu-chi", label: "KPI · Bộ tiêu chí", anyOf: [PERMISSIONS.KPI_CRITERIA_MANAGE] },
+  { to: "kpi/danh-muc-san-pham", label: "KPI · Danh mục sản phẩm", anyOf: [PERMISSIONS.KPI_CRITERIA_MANAGE] },
 ];
 
 /* /admin trần (không chọn tab) -> tự vào tab đầu tiên mà tài khoản có quyền,

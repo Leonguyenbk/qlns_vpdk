@@ -67,6 +67,24 @@ export const PERMISSIONS = {
   GOISO_VIEW: "goiso.view",
   GOISO_COUNTER: "goiso.counter",
   GOISO_ADMIN: "goiso.admin",
+  // Giao việc
+  TASK_VIEW_OWN: "task.view_own",
+  TASK_VIEW_ALL: "task.view_all",
+  TASK_CREATE: "task.create",
+  TASK_ASSIGN: "task.assign",
+  TASK_MANAGE: "task.manage",
+  TASK_ACCEPT: "task.accept",
+  TASK_TEMPLATE_MANAGE: "task.template_manage",
+  // KPI
+  KPI_VIEW_OWN: "kpi.view_own",
+  KPI_VIEW_ALL: "kpi.view_all",
+  KPI_SELF_ASSESS: "kpi.self_assess",
+  KPI_REVIEW: "kpi.review",
+  KPI_AGGREGATE: "kpi.aggregate",
+  KPI_APPROVE: "kpi.approve",
+  KPI_CRITERIA_MANAGE: "kpi.criteria_manage",
+  KPI_PERIOD_MANAGE: "kpi.period_manage",
+  KPI_ADJUST: "kpi.adjust",
 };
 
 // Nhóm quyền để cổng ứng dụng quyết định hiện thẻ module nào
@@ -74,4 +92,86 @@ export const MODULE_PERMS = {
   NHANSU: ["employee.view", "unit.view", "position.view"],
   GOISO: ["goiso.view", "goiso.counter", "goiso.admin"],
   ADMIN: ["user.view", "role.view", "audit.view"],
+  TASKS: ["task.view_own", "task.view_all", "task.create", "task.assign", "task.manage", "task.accept"],
+  KPI: ["kpi.view_own", "kpi.view_all", "kpi.criteria_manage", "kpi.period_manage"],
+};
+
+// ---- Giao việc – Theo dõi nhiệm vụ ----
+
+export const TASK_STATUS_LABELS = {
+  DRAFT: "Nháp",
+  ASSIGNED: "Đã giao",
+  IN_PROGRESS: "Đang thực hiện",
+  PENDING_COLLAB: "Chờ phối hợp",
+  PAUSED: "Tạm dừng",
+  NEEDS_REVISION: "Yêu cầu bổ sung/làm lại",
+  PENDING_ACCEPTANCE: "Chờ nghiệm thu",
+  COMPLETED: "Hoàn thành",
+  CANCELLED: "Đã hủy",
+};
+
+export const TASK_STATUS_BADGE = {
+  DRAFT: "badge-neutral",
+  ASSIGNED: "badge-info",
+  IN_PROGRESS: "badge-info",
+  PENDING_COLLAB: "badge-warn",
+  PAUSED: "badge-warn",
+  NEEDS_REVISION: "badge-danger",
+  PENDING_ACCEPTANCE: "badge-warn",
+  COMPLETED: "badge-ok",
+  CANCELLED: "badge-neutral",
+};
+
+export const TASK_PRIORITY_LABELS = {
+  LOW: "Thấp",
+  NORMAL: "Bình thường",
+  HIGH: "Cao",
+  URGENT: "Khẩn cấp",
+};
+
+export const TASK_SOURCE_LABELS = {
+  PLAN: "Kế hoạch",
+  DIRECTIVE: "Chỉ đạo",
+  ROUTINE: "Thường xuyên",
+  CASE_FILE: "Hồ sơ vụ việc",
+  AD_HOC: "Đột xuất",
+};
+
+export const TASK_DEADLINE_TYPE_LABELS = {
+  INTERNAL: "Nội bộ",
+  TTHC: "Thủ tục hành chính",
+};
+
+export const TASK_PAUSE_REASON_LABELS = {
+  WAITING_CITIZEN: "Chờ người dân/doanh nghiệp bổ sung hồ sơ",
+  WAITING_AGENCY: "Chờ cơ quan/đơn vị phối hợp",
+  SYSTEM_ERROR: "Lỗi hệ thống",
+  FORCE_MAJEURE: "Bất khả kháng",
+  APPROVED_OTHER: "Tạm dừng khác (có quyết định)",
+};
+
+// ---- Đánh giá KPI ----
+
+export const KPI_SCORE_STATUS_LABELS = {
+  DRAFT: "Nháp — chờ tính điểm",
+  SELF_ASSESSED: "Đã tự đánh giá",
+  REVIEWED: "Đã theo dõi, đánh giá",
+  AGGREGATED: "Đã tổng hợp",
+  APPROVED: "Đã phê duyệt chính thức",
+  NOT_RATED: "Không xếp loại",
+};
+
+export const KPI_SCORE_STATUS_BADGE = {
+  DRAFT: "badge-neutral",
+  SELF_ASSESSED: "badge-info",
+  REVIEWED: "badge-info",
+  AGGREGATED: "badge-warn",
+  APPROVED: "badge-ok",
+  NOT_RATED: "badge-neutral",
+};
+
+export const CATALOG_STATUS_LABELS = {
+  DRAFT: "Dự thảo",
+  PILOT: "Thí điểm",
+  OFFICIAL: "Chính thức",
 };

@@ -20,6 +20,10 @@ import {
   IconChevronRight,
   IconChevronDown,
   IconSearch,
+  IconTask,
+  IconInbox,
+  IconSend,
+  IconGauge,
 } from "./ui/icons";
 
 /* Menu + routing unchanged — only grouped for the sidebar. Each item keeps its
@@ -38,6 +42,16 @@ const NAV_GROUPS = [
       { to: "/employees", label: "Nhân sự", Icon: IconPeople, anyOf: [PERMISSIONS.EMPLOYEE_VIEW] },
       { to: "/units", label: "Cơ cấu đơn vị", Icon: IconOrg, anyOf: [PERMISSIONS.UNIT_VIEW] },
       { to: "/positions", label: "Chức vụ", Icon: IconPosition, anyOf: [PERMISSIONS.POSITION_VIEW] },
+    ],
+  },
+  {
+    title: "Giao việc & KPI",
+    items: [
+      { to: "/tong-quan-dieu-hanh", label: "Tổng quan điều hành", Icon: IconOverview, anyOf: [PERMISSIONS.TASK_VIEW_ALL] },
+      { to: "/cong-viec-cua-toi", label: "Công việc của tôi", Icon: IconInbox, anyOf: [PERMISSIONS.TASK_VIEW_OWN] },
+      { to: "/viec-toi-da-giao", label: "Việc tôi đã giao", Icon: IconSend, anyOf: [PERMISSIONS.TASK_CREATE, PERMISSIONS.TASK_ASSIGN] },
+      { to: "/giao-viec", label: "Danh sách nhiệm vụ", Icon: IconTask, anyOf: [PERMISSIONS.TASK_VIEW_ALL] },
+      { to: "/kpi-cua-toi", label: "KPI của tôi", Icon: IconGauge, anyOf: [PERMISSIONS.KPI_VIEW_OWN] },
     ],
   },
   {
@@ -78,6 +92,16 @@ const CRUMBS = {
   edit: "Chỉnh sửa",
   transfer: "Chuyển đơn vị",
   history: "Lịch sử",
+  "tong-quan-dieu-hanh": "Tổng quan điều hành",
+  "giao-viec": "Giao việc",
+  "cong-viec-cua-toi": "Công việc của tôi",
+  "viec-toi-da-giao": "Việc tôi đã giao",
+  "kpi-cua-toi": "KPI của tôi",
+  kpi: "KPI",
+  moi: "Giao việc mới",
+  "ky-danh-gia": "Kỳ đánh giá",
+  "bo-tieu-chi": "Bộ tiêu chí",
+  "danh-muc-san-pham": "Danh mục sản phẩm",
 };
 
 const COLLAPSE_KEY = "qlns:sidebar_collapsed";

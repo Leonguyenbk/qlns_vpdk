@@ -157,3 +157,35 @@ export const IconEyeOff = (p) => (
     <path d="M9.9 5.2A9.5 9.5 0 0 1 12 5c6.5 0 10 7 10 7a17 17 0 0 1-3.4 4.3M6.6 6.6A17 17 0 0 0 2 12s3.5 7 10 7a9.6 9.6 0 0 0 4.1-.9" />
   </Icon>
 );
+export const IconTask = (p) => (
+  <Icon {...p}>
+    <rect x="5" y="4" width="14" height="17" rx="2" />
+    <path d="M9 3.5h6M9 10l1.8 1.8L15 8" />
+    <path d="M9 15.5h6" />
+  </Icon>
+);
+export const IconTarget = (p) => (
+  <Icon {...p}>
+    <circle cx="12" cy="12" r="8.5" />
+    <circle cx="12" cy="12" r="4.5" />
+    <circle cx="12" cy="12" r="0.8" fill="currentColor" />
+  </Icon>
+);
+export const IconSend = (p) => (
+  <Icon {...p}>
+    <path d="M21 3 3 10.5l7.2 2.3L13.5 21z" />
+    <path d="M21 3 10.2 12.8" />
+  </Icon>
+);
+export const IconGauge = (p) => (
+  <Icon {...p}>
+    <path d="M4 15a8 8 0 1 1 16 0" />
+    <path d="M12 15V9M12 15l4-3" />
+  </Icon>
+);
+export const IconClock = (p) => (
+  <Icon {...p}>
+    <circle cx="12" cy="12" r="9" />
+    <path d="M12 7v5l3.2 2" />
+  </Icon>
+);

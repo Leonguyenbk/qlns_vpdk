@@ -24,17 +24,48 @@ Backend **luôn** kiểm tra quyền (decorator `@require_permission` cho nhân 
 | `goiso.counter` | **Trực một cửa/quầy**: gọi số, gọi lại, bỏ qua, hoàn thành |
 | `goiso.admin` | Cấu hình dịch vụ/quầy/màn hình, chi nhánh, thiết bị kiosk, đặt lịch |
 
+### Giao việc – Theo dõi nhiệm vụ
+| Mã | Ý nghĩa |
+|---|---|
+| `task.view_own` | Xem nhiệm vụ của bản thân ("Công việc của tôi") |
+| `task.view_all` | Xem toàn bộ nhiệm vụ trong phạm vi đơn vị được phân quyền (tổng quan điều hành) |
+| `task.create` | Tạo nhiệm vụ / giao việc |
+| `task.assign` | Giao việc cho người/đơn vị khác, phân việc lại, thêm/gỡ người thực hiện |
+| `task.manage` | Sửa/hủy/gia hạn/điều chỉnh khối lượng nhiệm vụ, xác nhận thời gian tạm dừng |
+| `task.accept` | Nghiệm thu, phê duyệt kết quả, trả lại yêu cầu làm lại |
+| `task.template_manage` | Quản lý mẫu nhiệm vụ |
+
+### Đánh giá KPI (dự thảo/thí điểm — xem `docs/TASK_KPI_ANALYSIS.md`)
+| Mã | Ý nghĩa |
+|---|---|
+| `kpi.view_own` | Xem KPI của bản thân |
+| `kpi.view_all` | Xem KPI trong phạm vi được phân quyền |
+| `kpi.self_assess` | Tự đánh giá, tự nhận mức xếp loại |
+| `kpi.review` | Theo dõi, đánh giá trực tiếp (khoản 2 Điều 13 NĐ 233/2026) |
+| `kpi.aggregate` | Tổng hợp (bộ phận tổ chức cán bộ) |
+| `kpi.approve` | Quyết định xếp loại + khoá kỳ (khoản 3 Điều 13 — tập trung ở Giám đốc VPĐKĐĐ) |
+| `kpi.criteria_manage` | Quản lý bộ tiêu chí, danh mục sản phẩm, hệ số Kn/CAP |
+| `kpi.period_manage` | Mở/khoá/mở lại kỳ đánh giá |
+| `kpi.adjust` | Điều chỉnh/thay thế kết quả đã khoá (Mẫu số 15) |
+
 ## Vai trò mẫu (bảng `roles`, `is_system = true`)
 
 | Mã vai trò | Quyền | Ghi chú |
 |---|---|---|
-| `SYSTEM_ADMIN` | **tất cả** (gồm `goiso.*`) | Toàn quyền platform |
-| `HR_ADMIN` | nhóm `employee.*`, `unit.*`, `position.*`, `audit.view` | Quản trị nhân sự toàn hệ |
-| `UNIT_MANAGER` | `employee.view/create/update/transfer`, `unit.view`, `position.view` | Giới hạn theo phạm vi đơn vị (`user_unit_scopes`) |
-| `VIEWER` | `employee.view`, `unit.view`, `position.view` | Chỉ đọc |
-| `GOISO_ADMIN` | `goiso.view`, `goiso.counter`, `goiso.admin`, `unit.view` | Quản trị gọi số **toàn hệ thống** |
-| `GOISO_BRANCH_ADMIN` | `goiso.view`, `goiso.counter`, `goiso.admin` | Quản trị gọi số **trong phạm vi chi nhánh được cấp** |
-| **`GOISO_COUNTER`** | `goiso.view`, `goiso.counter` | **Tài khoản được giao trực một cửa/quầy** — vào được trang gọi số của chi nhánh mình |
+| `SYSTEM_ADMIN` | **tất cả** (gồm `goiso.*`, `task.*`, `kpi.*`) | Toàn quyền kỹ thuật platform — **khuyến nghị KHÔNG dùng làm người phê duyệt KPI nghiệp vụ chính thức** trong thực tế (xem mục 4.7 `TASK_KPI_ANALYSIS.md`) |
+| `HR_ADMIN` | nhóm `employee.*`, `unit.*`, `position.*`, `audit.view` + tự phục vụ (`task.view_own`/`kpi.view_own`/`kpi.self_assess`) | Quản trị nhân sự toàn hệ |
+| `UNIT_MANAGER` | `employee.view/create/update/transfer`, `unit.view`, `position.view` + tự phục vụ | Giới hạn theo phạm vi đơn vị (`user_unit_scopes`) |
+| `VIEWER` | `employee.view`, `unit.view`, `position.view` + tự phục vụ | Chỉ đọc |
+| `GOISO_ADMIN` / `GOISO_BRANCH_ADMIN` / `GOISO_COUNTER` | như cũ + tự phục vụ | Quản trị/trực quầy gọi số |
+| **`OFFICE_LEADER`** | `task.view_all/create/assign/manage/accept`, `kpi.view_all/review/approve/period_manage/adjust/criteria_manage` | Lãnh đạo Văn phòng — thẩm quyền xếp loại tập trung (khoản 3 Điều 13) |
+| **`ORG_PERSONNEL`** | `task.view_all/template_manage`, `kpi.view_all/aggregate/criteria_manage/period_manage` | Bộ phận tổ chức cán bộ — tổng hợp, quản lý danh mục/bộ tiêu chí |
+| **`UNIT_HEAD`** | `task.view_all/create/assign/manage/accept`, `kpi.view_all/review` (phạm vi theo `user_unit_scopes`) | Lãnh đạo phòng/chi nhánh |
+| **`TASK_ASSIGNER`** | `task.view_all/create/assign/accept` (phạm vi theo `user_unit_scopes`) | Người được uỷ quyền giao việc/nghiệm thu, không nhất thiết là lãnh đạo |
+
+Mọi tài khoản có hồ sơ nhân sự (`users.employee_id` khác NULL) và giữ bất kỳ
+vai trò nào ở trên đều thấy được trang cá nhân "Công việc của tôi"/"KPI của
+tôi" nhờ quyền `task.view_own`/`kpi.view_own`/`kpi.self_assess` được gắn kèm
+theo từng vai trò (migration `0008_task_kpi_permissions`).
 
 ## "Ai được vào trang gọi số?"
 

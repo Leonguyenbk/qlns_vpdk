@@ -10,6 +10,9 @@ triển khai trên máy hiện tại). Bảng phân theo tiền tố:
 | Nhân sự | `employees`, `employee_assignments`, `employee_education`, `job_grades`, `positions`, `unit_position_limits` |
 | Nhật ký | `audit_logs` |
 | **Gọi số** | `goiso_branches`, `goiso_queue`, `goiso_counters_status`, `goiso_config`, `goiso_visitor_stats`, `goiso_appointments`, `goiso_devices` |
+| **Giao việc** | `tasks`, `task_assignments`, `task_pauses`, `task_logs`, `task_attachments`, `task_templates` |
+| **KPI / danh mục sản phẩm** | `product_catalog_groups`, `products`, `product_conversions`, `kpi_criteria_sets`, `kpi_criteria`, `kpi_periods`, `kpi_scores`, `kpi_score_details`, `kpi_evaluation_comments` |
+| Thông báo | `notifications` |
 
 - `goiso_config.branch_id = 0` → cấu hình toàn cục (vd `kiosk_release`).
 - `goiso_branches.id` được giữ NGUYÊN từ hệ cũ để `goiso_queue.branch_id`… không đứt tham chiếu.
@@ -23,11 +26,17 @@ triển khai trên máy hiện tại). Bảng phân theo tiền tố:
 | 0001–0004 | Schema nhân sự giai đoạn 1 |
 | **0005** | Quyền/vai trò `GOISO_*`; cột `users.goiso_branch_code`, `users.legacy_password_sha256` |
 | **0006** | Bảng `goiso_*`; cột `organization_units.goiso_branch_code` |
+| **0007** | Bảng Giao việc + KPI (xem danh mục ở trên); seed 18 nhóm sản phẩm `product_catalog_groups` (dữ liệu tham chiếu trích từ Phụ lục II tài liệu dự thảo KPI VPĐKĐĐ — không phải dữ liệu demo) |
+| **0008** | Quyền/vai trò `task.*`/`kpi.*`; vai trò mới `OFFICE_LEADER`, `ORG_PERSONNEL`, `UNIT_HEAD`, `TASK_ASSIGNER`; bổ sung quyền tự phục vụ (`task.view_own`/`kpi.view_own`/`kpi.self_assess`) cho các vai trò sẵn có |
 
 ```bash
-flask --app wsgi db upgrade      # nâng cấp
+flask --app wsgi db upgrade      # nâng cấp — chạy 1 lần, áp dụng tuần tự 0007 rồi 0008
 flask --app wsgi db downgrade -1 # lùi 1 bước
 ```
+
+Cả hai migration 0007/0008 chỉ **thêm** bảng/cột/quyền mới, kiểm tra tồn tại
+trước khi tạo (idempotent) và không xoá/sửa dữ liệu nhân sự, gọi số hay tài
+khoản hiện có. An toàn để chạy trên CSDL đang có dữ liệu thật.
 
 ## Tầng dữ liệu goiso
 
@@ -42,3 +51,23 @@ sang ORM/repository làm dần ở các phase sau — ưu tiên ổn định.
 mysqldump -u <user> -p --single-transaction --no-tablespaces --routines --triggers \
   --databases personnel_management > backup_YYYYMMDD.sql
 ```
+
+## Khôi phục (nếu migration lỗi hoặc cần lùi lại)
+
+```bash
+# 1. Dừng dịch vụ backend (NSSM) trước khi khôi phục để tránh ghi đè trong lúc restore
+nssm stop <ten-service-backend>
+
+# 2. Khôi phục từ bản sao lưu gần nhất
+mysql -u <user> -p personnel_management < backup_YYYYMMDD.sql
+
+# 3. Kiểm tra phiên bản migration hiện tại của CSDL vừa khôi phục
+flask --app wsgi db current
+
+# 4. Khởi động lại dịch vụ
+nssm start <ten-service-backend>
+```
+
+Luôn sao lưu (`mysqldump`) ngay trước khi chạy `flask db upgrade` cho một
+migration mới trên CSDL sản xuất — kể cả migration được viết idempotent/an
+toàn như 0007–0008, đây vẫn là quy tắc bắt buộc trước mọi thay đổi schema.

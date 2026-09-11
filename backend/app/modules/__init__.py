@@ -3,7 +3,9 @@
     app/modules/
     ├── auth/      -> đăng nhập CHUNG (JWT) cho mọi module
     ├── nhansu/    -> quản lý nhân sự, đơn vị, chức vụ, tài khoản, vai trò, nhật ký
-    └── goiso/     -> gọi số / kiosk (lớp tương thích, giữ nguyên đường dẫn cũ)
+    ├── goiso/     -> gọi số / kiosk (lớp tương thích, giữ nguyên đường dẫn cũ)
+    ├── tasks/     -> Giao việc – Theo dõi nhiệm vụ
+    └── kpi/       -> Đánh giá KPI (danh mục sản phẩm, bộ tiêu chí, kỳ, chấm điểm)
 """
 from __future__ import annotations
 
@@ -31,3 +33,10 @@ def register_blueprints(app: Flask) -> None:
     from .goiso.legacy_app import bp as goiso_compat_bp
 
     app.register_blueprint(goiso_compat_bp)
+
+    # --- Module Giao việc – Theo dõi nhiệm vụ – Đánh giá KPI ---
+    from .tasks.routes import bp as tasks_bp
+    from .kpi.routes import bp as kpi_bp
+
+    app.register_blueprint(tasks_bp)
+    app.register_blueprint(kpi_bp)

@@ -63,6 +63,21 @@ def _clean_db(app):
     # Xóa theo thứ tự phụ thuộc; gồm cả bảng liên kết (SQLite không ép FK).
     for table in (
         "audit_logs",
+        "notifications",
+        "kpi_evaluation_comments",
+        "kpi_score_details",
+        "kpi_scores",
+        "kpi_periods",
+        "kpi_criteria",
+        "kpi_criteria_sets",
+        "task_templates",
+        "task_attachments",
+        "task_logs",
+        "task_pauses",
+        "task_assignments",
+        "tasks",
+        "product_conversions",
+        "products",
         "refresh_tokens",
         "employee_assignments",
         "unit_position_limits",
@@ -157,12 +172,18 @@ def make_employee(db):
 
 @pytest.fixture
 def make_user(db):
-    def _make(username, role_code=ROLE_HR_ADMIN, password="Password@123", scopes=(("GLOBAL", None),), is_active=True):
-        role = db.session.query(Role).filter_by(code=role_code).first()
-        u = User(username=username, full_name=username, email=f"{username}@ex.com", is_active=is_active)
+    def _make(username, role_code=ROLE_HR_ADMIN, password="Password@123", scopes=(("GLOBAL", None),),
+              is_active=True, employee=None):
+        role_codes = [role_code] if isinstance(role_code, str) else list(role_code)
+        u = User(
+            username=username, full_name=username, email=f"{username}@ex.com", is_active=is_active,
+            employee_id=employee.id if employee else None,
+        )
         u.set_password(password)
-        if role:
-            u.roles.append(role)
+        for rc in role_codes:
+            role = db.session.query(Role).filter_by(code=rc).first()
+            if role:
+                u.roles.append(role)
         for stype, unit in scopes:
             u.unit_scopes.append(
                 UserUnitScope(scope_type=stype, unit_id=unit.id if unit else None)
@@ -170,6 +191,19 @@ def make_user(db):
         db.session.add(u)
         db.session.commit()
         return u
+
+    return _make
+
+
+@pytest.fixture
+def make_staff(make_employee, make_user):
+    """Tạo nhanh một tài khoản gắn với hồ sơ nhân sự (đơn vị/chức vụ hiện tại) —
+    dùng cho test Giao việc/KPI cần snapshot đơn vị/chức vụ thật."""
+
+    def _make(username, unit, position, role_code, full_name=None, scopes=(("GLOBAL", None),)):
+        emp = make_employee(f"NV-{username}", unit, position, full_name=full_name or username)
+        user = make_user(username, role_code=role_code, scopes=scopes, employee=emp)
+        return user
 
     return _make
 
