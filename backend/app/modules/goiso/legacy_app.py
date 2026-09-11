@@ -323,9 +323,15 @@ def page_counter():
                            counters=active, me=g.user)
 
 
-@bp.route("/admin")
+@bp.route("/goiso-admin-legacy")
 @admin_required
 def page_admin():
+    """Trang quản trị Jinja cũ — giữ lại làm dự phòng/tham chiếu.
+
+    Quản trị hợp nhất (nhân sự + gọi số) giờ ở Portal React tại /admin
+    (xem frontend/src/pages/admin/AdminPage.jsx). Trang này KHÔNG còn được
+    liên kết tới từ đâu trong hệ thống nhưng vẫn dùng được các API
+    /api/admin/* nếu cần đối chiếu."""
     return render_template("admin.html", me=g.user)
 
 

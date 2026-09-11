@@ -20,11 +20,11 @@ function greeting() {
 /* Đích của module Gọi số theo quyền của tài khoản. Đây là trang Jinja (fullscreen),
  * nên điều hướng bằng chuyển trang thật (href) chứ không phải router. */
 function goisoTarget(user, hasAny) {
-  if (hasAny(["goiso.admin"])) return "/admin";
+  if (hasAny(["goiso.admin"])) return "/admin/goiso/branches";
   const code = user?.goiso_branch_code;
   if (hasAny(["goiso.counter"]) && code) return `/b/${code}/counter`;
   if (code) return `/b/${code}/cho`;
-  return "/admin";
+  return "/admin/goiso/branches";
 }
 
 function AppCard({ title, desc, Icon, tone, onOpen }) {
@@ -83,7 +83,7 @@ export default function PortalPage() {
       desc: "Tài khoản, vai trò & quyền, nhật ký thao tác.",
       Icon: IconKey,
       tone: "linear-gradient(135deg,#7c3aed,#db2777)",
-      onOpen: () => (window.location.href = "/users"),
+      onOpen: () => (window.location.href = "/admin"),
     });
   }
 

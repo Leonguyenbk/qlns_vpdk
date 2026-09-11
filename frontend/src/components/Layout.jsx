@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Link, NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import clsx from "clsx";
 import { useAuth } from "../auth/AuthContext";
-import { PERMISSIONS, MODULE_PERMS } from "../lib/constants";
+import { PERMISSIONS } from "../lib/constants";
 import { Avatar } from "./ui/primitives";
 import { CommandPalette } from "./CommandPalette";
 import {
@@ -43,9 +43,18 @@ const NAV_GROUPS = [
   {
     title: "Hệ thống",
     items: [
-      { to: "/users", label: "Tài khoản", Icon: IconKey, anyOf: [PERMISSIONS.USER_VIEW] },
-      { to: "/roles", label: "Vai trò & quyền", Icon: IconShield, anyOf: [PERMISSIONS.ROLE_VIEW] },
-      { to: "/audit-logs", label: "Nhật ký hệ thống", Icon: IconLog, anyOf: [PERMISSIONS.AUDIT_VIEW] },
+      {
+        to: "/admin",
+        label: "Quản trị",
+        Icon: IconShield,
+        anyOf: [
+          PERMISSIONS.USER_VIEW,
+          PERMISSIONS.ROLE_VIEW,
+          PERMISSIONS.AUDIT_VIEW,
+          PERMISSIONS.GOISO_ADMIN,
+          PERMISSIONS.GOISO_VIEW,
+        ],
+      },
     ],
   },
 ];
@@ -57,9 +66,14 @@ const CRUMBS = {
   employees: "Nhân sự",
   units: "Cơ cấu đơn vị",
   positions: "Chức vụ",
+  admin: "Quản trị",
   users: "Tài khoản",
   roles: "Vai trò & quyền",
   "audit-logs": "Nhật ký hệ thống",
+  goiso: "Gọi số",
+  branches: "Chi nhánh",
+  stats: "Thống kê",
+  devices: "Thiết bị",
   new: "Thêm mới",
   edit: "Chỉnh sửa",
   transfer: "Chuyển đơn vị",
@@ -303,23 +317,16 @@ export function Layout() {
             </div>
           ))}
 
-          {hasAnyPermission(MODULE_PERMS.GOISO) && (
+          {hasAnyPermission([PERMISSIONS.GOISO_COUNTER]) && user?.goiso_branch_code && (
             <div className="mt-3">
               {!collapsed && (
                 <p className="px-6 pb-1.5 pt-1 text-[11px] font-semibold uppercase tracking-[0.08em] text-[#94a3b8]">
                   Gọi số
                 </p>
               )}
-              {(hasAnyPermission([PERMISSIONS.GOISO_ADMIN])
-                ? [{ href: "/admin", label: "Quản trị gọi số" }]
-                : []
-              )
-                .concat(
-                  hasAnyPermission([PERMISSIONS.GOISO_COUNTER]) && user?.goiso_branch_code
-                    ? [{ href: `/b/${user.goiso_branch_code}/counter`, label: "Bàn gọi số" }]
-                    : []
-                )
-                .map((it) => (
+              {/* Quản trị gọi số nay ở trong trang Quản trị chung (/admin) ở trên.
+                 Chỉ còn link riêng tới bàn gọi số — trang Jinja fullscreen. */}
+              {[{ href: `/b/${user.goiso_branch_code}/counter`, label: "Bàn gọi số" }].map((it) => (
                   <a
                     key={it.href}
                     href={it.href}

@@ -19,6 +19,11 @@ import PositionsPage from "./pages/positions/PositionsPage";
 import UsersPage from "./pages/users/UsersPage";
 import RolesPage from "./pages/roles/RolesPage";
 import AuditLogPage from "./pages/audit/AuditLogPage";
+import AdminPage, { AdminIndexRedirect } from "./pages/admin/AdminPage";
+import GoisoBranchesPage from "./pages/admin/goiso/BranchesPage";
+import GoisoBranchConfigPage from "./pages/admin/goiso/BranchConfigPage";
+import GoisoStatsPage from "./pages/admin/goiso/StatsPage";
+import GoisoDevicesPage from "./pages/admin/goiso/DevicesPage";
 import ForbiddenPage from "./pages/ForbiddenPage";
 import NotFoundPage from "./pages/NotFoundPage";
 
@@ -121,30 +126,85 @@ export default function App() {
             </ProtectedRoute>
           }
         />
+        {/* Quản trị — MỘT trang duy nhất, có tab; mở rộng bằng cách thêm route con */}
         <Route
-          path="users"
+          path="admin"
           element={
-            <ProtectedRoute permission={PERMISSIONS.USER_VIEW}>
-              <UsersPage />
+            <ProtectedRoute
+              anyOf={[
+                PERMISSIONS.USER_VIEW,
+                PERMISSIONS.ROLE_VIEW,
+                PERMISSIONS.AUDIT_VIEW,
+                PERMISSIONS.GOISO_ADMIN,
+                PERMISSIONS.GOISO_VIEW,
+              ]}
+            >
+              <AdminPage />
             </ProtectedRoute>
           }
-        />
-        <Route
-          path="roles"
-          element={
-            <ProtectedRoute permission={PERMISSIONS.ROLE_VIEW}>
-              <RolesPage />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="audit-logs"
-          element={
-            <ProtectedRoute permission={PERMISSIONS.AUDIT_VIEW}>
-              <AuditLogPage />
-            </ProtectedRoute>
-          }
-        />
+        >
+          <Route index element={<AdminIndexRedirect />} />
+          <Route
+            path="users"
+            element={
+              <ProtectedRoute permission={PERMISSIONS.USER_VIEW}>
+                <UsersPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="roles"
+            element={
+              <ProtectedRoute permission={PERMISSIONS.ROLE_VIEW}>
+                <RolesPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="audit-logs"
+            element={
+              <ProtectedRoute permission={PERMISSIONS.AUDIT_VIEW}>
+                <AuditLogPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="goiso/branches"
+            element={
+              <ProtectedRoute permission={PERMISSIONS.GOISO_ADMIN}>
+                <GoisoBranchesPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="goiso/branches/:code"
+            element={
+              <ProtectedRoute permission={PERMISSIONS.GOISO_ADMIN}>
+                <GoisoBranchConfigPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="goiso/stats"
+            element={
+              <ProtectedRoute anyOf={[PERMISSIONS.GOISO_ADMIN, PERMISSIONS.GOISO_VIEW]}>
+                <GoisoStatsPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="goiso/devices"
+            element={
+              <ProtectedRoute permission={PERMISSIONS.GOISO_ADMIN}>
+                <GoisoDevicesPage />
+              </ProtectedRoute>
+            }
+          />
+        </Route>
+        {/* Đường cũ — chuyển tiếp cho ai còn lưu link */}
+        <Route path="users" element={<Navigate to="/admin/users" replace />} />
+        <Route path="roles" element={<Navigate to="/admin/roles" replace />} />
+        <Route path="audit-logs" element={<Navigate to="/admin/audit-logs" replace />} />
 
         <Route path="403" element={<ForbiddenPage />} />
         <Route path="*" element={<NotFoundPage />} />
