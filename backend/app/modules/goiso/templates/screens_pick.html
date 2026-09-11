@@ -7,7 +7,7 @@
     <div class="ml-auto flex items-center gap-3 text-sm">
       <span class="opacity-90">{{ me.full_name }}</span>
       <a href="/b/{{ branch.code }}/counter" class="btn bg-white/15 hover:bg-white/25 px-3 py-1.5">Bàn gọi số</a>
-      <a href="/login" onclick="event.preventDefault();fetch('/api/logout',{method:'POST'}).finally(()=>location.href='/login')" class="btn bg-white/15 hover:bg-white/25 px-3 py-1.5">Đăng xuất</a>
+      <a href="/logout" class="btn bg-white/15 hover:bg-white/25 px-3 py-1.5">Đăng xuất</a>
     </div>
   </header>
 

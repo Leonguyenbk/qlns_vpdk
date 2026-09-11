@@ -35,10 +35,7 @@ const EXTRA_NUM = {
 };
 
 /* -------------------------------------------------- đăng xuất */
-$('#btn-logout').addEventListener('click', async () => {
-  try { await fetch('/api/logout', { method: 'POST' }); } catch (_) {}
-  location.href = '/login';
-});
+$('#btn-logout').addEventListener('click', () => { location.href = '/logout'; });
 
 /* -------------------------------------------------- tabs */
 $$('.tab').forEach(b => b.addEventListener('click', () => activateTab(b.dataset.tab)));
