@@ -117,6 +117,11 @@ ROLE_TASK_ASSIGNER = "TASK_ASSIGNER"      # Người được uỷ quyền giao 
 # trang "Công việc của tôi" (mục 5), bất kể đang giữ vai trò module nào khác.
 _STAFF_SELF_SERVICE = [TASK_VIEW_OWN, KPI_VIEW_OWN, KPI_SELF_ASSESS]
 
+# Vai trò mặc định cho viên chức không giữ chức vụ quản lý khi tạo tài khoản
+# hàng loạt — CHỈ tự phục vụ, không xem được danh sách nhân sự/đơn vị toàn cơ
+# quan (khác VIEWER, vốn có thêm employee.view/unit.view/position.view).
+ROLE_STAFF = "STAFF"
+
 ROLE_DEFINITIONS: dict[str, dict] = {
     ROLE_SYSTEM_ADMIN: {
         "name": "Quản trị hệ thống",
@@ -239,5 +244,13 @@ ROLE_DEFINITIONS: dict[str, dict] = {
             UNIT_VIEW, EMPLOYEE_VIEW,
             *_STAFF_SELF_SERVICE,
         ],
+    },
+    ROLE_STAFF: {
+        "name": "Viên chức (tự phục vụ)",
+        "description": "Vai trò mặc định cho viên chức không giữ chức vụ quản lý: chỉ xem/thao "
+        "tác nhiệm vụ và KPI của chính mình (Công việc của tôi, KPI của tôi) — không xem được "
+        "danh sách nhân sự/đơn vị toàn cơ quan.",
+        "is_system": True,
+        "permissions": [*_STAFF_SELF_SERVICE],
     },
 }

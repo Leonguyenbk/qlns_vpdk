@@ -44,8 +44,17 @@ export default function EmployeeTransferPage() {
     Object.keys(body).forEach((k) => body[k] === "" && delete body[k]);
     if (replace) body.replace_existing = true;
     try {
-      await transfer.mutateAsync({ id, body });
-      toast.success("Chuyển đơn vị thành công");
+      const resp = await transfer.mutateAsync({ id, body });
+      const change = resp?.data?.data?.username_change;
+      if (change) {
+        toast.success(
+          `Chuyển đơn vị thành công. Tên đăng nhập đã đổi từ "${change.old_username}" ` +
+            `sang "${change.new_username}" — vui lòng báo lại cho nhân sự.`,
+          { duration: 10000 }
+        );
+      } else {
+        toast.success("Chuyển đơn vị thành công");
+      }
       navigate(`/employees/${id}`);
     } catch (err) {
       const p = conflictPayload(err);

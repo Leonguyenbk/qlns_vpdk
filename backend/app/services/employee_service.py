@@ -28,6 +28,7 @@ from .assignment_service import (
     end_assignment,
 )
 from .audit_service import record_audit
+from .username_service import sync_username_for_employee
 
 # ---- Các trường hồ sơ được phép cập nhật trực tiếp (KHÔNG gồm đơn vị/chức vụ) ----
 _PROFILE_FIELDS = {
@@ -457,6 +458,11 @@ def transfer_employee(employee_id: int, data: dict, *, actor, scope, meta: dict)
 
         db.session.flush()
 
+        # 6b. Nếu nhân sự đã có tài khoản đăng nhập, tự đổi tiền tố username
+        # theo đơn vị mới (chuyển Phòng/Chi nhánh) — theo yêu cầu vận hành.
+        # KHÔNG đổi nếu vẫn ở cùng Phòng/Chi nhánh (chỉ đổi bộ phận/tổ bên trong).
+        username_change = sync_username_for_employee(emp, actor_id=actor.id, meta=meta)
+
         # 9b. Audit "sau thay đổi"
         record_audit(
             user_id=actor.id,
@@ -483,6 +489,7 @@ def transfer_employee(employee_id: int, data: dict, *, actor, scope, meta: dict)
     db.session.refresh(emp)
     data_out = emp.to_dict(include_sensitive=_can_view_sensitive(actor))
     data_out["assignments"] = [a.to_dict() for a in emp.assignments]
+    data_out["username_change"] = username_change
     return data_out
 
 

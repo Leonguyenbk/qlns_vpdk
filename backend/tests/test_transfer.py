@@ -20,6 +20,42 @@ def _transfer_body(to_unit, to_pos, **over):
     return body
 
 
+def test_transfer_renames_linked_account_username(
+    client, admin_user, auth_header, make_unit, make_position, make_employee, make_user
+):
+    root = make_unit("ROOT2", unit_type="HEAD_OFFICE")
+    a = make_unit("A2", parent=root)
+    b = make_unit("B2", parent=root)
+    a.username_prefix, b.username_prefix = "cna2", "cnb2"
+    pos = make_position("CV9")
+    emp = make_employee("T9", a, pos, full_name="Trần Văn Long", start=date(2020, 1, 1))
+    user = make_user("cna2.longtv", employee=emp, full_name="Trần Văn Long")
+    db.session.commit()
+    headers = auth_header("admin_test")
+
+    resp = client.post(f"/api/employees/{emp.id}/transfer", headers=headers, json=_transfer_body(b, pos))
+    assert resp.status_code == 200, resp.get_json()
+    change = resp.get_json()["data"]["username_change"]
+    assert change == {"old_username": "cna2.longtv", "new_username": "cnb2.longtv"}
+    db.session.refresh(user)
+    assert user.username == "cnb2.longtv"
+
+
+def test_transfer_without_linked_account_has_no_username_change(
+    client, admin_user, auth_header, make_unit, make_position, make_employee
+):
+    root = make_unit("ROOT3", unit_type="HEAD_OFFICE")
+    a = make_unit("A3", parent=root)
+    b = make_unit("B3", parent=root)
+    pos = make_position("CV10")
+    emp = make_employee("T10", a, pos, start=date(2020, 1, 1))
+    headers = auth_header("admin_test")
+
+    resp = client.post(f"/api/employees/{emp.id}/transfer", headers=headers, json=_transfer_body(b, pos))
+    assert resp.status_code == 200, resp.get_json()
+    assert resp.get_json()["data"]["username_change"] is None
+
+
 def test_transfer_success_keeps_history(
     client, admin_user, auth_header, make_unit, make_position, make_employee
 ):

@@ -173,10 +173,10 @@ def make_employee(db):
 @pytest.fixture
 def make_user(db):
     def _make(username, role_code=ROLE_HR_ADMIN, password="Password@123", scopes=(("GLOBAL", None),),
-              is_active=True, employee=None):
+              is_active=True, employee=None, full_name=None):
         role_codes = [role_code] if isinstance(role_code, str) else list(role_code)
         u = User(
-            username=username, full_name=username, email=f"{username}@ex.com", is_active=is_active,
+            username=username, full_name=full_name or username, email=f"{username}@ex.com", is_active=is_active,
             employee_id=employee.id if employee else None,
         )
         u.set_password(password)

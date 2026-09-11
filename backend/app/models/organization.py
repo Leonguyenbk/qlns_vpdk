@@ -29,6 +29,10 @@ class OrganizationUnit(TimestampMixin, db.Model):
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     # Thứ tự duyệt cây (DFS) — dùng để sắp xếp nhân sự theo cơ cấu tổ chức.
     sort_index: Mapped[int | None] = mapped_column(Integer, index=True)
+    # Tiền tố username khi tạo/đổi tên đăng nhập tự động (chỉ đặt ở cấp Phòng/
+    # Chi nhánh — xem app/services/username_service.py). Với Chi nhánh, trùng
+    # goiso_branch_code để tương thích tài khoản gọi số cũ.
+    username_prefix: Mapped[str | None] = mapped_column(String(20), index=True)
 
     parent: Mapped["OrganizationUnit | None"] = relationship(
         "OrganizationUnit", remote_side="OrganizationUnit.id", backref="children"
@@ -85,6 +89,7 @@ class OrganizationUnit(TimestampMixin, db.Model):
             "unit_type": self.unit_type,
             "parent_id": self.parent_id,
             "sort_index": self.sort_index,
+            "username_prefix": self.username_prefix,
             "address": self.address,
             "phone": self.phone,
             "email": self.email,
