@@ -18,7 +18,14 @@ from .notification import Notification
 from .organization import OrganizationUnit
 from .position import Position, UnitPositionLimit
 from .rbac import Permission, Role, UserUnitScope, role_permissions, user_roles
-from .survey import Survey, SurveyAnswer, SurveyOption, SurveyQuestion, SurveyResponse
+from .survey import (
+    Survey,
+    SurveyAnswer,
+    SurveyBranchLimit,
+    SurveyOption,
+    SurveyQuestion,
+    SurveyResponse,
+)
 from .task import (
     Task,
     TaskAssignment,
@@ -53,6 +60,7 @@ __all__ = [
     "SurveyOption",
     "SurveyResponse",
     "SurveyAnswer",
+    "SurveyBranchLimit",
     # Giao việc
     "Task",
     "TaskAssignment",

@@ -14,6 +14,7 @@ import {
 import { LoadingState, ErrorState } from "../../components/ui/DataStates";
 import { QRCodeModal } from "../../components/surveys/QRCodeModal";
 import { PreviewModal } from "../../components/surveys/PreviewModal";
+import { BranchLimitsCard } from "../../components/surveys/BranchLimitsCard";
 
 function toLocalInput(iso) {
   if (!iso) return "";
@@ -58,6 +59,7 @@ export default function SurveyEditPage() {
       reset({
         title: survey.title,
         description: survey.description || "",
+        welcome_message: survey.welcome_message || "",
         is_anonymous: survey.is_anonymous,
         start_at: toLocalInput(survey.start_at),
         end_at: toLocalInput(survey.end_at),
@@ -72,6 +74,7 @@ export default function SurveyEditPage() {
     const body = {
       title: values.title,
       description: values.description || null,
+      welcome_message: values.welcome_message || null,
       is_anonymous: values.is_anonymous,
       start_at: fromLocalInput(values.start_at),
       end_at: fromLocalInput(values.end_at),
@@ -149,6 +152,13 @@ export default function SurveyEditPage() {
             <FormField label="Tên khảo sát" required error={errors.title?.message}>
               <TextInput {...register("title")} error={errors.title} disabled={locked || !canEdit} />
             </FormField>
+            <FormField
+              label="Lời chào"
+              hint="Hiển thị đầu trang khảo sát công khai, trước khi chọn chi nhánh/nhập thông tin"
+              error={errors.welcome_message?.message}
+            >
+              <Textarea {...register("welcome_message")} disabled={locked || !canEdit} rows={2} />
+            </FormField>
             <FormField label="Mô tả ngắn" error={errors.description?.message}>
               <Textarea {...register("description")} disabled={locked || !canEdit} rows={3} />
             </FormField>
@@ -162,7 +172,8 @@ export default function SurveyEditPage() {
             </div>
             <label className="flex items-center gap-2 text-sm">
               <input type="checkbox" {...register("is_anonymous")} disabled={locked || !canEdit} />
-              Khảo sát ẩn danh (không yêu cầu tên/SĐT người trả lời)
+              Khảo sát ẩn danh (không bắt buộc nhập họ tên/SĐT — người dân vẫn luôn thấy ô nhập,
+              chỉ khác là không bắt buộc điền)
             </label>
             {canEdit && !locked && (
               <div>
@@ -234,6 +245,8 @@ export default function SurveyEditPage() {
               </div>
             </Card>
           )}
+
+          <BranchLimitsCard surveyId={id} canEdit={can(PERMISSIONS.SURVEY_UPDATE) && !locked} />
         </div>
       )}
 

@@ -8,6 +8,7 @@ from ...common.responses import paginated, success
 from ...permissions import constants as perms
 from ...schemas import (
     reorder_schema,
+    survey_branch_limits_schema,
     survey_create_schema,
     survey_option_create_schema,
     survey_option_update_schema,
@@ -90,6 +91,23 @@ def duplicate_survey(survey_id: int):
     actor, _ = actor_and_scope()
     data = survey_service.duplicate_survey(survey_id, actor=actor, meta=audit_meta())
     return success(data, "Sao chép khảo sát thành công", status_code=201)
+
+
+@bp.get("/<int:survey_id>/branch-limits")
+@require_permission(perms.SURVEY_VIEW)
+def get_branch_limits(survey_id: int):
+    return success(survey_service.get_branch_limits(survey_id))
+
+
+@bp.put("/<int:survey_id>/branch-limits")
+@require_permission(perms.SURVEY_UPDATE)
+def set_branch_limits(survey_id: int):
+    actor, _ = actor_and_scope()
+    payload = validated_json(survey_branch_limits_schema)
+    data = survey_service.set_branch_limits(
+        survey_id, payload["items"], actor=actor, meta=audit_meta()
+    )
+    return success(data, "Đã cập nhật chỉ tiêu theo chi nhánh")
 
 
 # ----------------------------- Câu hỏi -----------------------------

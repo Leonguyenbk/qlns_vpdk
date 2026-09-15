@@ -114,6 +114,7 @@ export const positionSchema = z.object({
 export const surveySchema = z.object({
   title: z.string().trim().min(1, "Tên khảo sát là bắt buộc"),
   description: z.string().trim().optional().or(z.literal("")),
+  welcome_message: z.string().trim().optional().or(z.literal("")),
   is_anonymous: z.boolean().optional(),
   start_at: z.string().optional().or(z.literal("")),
   end_at: z.string().optional().or(z.literal("")),

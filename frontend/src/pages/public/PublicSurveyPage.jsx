@@ -57,6 +57,7 @@ export default function PublicSurveyPage() {
   }, [branches, branchParam]);
   const [branchId, setBranchId] = useState("");
   const effectiveBranchId = presetBranch ? presetBranch.id : branchId;
+  const requireContact = survey?.is_anonymous === false;
 
   const setAnswer = (qid, value) => {
     setAnswers((a) => ({ ...a, [qid]: value }));
@@ -68,6 +69,12 @@ export default function PublicSurveyPage() {
     if (branches.length > 0 && !effectiveBranchId) {
       nextErrors._branch = "Vui lòng chọn chi nhánh được khảo sát.";
     }
+    if (requireContact && !respondentName.trim()) {
+      nextErrors._name = "Vui lòng nhập họ và tên.";
+    }
+    if (requireContact && !respondentPhone.trim()) {
+      nextErrors._phone = "Vui lòng nhập số điện thoại.";
+    }
     for (const q of questions) {
       if (q.is_required && !isAnswered(q.question_type, answers[q.id])) {
         nextErrors[q.id] = "Câu hỏi này là bắt buộc.";
@@ -75,11 +82,12 @@ export default function PublicSurveyPage() {
     }
     if (Object.keys(nextErrors).length) {
       setErrors(nextErrors);
-      const firstId = questions.find((q) => nextErrors[q.id])?.id;
-      document.getElementById(nextErrors._branch ? "q-branch" : `q-${firstId}`)?.scrollIntoView({
-        behavior: "smooth",
-        block: "center",
-      });
+      const anchorId = nextErrors._branch
+        ? "q-branch"
+        : nextErrors._name || nextErrors._phone
+          ? "q-contact"
+          : `q-${questions.find((q) => nextErrors[q.id])?.id}`;
+      document.getElementById(anchorId)?.scrollIntoView({ behavior: "smooth", block: "center" });
       return;
     }
     const items = questions
@@ -132,6 +140,16 @@ export default function PublicSurveyPage() {
     );
   }
 
+  if (presetBranch?.full) {
+    return (
+      <PublicShell title={survey.title}>
+        <p className="text-center text-ink-2">
+          Chi nhánh {presetBranch.name} đã đủ số lượt khảo sát, xin cảm ơn Quý khách đã quan tâm.
+        </p>
+      </PublicShell>
+    );
+  }
+
   if (done) {
     return (
       <PublicShell title={survey.title}>
@@ -158,6 +176,10 @@ export default function PublicSurveyPage() {
         </div>
       )}
 
+      {survey.welcome_message && (
+        <p className="mb-5 whitespace-pre-line text-sm text-ink-2">{survey.welcome_message}</p>
+      )}
+
       {branches.length > 0 && (
         <div className="mb-5" id="q-branch">
           <FormField label="Chi nhánh được khảo sát" required error={errors._branch}>
@@ -169,8 +191,8 @@ export default function PublicSurveyPage() {
               <Select value={branchId} onChange={(e) => { setBranchId(e.target.value); setErrors((er) => ({ ...er, _branch: null })); }}>
                 <option value="">-- Chọn chi nhánh --</option>
                 {branches.map((b) => (
-                  <option key={b.id} value={b.id}>
-                    {b.name}
+                  <option key={b.id} value={b.id} disabled={b.full}>
+                    {b.name}{b.full ? " (đã đủ số lượt)" : ""}
                   </option>
                 ))}
               </Select>
@@ -179,22 +201,20 @@ export default function PublicSurveyPage() {
         </div>
       )}
 
-      {survey.is_anonymous === false && (
-        <div className="mb-5 grid gap-3">
-          <FormField label="Họ và tên">
-            <TextInput value={respondentName} onChange={(e) => setRespondentName(e.target.value)} />
-          </FormField>
-          <FormField label="Số điện thoại">
-            <TextInput value={respondentPhone} onChange={(e) => setRespondentPhone(e.target.value)} />
-          </FormField>
-          <FormField label="Email">
-            <TextInput value={respondentEmail} onChange={(e) => setRespondentEmail(e.target.value)} />
-          </FormField>
-          <FormField label="Địa chỉ" hint="Nếu có">
-            <TextInput value={respondentAddress} onChange={(e) => setRespondentAddress(e.target.value)} />
-          </FormField>
-        </div>
-      )}
+      <div className="mb-5 grid gap-3" id="q-contact">
+        <FormField label="Họ và tên" required={requireContact} error={errors._name}>
+          <TextInput value={respondentName} onChange={(e) => { setRespondentName(e.target.value); setErrors((er) => ({ ...er, _name: null })); }} />
+        </FormField>
+        <FormField label="Số điện thoại" required={requireContact} error={errors._phone}>
+          <TextInput value={respondentPhone} onChange={(e) => { setRespondentPhone(e.target.value); setErrors((er) => ({ ...er, _phone: null })); }} />
+        </FormField>
+        <FormField label="Email" hint="Nếu có">
+          <TextInput value={respondentEmail} onChange={(e) => setRespondentEmail(e.target.value)} />
+        </FormField>
+        <FormField label="Địa chỉ" hint="Nếu có">
+          <TextInput value={respondentAddress} onChange={(e) => setRespondentAddress(e.target.value)} />
+        </FormField>
+      </div>
 
       <div className="grid gap-6">
         {questions.map((q) => (

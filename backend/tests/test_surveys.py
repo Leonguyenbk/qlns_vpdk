@@ -107,7 +107,7 @@ def test_public_payload_lists_branches_and_accepts_respondent_contact(
     client.post(f"/api/surveys/{survey['id']}/status", headers=headers, json={"status": "active"})
 
     public = client.get(f"/api/public/surveys/{survey['slug']}").get_json()["data"]
-    assert {"id": branch.id, "code": branch.code, "name": branch.name} in public["branches"]
+    assert {"id": branch.id, "code": branch.code, "name": branch.name, "full": False} in public["branches"]
 
     opt_id = q["options"][0]["id"]
     resp = client.post(
@@ -375,3 +375,75 @@ def test_publish_requires_at_least_one_active_question(client, admin_user, auth_
     survey = _create_survey(client, headers)
     resp = client.post(f"/api/surveys/{survey['id']}/status", headers=headers, json={"status": "active"})
     assert resp.status_code == 422
+
+
+def test_non_anonymous_survey_requires_name_and_phone(client, admin_user, auth_header):
+    headers = auth_header("admin_test")
+    created = client.post(
+        "/api/surveys",
+        headers=headers,
+        json={"title": "Khảo sát định danh", "is_anonymous": False},
+    )
+    survey = created.get_json()["data"]
+    assert survey["is_anonymous"] is False
+    q = _add_choice_question(client, headers, survey["id"])
+    client.post(f"/api/surveys/{survey['id']}/status", headers=headers, json={"status": "active"})
+
+    opt_id = q["options"][0]["id"]
+    missing = client.post(
+        f"/api/public/surveys/{survey['id']}/submit",
+        json={"answers": [{"question_id": q["id"], "option_id": opt_id}]},
+    )
+    assert missing.status_code == 422
+
+    ok = client.post(
+        f"/api/public/surveys/{survey['id']}/submit",
+        json={
+            "respondent_name": "Trần Thị B",
+            "respondent_phone": "0909000111",
+            "answers": [{"question_id": q["id"], "option_id": opt_id}],
+        },
+    )
+    assert ok.status_code == 201, ok.get_json()
+
+
+def test_branch_quota_locks_branch_once_full(client, admin_user, auth_header, make_unit):
+    headers = auth_header("admin_test")
+    branch = make_unit("QUOTA-BRANCH", name="CN Chỉ tiêu", unit_type="BRANCH")
+    survey = _create_survey(client, headers)
+    q = _add_choice_question(client, headers, survey["id"])
+    client.post(f"/api/surveys/{survey['id']}/status", headers=headers, json={"status": "active"})
+
+    limits = client.put(
+        f"/api/surveys/{survey['id']}/branch-limits",
+        headers=headers,
+        json={"items": [{"branch_id": branch.id, "max_responses": 1}]},
+    )
+    assert limits.status_code == 200, limits.get_json()
+    row = next(r for r in limits.get_json()["data"] if r["branch_id"] == branch.id)
+    assert row["max_responses"] == 1
+
+    opt_id = q["options"][0]["id"]
+    first = client.post(
+        f"/api/public/surveys/{survey['id']}/submit",
+        json={"branch_id": branch.id, "answers": [{"question_id": q["id"], "option_id": opt_id}]},
+    )
+    assert first.status_code == 201, first.get_json()
+
+    public_after = client.get(f"/api/public/surveys/{survey['slug']}").get_json()["data"]
+    assert next(b for b in public_after["branches"] if b["id"] == branch.id)["full"] is True
+
+    second = client.post(
+        f"/api/public/surveys/{survey['id']}/submit",
+        json={"branch_id": branch.id, "answers": [{"question_id": q["id"], "option_id": opt_id}]},
+    )
+    assert second.status_code == 400, second.get_json()
+
+    cleared = client.put(
+        f"/api/surveys/{survey['id']}/branch-limits",
+        headers=headers,
+        json={"items": [{"branch_id": branch.id, "max_responses": None}]},
+    )
+    assert cleared.status_code == 200
+    row = next(r for r in cleared.get_json()["data"] if r["branch_id"] == branch.id)
+    assert row["max_responses"] is None

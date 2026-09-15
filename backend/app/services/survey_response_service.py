@@ -7,12 +7,14 @@ trước khi commit nên toàn bộ response + answers của lượt đó không
 """
 from __future__ import annotations
 
+from sqlalchemy import func
+
 from ..common.exceptions import BusinessRuleError, NotFoundError, ValidationError
 from ..common.utils import clean_str, ensure_aware, parse_date, parse_pagination, utcnow, validate_email
 from ..exports.survey_export import build_workbook
 from ..extensions import db
 from ..models import Employee, OrganizationUnit
-from ..models.survey import Survey, SurveyAnswer, SurveyQuestion, SurveyResponse
+from ..models.survey import Survey, SurveyAnswer, SurveyBranchLimit, SurveyQuestion, SurveyResponse
 from .survey_filters import apply_branch_scope, apply_response_filters
 from .survey_service import get_survey_or_404
 
@@ -51,13 +53,33 @@ def get_public_survey(slug: str) -> dict:
         data["questions"] = [q.to_dict(only_active_options=True) for q in questions]
     # Câu hỏi mặc định "Chi nhánh được khảo sát": danh sách chi nhánh đang hoạt
     # động để trang công khai tự chọn theo mã QR hoặc hiển thị cho người dân chọn.
+    # Chi nhánh đã đủ chỉ tiêu (survey_branch_limits) được đánh dấu `full` để
+    # trang công khai khoá không cho chọn/nộp thêm.
     branches = (
         db.session.query(OrganizationUnit)
         .filter(OrganizationUnit.unit_type == "BRANCH", OrganizationUnit.is_active.is_(True))
         .order_by(OrganizationUnit.name)
         .all()
     )
-    data["branches"] = [{"id": b.id, "code": b.code, "name": b.name} for b in branches]
+    limits = {
+        r.branch_id: r.max_responses
+        for r in db.session.query(SurveyBranchLimit).filter(SurveyBranchLimit.survey_id == survey.id)
+    }
+    counts = dict(
+        db.session.query(SurveyResponse.branch_id, func.count(SurveyResponse.id))
+        .filter(SurveyResponse.survey_id == survey.id, SurveyResponse.branch_id.isnot(None))
+        .group_by(SurveyResponse.branch_id)
+        .all()
+    )
+    data["branches"] = [
+        {
+            "id": b.id,
+            "code": b.code,
+            "name": b.name,
+            "full": b.id in limits and counts.get(b.id, 0) >= limits[b.id],
+        }
+        for b in branches
+    ]
     return data
 
 
@@ -166,11 +188,35 @@ def submit_response(survey_id: int, data: dict, *, meta: dict) -> tuple[dict, bo
     branch_id = data.get("branch_id")
     if branch_id is not None and db.session.get(OrganizationUnit, branch_id) is None:
         raise ValidationError("Chi nhánh không hợp lệ.")
+    if branch_id is not None:
+        limit = (
+            db.session.query(SurveyBranchLimit)
+            .filter(SurveyBranchLimit.survey_id == survey.id, SurveyBranchLimit.branch_id == branch_id)
+            .first()
+        )
+        if limit is not None:
+            current = (
+                db.session.query(func.count(SurveyResponse.id))
+                .filter(SurveyResponse.survey_id == survey.id, SurveyResponse.branch_id == branch_id)
+                .scalar()
+                or 0
+            )
+            if current >= limit.max_responses:
+                raise BusinessRuleError(
+                    "Chi nhánh này đã đủ số lượt khảo sát, xin cảm ơn Quý khách đã quan tâm."
+                )
     employee_id = data.get("employee_id")
     if employee_id is not None and db.session.get(Employee, employee_id) is None:
         raise ValidationError("Cán bộ không hợp lệ.")
     respondent_email = clean_str(data.get("respondent_email"))
     validate_email(respondent_email, "respondent_email")
+    respondent_name = clean_str(data.get("respondent_name"))
+    respondent_phone = clean_str(data.get("respondent_phone"))
+    if not survey.is_anonymous:
+        if not respondent_name:
+            raise ValidationError("Vui lòng nhập họ và tên.")
+        if not respondent_phone:
+            raise ValidationError("Vui lòng nhập số điện thoại.")
 
     response = SurveyResponse(
         survey_id=survey.id,
@@ -178,8 +224,8 @@ def submit_response(survey_id: int, data: dict, *, meta: dict) -> tuple[dict, bo
         service_id=data.get("service_id"),
         counter_id=data.get("counter_id"),
         employee_id=employee_id,
-        respondent_name=clean_str(data.get("respondent_name")),
-        respondent_phone=clean_str(data.get("respondent_phone")),
+        respondent_name=respondent_name,
+        respondent_phone=respondent_phone,
         respondent_email=respondent_email,
         respondent_address=clean_str(data.get("respondent_address")),
         ip_address=meta.get("ip_address"),

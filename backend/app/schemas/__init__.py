@@ -244,21 +244,33 @@ class RoleUpdateSchema(RoleBaseSchema):
 
 
 class SurveyCreateSchema(ApiSchema):
-    nullable_fields = {"description", "start_at", "end_at"}
+    nullable_fields = {"description", "welcome_message", "start_at", "end_at"}
     title = fields.String(required=True, error_messages=required)
     description = fields.String(allow_none=True)
+    welcome_message = fields.String(allow_none=True)
     is_anonymous = fields.Boolean(load_default=True)
     start_at = fields.DateTime(allow_none=True)
     end_at = fields.DateTime(allow_none=True)
 
 
 class SurveyUpdateSchema(ApiSchema):
-    nullable_fields = {"description", "start_at", "end_at"}
+    nullable_fields = {"description", "welcome_message", "start_at", "end_at"}
     title = fields.String()
     description = fields.String(allow_none=True)
+    welcome_message = fields.String(allow_none=True)
     is_anonymous = fields.Boolean()
     start_at = fields.DateTime(allow_none=True)
     end_at = fields.DateTime(allow_none=True)
+
+
+class SurveyBranchLimitItemSchema(ApiSchema):
+    nullable_fields = {"max_responses"}
+    branch_id = fields.Integer(required=True, strict=True, error_messages=required)
+    max_responses = fields.Integer(allow_none=True, strict=True)
+
+
+class SurveyBranchLimitsSchema(ApiSchema):
+    items = fields.List(fields.Nested(SurveyBranchLimitItemSchema), required=True, error_messages=required)
 
 
 class SurveyStatusSchema(ApiSchema):
@@ -361,6 +373,7 @@ role_update_schema = RoleUpdateSchema()
 survey_create_schema = SurveyCreateSchema()
 survey_update_schema = SurveyUpdateSchema()
 survey_status_schema = SurveyStatusSchema()
+survey_branch_limits_schema = SurveyBranchLimitsSchema()
 survey_question_create_schema = SurveyQuestionCreateSchema()
 survey_question_update_schema = SurveyQuestionUpdateSchema()
 survey_option_create_schema = SurveyOptionCreateSchema()

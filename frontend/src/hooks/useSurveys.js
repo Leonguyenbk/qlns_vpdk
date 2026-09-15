@@ -42,3 +42,19 @@ export function useSurveyMutations() {
 export function exportSurvey(id, params) {
   return downloadFile(`/surveys/${id}/export`, { params, fallbackName: `khao-sat-${id}.xlsx` });
 }
+
+export function useSurveyBranchLimits(surveyId) {
+  return useQuery({
+    queryKey: ["surveys", surveyId, "branch-limits"],
+    queryFn: () => api.get(`/surveys/${surveyId}/branch-limits`).then((r) => r.data.data),
+    enabled: !!surveyId,
+  });
+}
+
+export function useSetSurveyBranchLimits(surveyId) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (items) => api.put(`/surveys/${surveyId}/branch-limits`, { items }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["surveys", surveyId, "branch-limits"] }),
+  });
+}

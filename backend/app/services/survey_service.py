@@ -6,7 +6,15 @@ from sqlalchemy import func
 from ..common.exceptions import BusinessRuleError, ConflictError, NotFoundError, ValidationError
 from ..common.utils import clean_str, parse_pagination, slugify_vi
 from ..extensions import db
-from ..models.survey import SURVEY_STATUSES, Survey, SurveyOption, SurveyQuestion, SurveyResponse
+from ..models.organization import OrganizationUnit
+from ..models.survey import (
+    SURVEY_STATUSES,
+    Survey,
+    SurveyBranchLimit,
+    SurveyOption,
+    SurveyQuestion,
+    SurveyResponse,
+)
 from .audit_service import record_audit
 
 # Chuyển trạng thái hợp lệ. "closed" là gần như chung cuộc; "archived" chỉ để ẩn
@@ -99,6 +107,7 @@ def create_survey(data: dict, *, actor, meta: dict) -> dict:
         title=title,
         slug=slug,
         description=clean_str(data.get("description")),
+        welcome_message=clean_str(data.get("welcome_message")),
         is_anonymous=bool(data.get("is_anonymous", True)),
         start_at=data.get("start_at"),
         end_at=data.get("end_at"),
@@ -131,6 +140,8 @@ def update_survey(survey_id: int, data: dict, *, actor, meta: dict) -> dict:
         survey.title = title
     if "description" in data:
         survey.description = clean_str(data["description"])
+    if "welcome_message" in data:
+        survey.welcome_message = clean_str(data["welcome_message"])
     if "is_anonymous" in data:
         survey.is_anonymous = bool(data["is_anonymous"])
     if "start_at" in data:
@@ -258,3 +269,78 @@ def duplicate_survey(survey_id: int, *, actor, meta: dict) -> dict:
     )
     db.session.commit()
     return new_survey.to_dict()
+
+
+# ------------------------- Giới hạn theo chi nhánh -------------------------
+
+def get_branch_limits(survey_id: int) -> list[dict]:
+    """Toàn bộ chi nhánh đang hoạt động, kèm chỉ tiêu (nếu có đặt) và số lượt
+    đã nhận — để màn hình cấu hình hiển thị đủ danh sách cho admin điền."""
+    get_survey_or_404(survey_id)
+    branches = (
+        db.session.query(OrganizationUnit)
+        .filter(OrganizationUnit.unit_type == "BRANCH", OrganizationUnit.is_active.is_(True))
+        .order_by(OrganizationUnit.name)
+        .all()
+    )
+    limits = {
+        r.branch_id: r.max_responses
+        for r in db.session.query(SurveyBranchLimit).filter(SurveyBranchLimit.survey_id == survey_id)
+    }
+    counts = dict(
+        db.session.query(SurveyResponse.branch_id, func.count(SurveyResponse.id))
+        .filter(SurveyResponse.survey_id == survey_id, SurveyResponse.branch_id.isnot(None))
+        .group_by(SurveyResponse.branch_id)
+        .all()
+    )
+    return [
+        {
+            "branch_id": b.id,
+            "branch_name": b.name,
+            "max_responses": limits.get(b.id),
+            "response_count": counts.get(b.id, 0),
+        }
+        for b in branches
+    ]
+
+
+def set_branch_limits(survey_id: int, items: list[dict], *, actor, meta: dict) -> list[dict]:
+    survey = get_survey_or_404(survey_id)
+    branch_ids = [it["branch_id"] for it in items]
+    valid_branch_ids = {
+        b.id
+        for b in db.session.query(OrganizationUnit.id)
+        .filter(OrganizationUnit.id.in_(branch_ids), OrganizationUnit.unit_type == "BRANCH")
+        .all()
+    }
+    existing = {
+        r.branch_id: r
+        for r in db.session.query(SurveyBranchLimit).filter(SurveyBranchLimit.survey_id == survey_id)
+    }
+    for item in items:
+        branch_id = item["branch_id"]
+        if branch_id not in valid_branch_ids:
+            raise ValidationError(f"Chi nhánh không hợp lệ: {branch_id}.")
+        max_responses = item.get("max_responses")
+        if max_responses is not None and max_responses < 1:
+            raise ValidationError("Chỉ tiêu số lượt phải lớn hơn 0 (để trống nếu không giới hạn).")
+        row = existing.get(branch_id)
+        if max_responses is None:
+            if row is not None:
+                db.session.delete(row)
+            continue
+        if row is None:
+            db.session.add(SurveyBranchLimit(survey_id=survey_id, branch_id=branch_id, max_responses=max_responses))
+        else:
+            row.max_responses = max_responses
+    db.session.flush()
+    record_audit(
+        user_id=actor.id,
+        action="survey.set_branch_limits",
+        entity_type="survey",
+        entity_id=survey.id,
+        new_values={"items": items},
+        **meta,
+    )
+    db.session.commit()
+    return get_branch_limits(survey_id)

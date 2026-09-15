@@ -55,6 +55,9 @@ class Survey(TimestampMixin, db.Model):
     title: Mapped[str] = mapped_column(String(255), nullable=False)
     slug: Mapped[str] = mapped_column(String(160), nullable=False, index=True)
     description: Mapped[str | None] = mapped_column(Text)
+    # Lời chào hiển thị đầu trang khảo sát công khai, trước khi chọn chi
+    # nhánh/nhập thông tin — khác với `description` (mô tả ngắn dưới tiêu đề).
+    welcome_message: Mapped[str | None] = mapped_column(Text)
     status: Mapped[str] = mapped_column(String(20), default="draft", nullable=False, index=True)
     is_anonymous: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     start_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
@@ -77,6 +80,7 @@ class Survey(TimestampMixin, db.Model):
             "title": self.title,
             "slug": self.slug,
             "description": self.description,
+            "welcome_message": self.welcome_message,
             "status": self.status,
             "is_anonymous": self.is_anonymous,
             "start_at": _iso(self.start_at),
@@ -262,4 +266,35 @@ class SurveyAnswer(TimestampMixin, db.Model):
             "option_text": self.option.option_text if self.option else None,
             "answer_text": self.answer_text,
             "answer_number": self.answer_number,
+        }
+
+
+class SurveyBranchLimit(TimestampMixin, db.Model):
+    """Chỉ tiêu số lượt khảo sát tối đa cho một chi nhánh, trong MỘT khảo sát
+    cụ thể (ví dụ BMT 1000, Buôn Đôn 500) — khi chi nhánh đủ số lượt, trang
+    công khai khoá không nhận thêm phản hồi gán cho chi nhánh đó nữa."""
+
+    __tablename__ = "survey_branch_limits"
+    __table_args__ = (
+        UniqueConstraint("survey_id", "branch_id", name="uq_survey_branch_limit"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    survey_id: Mapped[int] = mapped_column(
+        ForeignKey("surveys.id", ondelete="CASCADE"), nullable=False
+    )
+    branch_id: Mapped[int] = mapped_column(
+        ForeignKey("organization_units.id", ondelete="CASCADE"), nullable=False
+    )
+    max_responses: Mapped[int] = mapped_column(Integer, nullable=False)
+
+    branch = relationship("OrganizationUnit")
+
+    def to_dict(self) -> dict:
+        return {
+            "id": self.id,
+            "survey_id": self.survey_id,
+            "branch_id": self.branch_id,
+            "branch_name": self.branch.name if self.branch else None,
+            "max_responses": self.max_responses,
         }
