@@ -285,11 +285,12 @@ ROLE_DEFINITIONS: dict[str, dict] = {
     ROLE_TASK_ASSIGNER: {
         "name": "Người được giao quyền giao việc/nghiệm thu",
         "description": "Được uỷ quyền giao việc và nghiệm thu trong phạm vi cụ thể mà "
-        "không nhất thiết là lãnh đạo đơn vị (mục 9 — quyền cấp qua user_unit_scopes).",
+        "không nhất thiết là lãnh đạo đơn vị (mục 9 — quyền cấp qua user_unit_scopes). "
+        "Không xem danh sách nhân sự/cơ cấu đơn vị toàn cơ quan — chọn người nhận việc "
+        "qua danh sách người có thể giao việc (assignable-people), không cần employee.view.",
         "is_system": True,
         "permissions": [
             TASK_VIEW_ALL, TASK_CREATE, TASK_ASSIGN, TASK_ACCEPT,
-            UNIT_VIEW, EMPLOYEE_VIEW,
             *_STAFF_SELF_SERVICE,
         ],
     },

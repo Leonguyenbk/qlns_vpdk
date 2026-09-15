@@ -177,7 +177,7 @@ def counter_guard(view):
     return wrapper
 
 
-@bp.app_errorhandler(_SAOperationalError)
+@bp.errorhandler(_SAOperationalError)
 def _db_locked(e):
     msg = str(e)
     if "locked" in msg or "busy" in msg:
