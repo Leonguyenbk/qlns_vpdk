@@ -1,6 +1,6 @@
 """Thu hẹp quyền khảo sát của Lãnh đạo Văn phòng (OFFICE_LEADER)
 
-Revision ID: 0014_office_leader_survey_view_only
+Revision ID: 0014_office_leader_survey
 Revises: 0013_survey_respondent_contact
 Create Date: 2026-09-15
 
@@ -19,7 +19,7 @@ from alembic import op
 
 from app.permissions.constants import ROLE_OFFICE_LEADER
 
-revision = "0014_office_leader_survey_view_only"
+revision = "0014_office_leader_survey"
 down_revision = "0013_survey_respondent_contact"
 branch_labels = None
 depends_on = None

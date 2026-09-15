@@ -46,6 +46,24 @@ def test_create_user_assign_role_scope_and_reset_password(
     ).status_code == 200
 
 
+def test_create_user_without_roles_defaults_to_staff(client, db, admin_user, auth_header):
+    headers = auth_header("admin_test")
+    created = client.post(
+        "/api/users",
+        headers=headers,
+        json={
+            "username": "no_role_user",
+            "password": "Password@123",
+            "full_name": "Tài khoản không chọn vai trò",
+        },
+    )
+    assert created.status_code == 201, created.get_json()
+    user = created.get_json()["data"]
+    assert [r["code"] for r in user["roles"]] == ["STAFF"]
+    assert "task.view_own" in user["permissions"]
+    assert "kpi.view_own" in user["permissions"]
+
+
 def test_list_users_filters_by_role_and_unit(client, db, admin_user, auth_header, make_unit):
     headers = auth_header("admin_test")
     unit = make_unit("USER-FILTER", unit_type="DEPARTMENT")

@@ -161,7 +161,13 @@ function UserEditor({ user, roles, units, onClose }) {
 
 function CreateUser({ roles, onClose }) {
   const { create } = useUserMutations();
-  const [form, setForm] = useState({ username: "", full_name: "", email: "", password: "", role_ids: [] });
+  // Mặc định chọn sẵn "Viên chức (tự phục vụ)" — mọi tài khoản nên có ít nhất
+  // vai trò này để tự xem được nhiệm vụ/KPI của mình dù không được phân thêm
+  // quyền gì khác; backend cũng tự gán vai trò này nếu để trống hoàn toàn.
+  const [form, setForm] = useState(() => {
+    const staff = roles?.find((r) => r.code === "STAFF");
+    return { username: "", full_name: "", email: "", password: "", role_ids: staff ? [staff.id] : [] };
+  });
 
   const submit = async () => {
     try {

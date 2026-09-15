@@ -7,7 +7,7 @@ from ..common.exceptions import ConflictError, NotFoundError, PermissionDeniedEr
 from ..common.utils import clean_str, parse_pagination, validate_email
 from ..extensions import db
 from ..models import Employee, OrganizationUnit, Role, User, UserUnitScope, user_roles
-from ..permissions.constants import ROLE_SYSTEM_ADMIN
+from ..permissions.constants import ROLE_STAFF, ROLE_SYSTEM_ADMIN
 from .audit_service import record_audit
 from .auth_service import revoke_all_for_user
 
@@ -90,6 +90,12 @@ def create_user(data: dict, *, actor, meta: dict) -> dict:
     db.session.flush()
 
     role_ids = data.get("role_ids") or []
+    if not role_ids:
+        # Không để tài khoản mới không có vai trò nào — kể cả viên chức không
+        # giữ chức vụ/không được phân quyền gì thêm vẫn phải xem được nhiệm
+        # vụ/KPI của chính mình (STAFF = tự phục vụ tối thiểu).
+        staff_role = db.session.query(Role).filter(Role.code == ROLE_STAFF).first()
+        role_ids = [staff_role.id] if staff_role else []
     if role_ids:
         _set_roles(actor, user, role_ids)
 
