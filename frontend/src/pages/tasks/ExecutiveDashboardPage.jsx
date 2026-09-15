@@ -129,7 +129,7 @@ export default function ExecutiveDashboardPage() {
                       </td>
                       <td className="px-4 py-3">
                         {t ? (
-                          <Link to={`/giao-viec/${t.id}`} className="link font-medium">
+                          <Link to={`/cong-viec/danh-sach/${t.id}`} className="link font-medium">
                             {t.code} — {t.name}
                           </Link>
                         ) : "—"}
@@ -167,7 +167,7 @@ export default function ExecutiveDashboardPage() {
                       </td>
                       <td className="px-4 py-3 text-right">
                         <Link
-                          to={`/giao-viec?person_id=${p.user_id}`}
+                          to={`/cong-viec/danh-sach?person_id=${p.user_id}`}
                           className="inline-flex items-center gap-1 text-xs font-medium text-accent-text hover:underline"
                         >
                           Xem tất cả <IconArrowRight size={12} />

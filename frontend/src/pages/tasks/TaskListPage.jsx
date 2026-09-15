@@ -32,7 +32,7 @@ const TASK_COLUMNS = [
     key: "task", header: "Nhiệm vụ",
     render: (t) => (
       <>
-        <Link to={`/giao-viec/${t.id}`} className="link font-medium">{t.code}</Link>
+        <Link to={`/cong-viec/danh-sach/${t.id}`} className="link font-medium">{t.code}</Link>
         <div className="max-w-xs truncate text-xs text-muted">{t.name}</div>
       </>
     ),
@@ -123,7 +123,7 @@ export default function TaskListPage({ mode = "all" }) {
               </button>
             </div>
             {canAny([PERMISSIONS.TASK_CREATE]) && (
-              <Button onClick={() => navigate("/giao-viec/moi")}>+ Giao việc</Button>
+              <Button onClick={() => navigate("/cong-viec/danh-sach/moi")}>+ Giao việc</Button>
             )}
           </>
         }
@@ -189,7 +189,7 @@ export default function TaskListPage({ mode = "all" }) {
                   {col.items.map((t) => (
                     <Link
                       key={t.id}
-                      to={`/giao-viec/${t.id}`}
+                      to={`/cong-viec/danh-sach/${t.id}`}
                       className="card block p-3 text-sm hover:border-accent"
                     >
                       <div className="font-medium text-ink">{t.code}</div>

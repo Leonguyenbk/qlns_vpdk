@@ -28,7 +28,7 @@ export default function PeriodScoresPage() {
   if (isError) return <ErrorState error={error} onRetry={refetch} />;
 
   const columns = [
-    { key: "user", header: "Viên chức", render: (s) => <Link className="link font-medium" to={`/kpi/${s.id}`}>{s.user_full_name || `#${s.user_id}`}</Link> },
+    { key: "user", header: "Viên chức", render: (s) => <Link className="link font-medium" to={`/cong-viec/kpi/${s.id}`}>{s.user_full_name || `#${s.user_id}`}</Link> },
     { key: "status", header: "Trạng thái", render: (s) => <span className={`badge ${KPI_SCORE_STATUS_BADGE[s.status] || "badge-neutral"}`}>{KPI_SCORE_STATUS_LABELS[s.status] || s.status}</span> },
     { key: "provisional", header: "Tạm tính", render: (s) => s.provisional_total ?? "—" },
     { key: "confirmed", header: "Xác nhận", render: (s) => s.confirmed_total ?? "—" },

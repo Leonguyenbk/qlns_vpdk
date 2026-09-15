@@ -37,6 +37,7 @@ import TaskDetailPage from "./pages/tasks/TaskDetailPage";
 import TaskCreatePage from "./pages/tasks/TaskCreatePage";
 import MyKpiPage from "./pages/kpi/MyKpiPage";
 import KpiScoreDetailPage from "./pages/kpi/KpiScoreDetailPage";
+import WorkPage, { WorkIndexRedirect } from "./pages/work/WorkPage";
 
 import BranchPickerPage from "./pages/goiso/BranchPickerPage";
 import BoardPage from "./pages/goiso/BoardPage";
@@ -265,71 +266,89 @@ export default function App() {
           }
         />
 
-        {/* Giao việc – Theo dõi nhiệm vụ – Đánh giá KPI */}
+        {/* Công việc — MỘT trang duy nhất, có tab (Giao việc + KPI); mở rộng bằng cách thêm route con */}
         <Route
-          path="tong-quan-dieu-hanh"
+          path="cong-viec"
           element={
-            <ProtectedRoute permission={PERMISSIONS.TASK_VIEW_ALL}>
-              <ExecutiveDashboardPage />
+            <ProtectedRoute
+              anyOf={[
+                PERMISSIONS.TASK_VIEW_ALL,
+                PERMISSIONS.TASK_VIEW_OWN,
+                PERMISSIONS.TASK_CREATE,
+                PERMISSIONS.TASK_ASSIGN,
+                PERMISSIONS.KPI_VIEW_OWN,
+              ]}
+            >
+              <WorkPage />
             </ProtectedRoute>
           }
-        />
-        <Route
-          path="giao-viec"
-          element={
-            <ProtectedRoute anyOf={[PERMISSIONS.TASK_VIEW_ALL, PERMISSIONS.TASK_VIEW_OWN]}>
-              <TaskListPage mode="all" />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="giao-viec/moi"
-          element={
-            <ProtectedRoute permission={PERMISSIONS.TASK_CREATE}>
-              <TaskCreatePage />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="giao-viec/:id"
-          element={
-            <ProtectedRoute anyOf={[PERMISSIONS.TASK_VIEW_ALL, PERMISSIONS.TASK_VIEW_OWN]}>
-              <TaskDetailPage />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="cong-viec-cua-toi"
-          element={
-            <ProtectedRoute permission={PERMISSIONS.TASK_VIEW_OWN}>
-              <TaskListPage mode="mine" />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="viec-toi-da-giao"
-          element={
-            <ProtectedRoute anyOf={[PERMISSIONS.TASK_CREATE, PERMISSIONS.TASK_ASSIGN]}>
-              <TaskListPage mode="assigned" />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="kpi-cua-toi"
-          element={
-            <ProtectedRoute permission={PERMISSIONS.KPI_VIEW_OWN}>
-              <MyKpiPage />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="kpi/:id"
-          element={
-            <ProtectedRoute anyOf={[PERMISSIONS.KPI_VIEW_OWN, PERMISSIONS.KPI_VIEW_ALL]}>
-              <KpiScoreDetailPage />
-            </ProtectedRoute>
-          }
-        />
+        >
+          <Route index element={<WorkIndexRedirect />} />
+          <Route
+            path="tong-quan"
+            element={
+              <ProtectedRoute permission={PERMISSIONS.TASK_VIEW_ALL}>
+                <ExecutiveDashboardPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="danh-sach"
+            element={
+              <ProtectedRoute anyOf={[PERMISSIONS.TASK_VIEW_ALL, PERMISSIONS.TASK_VIEW_OWN]}>
+                <TaskListPage mode="all" />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="danh-sach/moi"
+            element={
+              <ProtectedRoute permission={PERMISSIONS.TASK_CREATE}>
+                <TaskCreatePage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="danh-sach/:id"
+            element={
+              <ProtectedRoute anyOf={[PERMISSIONS.TASK_VIEW_ALL, PERMISSIONS.TASK_VIEW_OWN]}>
+                <TaskDetailPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="cua-toi"
+            element={
+              <ProtectedRoute permission={PERMISSIONS.TASK_VIEW_OWN}>
+                <TaskListPage mode="mine" />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="da-giao"
+            element={
+              <ProtectedRoute anyOf={[PERMISSIONS.TASK_CREATE, PERMISSIONS.TASK_ASSIGN]}>
+                <TaskListPage mode="assigned" />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="kpi"
+            element={
+              <ProtectedRoute permission={PERMISSIONS.KPI_VIEW_OWN}>
+                <MyKpiPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="kpi/:id"
+            element={
+              <ProtectedRoute anyOf={[PERMISSIONS.KPI_VIEW_OWN, PERMISSIONS.KPI_VIEW_ALL]}>
+                <KpiScoreDetailPage />
+              </ProtectedRoute>
+            }
+          />
+        </Route>
 
         {/* Quản trị — MỘT trang duy nhất, có tab; mở rộng bằng cách thêm route con */}
         <Route

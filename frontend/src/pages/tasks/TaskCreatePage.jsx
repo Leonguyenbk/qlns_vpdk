@@ -66,7 +66,7 @@ export default function TaskCreatePage() {
       };
       const resp = await create.mutateAsync(body);
       toast.success("Tạo và giao nhiệm vụ thành công");
-      navigate(`/giao-viec/${resp.data.data.id}`);
+      navigate(`/cong-viec/danh-sach/${resp.data.data.id}`);
     } catch (err) {
       toast.error(apiErrorMessage(err));
     }

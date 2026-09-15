@@ -12,7 +12,7 @@ export default function MyKpiPage() {
   if (isError) return <ErrorState error={error} onRetry={refetch} />;
 
   const columns = [
-    { key: "period", header: "Kỳ", render: (s) => <Link className="link font-medium" to={`/kpi/${s.id}`}>#{s.id} — Kỳ {s.period_id}</Link> },
+    { key: "period", header: "Kỳ", render: (s) => <Link className="link font-medium" to={`/cong-viec/kpi/${s.id}`}>#{s.id} — Kỳ {s.period_id}</Link> },
     { key: "status", header: "Trạng thái", render: (s) => (
         <span className={`badge ${KPI_SCORE_STATUS_BADGE[s.status] || "badge-neutral"}`}>
           {KPI_SCORE_STATUS_LABELS[s.status] || s.status}
