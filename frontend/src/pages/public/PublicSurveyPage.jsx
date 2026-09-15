@@ -246,7 +246,7 @@ function PublicShell({ title, description, children }) {
     <div className="min-h-screen bg-canvas px-4 py-8">
       <div className="mx-auto w-full max-w-md">
         <div className="mb-6 text-center">
-          <p className="eyebrow mb-1">Văn phòng Đăng ký Đất đai</p>
+          <p className="eyebrow mb-1">Văn phòng đăng ký đất đai kính chào quý khách!</p>
           {title && (
             <h1 className="font-display text-lg font-semibold tracking-tight text-ink">{title}</h1>
           )}
