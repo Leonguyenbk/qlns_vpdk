@@ -5,6 +5,7 @@ import { Avatar } from "../components/ui/primitives";
 import {
   IconPeople,
   IconKey,
+  IconTask,
   IconArrowRight,
   IconLogout,
 } from "../components/ui/icons";
@@ -56,6 +57,16 @@ export default function PortalPage() {
   const unitName = user?.roles?.map((r) => r.name).join(" · ") || "Người dùng";
 
   const cards = [];
+  if (hasAnyPermission(MODULE_PERMS.WORK)) {
+    cards.push({
+      key: "cong-viec",
+      title: "Công việc",
+      desc: "Nhiệm vụ được giao, tiến độ công việc và kết quả KPI của bạn.",
+      Icon: IconTask,
+      tone: "linear-gradient(135deg,#059669,#2563eb)",
+      onOpen: () => (window.location.href = "/cong-viec"),
+    });
+  }
   if (hasAnyPermission(MODULE_PERMS.NHANSU)) {
     cards.push({
       key: "nhansu",

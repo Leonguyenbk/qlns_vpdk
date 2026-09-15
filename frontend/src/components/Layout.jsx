@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Link, NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import clsx from "clsx";
 import { useAuth } from "../auth/AuthContext";
-import { PERMISSIONS } from "../lib/constants";
+import { PERMISSIONS, MODULE_PERMS } from "../lib/constants";
 import { Avatar } from "./ui/primitives";
 import { CommandPalette } from "./CommandPalette";
 import {
@@ -34,7 +34,13 @@ const NAV_GROUPS = [
     title: null,
     items: [
       { to: "/", label: "Cổng ứng dụng", Icon: IconChevronLeft, exact: true },
-      { to: "/nhan-su", label: "Tổng quan", Icon: IconOverview, exact: true },
+      {
+        to: "/nhan-su",
+        label: "Tổng quan",
+        Icon: IconOverview,
+        exact: true,
+        anyOf: MODULE_PERMS.NHANSU,
+      },
     ],
   },
   {
@@ -71,13 +77,7 @@ const NAV_GROUPS = [
         to: "/cong-viec",
         label: "Công việc",
         Icon: IconTask,
-        anyOf: [
-          PERMISSIONS.TASK_VIEW_ALL,
-          PERMISSIONS.TASK_VIEW_OWN,
-          PERMISSIONS.TASK_CREATE,
-          PERMISSIONS.TASK_ASSIGN,
-          PERMISSIONS.KPI_VIEW_OWN,
-        ],
+        anyOf: MODULE_PERMS.WORK,
       },
     ],
   },

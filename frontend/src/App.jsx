@@ -270,15 +270,7 @@ export default function App() {
         <Route
           path="cong-viec"
           element={
-            <ProtectedRoute
-              anyOf={[
-                PERMISSIONS.TASK_VIEW_ALL,
-                PERMISSIONS.TASK_VIEW_OWN,
-                PERMISSIONS.TASK_CREATE,
-                PERMISSIONS.TASK_ASSIGN,
-                PERMISSIONS.KPI_VIEW_OWN,
-              ]}
-            >
+            <ProtectedRoute anyOf={MODULE_PERMS.WORK}>
               <WorkPage />
             </ProtectedRoute>
           }
