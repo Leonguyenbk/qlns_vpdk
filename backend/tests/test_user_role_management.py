@@ -64,6 +64,41 @@ def test_create_user_without_roles_defaults_to_staff(client, db, admin_user, aut
     assert "kpi.view_own" in user["permissions"]
 
 
+def test_create_user_links_employee_and_rejects_duplicate_link(
+    client, db, admin_user, auth_header, make_unit, make_position, make_employee
+):
+    headers = auth_header("admin_test")
+    unit = make_unit("USER-EMP-LINK", unit_type="DEPARTMENT")
+    pos = make_position("USER-EMP-LINK-POS")
+    emp = make_employee("USER-EMP-LINK-01", unit, pos, full_name="Nhân sự chờ tài khoản")
+
+    created = client.post(
+        "/api/users",
+        headers=headers,
+        json={
+            "username": "linked_user",
+            "password": "Password@123",
+            "full_name": emp.full_name,
+            "employee_id": emp.id,
+        },
+    )
+    assert created.status_code == 201, created.get_json()
+    assert created.get_json()["data"]["employee_id"] == emp.id
+
+    dup = client.post(
+        "/api/users",
+        headers=headers,
+        json={
+            "username": "linked_user_2",
+            "password": "Password@123",
+            "full_name": "Tài khoản trùng nhân sự",
+            "employee_id": emp.id,
+        },
+    )
+    assert dup.status_code == 409
+    assert "linked_user" in dup.get_json()["message"]
+
+
 def test_list_users_filters_by_role_and_unit(client, db, admin_user, auth_header, make_unit):
     headers = auth_header("admin_test")
     unit = make_unit("USER-FILTER", unit_type="DEPARTMENT")

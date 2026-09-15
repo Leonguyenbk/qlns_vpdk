@@ -11,6 +11,7 @@ import { PageHeader, Button, Badge, Card, FormField, Select, TextInput, Password
 import { Table, Pagination } from "../../components/ui/Table";
 import { LoadingState, ErrorState, EmptyState } from "../../components/ui/DataStates";
 import { Modal } from "../../components/ui/Modal";
+import { EmployeePicker } from "../../components/employees/EmployeePicker";
 
 function UserEditor({ user, roles, units, onClose }) {
   const { update, setRoles, setScopes, resetPassword } = useUserMutations();
@@ -166,8 +167,24 @@ function CreateUser({ roles, onClose }) {
   // quyền gì khác; backend cũng tự gán vai trò này nếu để trống hoàn toàn.
   const [form, setForm] = useState(() => {
     const staff = roles?.find((r) => r.code === "STAFF");
-    return { username: "", full_name: "", email: "", password: "", role_ids: staff ? [staff.id] : [] };
+    return {
+      username: "",
+      full_name: "",
+      email: "",
+      password: "",
+      employee_id: null,
+      role_ids: staff ? [staff.id] : [],
+    };
   });
+
+  const onPickEmployee = (employeeId, employee) => {
+    setForm((f) => ({
+      ...f,
+      employee_id: employeeId,
+      // Chỉ tự điền họ tên nếu admin chưa gõ gì — không ghi đè nếu đã nhập tay.
+      full_name: !f.full_name && employee ? employee.full_name : f.full_name,
+    }));
+  };
 
   const submit = async () => {
     try {
@@ -196,6 +213,12 @@ function CreateUser({ roles, onClose }) {
       }
     >
       <div className="grid gap-3">
+        <FormField
+          label="Liên kết hồ sơ nhân sự"
+          hint="Chọn để tài khoản tự thấy &quot;Công việc của tôi&quot;/&quot;KPI của tôi&quot; theo đúng hồ sơ — bỏ trống nếu là tài khoản không gắn nhân sự (vd. tài khoản dùng chung)"
+        >
+          <EmployeePicker value={form.employee_id} onChange={onPickEmployee} />
+        </FormField>
         <FormField label="Tên đăng nhập" required>
           <TextInput value={form.username} onChange={(e) => setForm({ ...form, username: e.target.value })} />
         </FormField>

@@ -84,6 +84,11 @@ def create_user(data: dict, *, actor, meta: dict) -> dict:
         employee_id = int(data["employee_id"])
         if db.session.get(Employee, employee_id) is None:
             raise ValidationError("Nhân sự liên kết không tồn tại.")
+        existing_owner = db.session.query(User).filter(User.employee_id == employee_id).first()
+        if existing_owner:
+            raise ConflictError(
+                f"Nhân sự này đã có tài khoản đăng nhập ({existing_owner.username})."
+            )
         user.employee_id = employee_id
 
     db.session.add(user)
@@ -138,8 +143,18 @@ def update_user(user_id: int, data: dict, *, actor, meta: dict) -> dict:
             revoke_all_for_user(user.id)
     if "employee_id" in data:
         employee_id = int(data["employee_id"]) if data.get("employee_id") else None
-        if employee_id and db.session.get(Employee, employee_id) is None:
-            raise ValidationError("Nhân sự liên kết không tồn tại.")
+        if employee_id:
+            if db.session.get(Employee, employee_id) is None:
+                raise ValidationError("Nhân sự liên kết không tồn tại.")
+            existing_owner = (
+                db.session.query(User)
+                .filter(User.employee_id == employee_id, User.id != user.id)
+                .first()
+            )
+            if existing_owner:
+                raise ConflictError(
+                    f"Nhân sự này đã có tài khoản đăng nhập ({existing_owner.username})."
+                )
         user.employee_id = employee_id
 
     db.session.flush()
