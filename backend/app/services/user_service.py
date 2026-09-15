@@ -6,7 +6,7 @@ import secrets
 from ..common.exceptions import ConflictError, NotFoundError, PermissionDeniedError, ValidationError
 from ..common.utils import clean_str, parse_pagination, validate_email
 from ..extensions import db
-from ..models import Employee, OrganizationUnit, Role, User, UserUnitScope
+from ..models import Employee, OrganizationUnit, Role, User, UserUnitScope, user_roles
 from ..permissions.constants import ROLE_SYSTEM_ADMIN
 from .audit_service import record_audit
 from .auth_service import revoke_all_for_user
@@ -33,6 +33,18 @@ def list_users(args) -> dict:
         q = q.filter(db.or_(User.username.ilike(like), User.full_name.ilike(like), User.email.ilike(like)))
     if args.get("is_active") in ("0", "1", "true", "false"):
         q = q.filter(User.is_active.is_(str(args.get("is_active")).lower() in ("1", "true")))
+    role_id = args.get("role_id")
+    if role_id:
+        q = q.filter(
+            User.id.in_(db.session.query(user_roles.c.user_id).filter(user_roles.c.role_id == int(role_id)))
+        )
+    unit_id = args.get("unit_id")
+    if unit_id:
+        q = q.filter(
+            User.id.in_(
+                db.session.query(UserUnitScope.user_id).filter(UserUnitScope.unit_id == int(unit_id))
+            )
+        )
     total = q.count()
     rows = q.order_by(User.username).offset((page - 1) * page_size).limit(page_size).all()
     return {

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import toast from "react-hot-toast";
 import { useUsers, useUserMutations } from "../../hooks/useUsers";
 import { useRoles } from "../../hooks/useRoles";
@@ -235,11 +235,28 @@ function CreateUser({ roles, onClose }) {
   );
 }
 
+const DEFAULT_FILTERS = {
+  keyword: "",
+  role_id: "",
+  unit_id: "",
+  is_active: "",
+  page: 1,
+  page_size: 10,
+};
+
 export default function UsersPage() {
   const { can } = useCan();
   const canManage = can(PERMISSIONS.USER_MANAGE);
-  const [page, setPage] = useState(1);
-  const { data, isLoading, isError, error, refetch } = useUsers({ page, page_size: 10 });
+  const [filters, setFilters] = useState(DEFAULT_FILTERS);
+  const setFilter = (patch) => setFilters((f) => ({ ...f, ...patch, page: 1 }));
+
+  const params = useMemo(() => {
+    const p = { ...filters };
+    Object.keys(p).forEach((k) => p[k] === "" && delete p[k]);
+    return p;
+  }, [filters]);
+
+  const { data, isLoading, isError, error, refetch } = useUsers(params);
   const { data: roles } = useRoles();
   const { data: units } = useUnits();
   const [editing, setEditing] = useState(null);
@@ -290,17 +307,46 @@ export default function UsersPage() {
         title="Quản lý tài khoản"
         actions={canManage && <Button onClick={() => setCreating(true)}>+ Thêm tài khoản</Button>}
       />
+      <div className="card mb-4 grid gap-3 p-4 md:grid-cols-2 xl:grid-cols-4">
+        <TextInput
+          placeholder="Tìm theo tên đăng nhập, họ tên, email..."
+          value={filters.keyword}
+          onChange={(e) => setFilter({ keyword: e.target.value })}
+        />
+        <Select value={filters.role_id} onChange={(e) => setFilter({ role_id: e.target.value })}>
+          <option value="">Tất cả vai trò</option>
+          {roles?.map((r) => (
+            <option key={r.id} value={r.id}>
+              {r.name}
+            </option>
+          ))}
+        </Select>
+        <Select value={filters.unit_id} onChange={(e) => setFilter({ unit_id: e.target.value })}>
+          <option value="">Tất cả đơn vị</option>
+          {units?.map((u) => (
+            <option key={u.id} value={u.id}>
+              {u.path || u.name}
+            </option>
+          ))}
+        </Select>
+        <Select value={filters.is_active} onChange={(e) => setFilter({ is_active: e.target.value })}>
+          <option value="">Tất cả trạng thái</option>
+          <option value="true">Hoạt động</option>
+          <option value="false">Khóa</option>
+        </Select>
+      </div>
+
       <Card className="overflow-hidden p-0">
         {isLoading ? (
           <LoadingState />
         ) : isError ? (
           <ErrorState error={error} onRetry={refetch} />
         ) : data.items.length === 0 ? (
-          <EmptyState title="Chưa có tài khoản" />
+          <EmptyState title="Không tìm thấy tài khoản phù hợp" />
         ) : (
           <>
             <Table columns={columns} rows={data.items} />
-            <Pagination pagination={data.pagination} onChange={setPage} />
+            <Pagination pagination={data.pagination} onChange={(page) => setFilters((f) => ({ ...f, page }))} />
           </>
         )}
       </Card>

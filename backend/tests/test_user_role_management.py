@@ -46,6 +46,44 @@ def test_create_user_assign_role_scope_and_reset_password(
     ).status_code == 200
 
 
+def test_list_users_filters_by_role_and_unit(client, db, admin_user, auth_header, make_unit):
+    headers = auth_header("admin_test")
+    unit = make_unit("USER-FILTER", unit_type="DEPARTMENT")
+    viewer = db.session.query(Role).filter(Role.code == "VIEWER").one()
+
+    created = client.post(
+        "/api/users",
+        headers=headers,
+        json={
+            "username": "filtered_user",
+            "password": "Password@123",
+            "full_name": "Tài khoản lọc theo vai trò",
+            "role_ids": [viewer.id],
+        },
+    )
+    assert created.status_code == 201, created.get_json()
+    user_id = created.get_json()["data"]["id"]
+    client.post(
+        f"/api/users/{user_id}/unit-scopes",
+        headers=headers,
+        json={"scopes": [{"scope_type": "UNIT", "unit_id": unit.id}]},
+    )
+
+    by_role = client.get(f"/api/users?role_id={viewer.id}", headers=headers)
+    assert by_role.status_code == 200
+    usernames = [u["username"] for u in by_role.get_json()["data"]["items"]]
+    assert "filtered_user" in usernames
+    assert "admin_test" not in usernames
+
+    by_unit = client.get(f"/api/users?unit_id={unit.id}", headers=headers)
+    assert by_unit.status_code == 200
+    assert [u["username"] for u in by_unit.get_json()["data"]["items"]] == ["filtered_user"]
+
+    no_match = client.get(f"/api/users?role_id={viewer.id}&unit_id=999999", headers=headers)
+    assert no_match.status_code == 200
+    assert no_match.get_json()["data"]["items"] == []
+
+
 def test_custom_role_crud(client, admin_user, auth_header):
     headers = auth_header("admin_test")
     created = client.post(
