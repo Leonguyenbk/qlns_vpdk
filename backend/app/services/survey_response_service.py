@@ -8,7 +8,7 @@ trước khi commit nên toàn bộ response + answers của lượt đó không
 from __future__ import annotations
 
 from ..common.exceptions import BusinessRuleError, NotFoundError, ValidationError
-from ..common.utils import clean_str, ensure_aware, parse_date, parse_pagination, utcnow
+from ..common.utils import clean_str, ensure_aware, parse_date, parse_pagination, utcnow, validate_email
 from ..exports.survey_export import build_workbook
 from ..extensions import db
 from ..models import Employee, OrganizationUnit
@@ -49,6 +49,15 @@ def get_public_survey(slug: str) -> dict:
             .all()
         )
         data["questions"] = [q.to_dict(only_active_options=True) for q in questions]
+    # Câu hỏi mặc định "Chi nhánh được khảo sát": danh sách chi nhánh đang hoạt
+    # động để trang công khai tự chọn theo mã QR hoặc hiển thị cho người dân chọn.
+    branches = (
+        db.session.query(OrganizationUnit)
+        .filter(OrganizationUnit.unit_type == "BRANCH", OrganizationUnit.is_active.is_(True))
+        .order_by(OrganizationUnit.name)
+        .all()
+    )
+    data["branches"] = [{"id": b.id, "code": b.code, "name": b.name} for b in branches]
     return data
 
 
@@ -160,6 +169,8 @@ def submit_response(survey_id: int, data: dict, *, meta: dict) -> tuple[dict, bo
     employee_id = data.get("employee_id")
     if employee_id is not None and db.session.get(Employee, employee_id) is None:
         raise ValidationError("Cán bộ không hợp lệ.")
+    respondent_email = clean_str(data.get("respondent_email"))
+    validate_email(respondent_email, "respondent_email")
 
     response = SurveyResponse(
         survey_id=survey.id,
@@ -169,6 +180,8 @@ def submit_response(survey_id: int, data: dict, *, meta: dict) -> tuple[dict, bo
         employee_id=employee_id,
         respondent_name=clean_str(data.get("respondent_name")),
         respondent_phone=clean_str(data.get("respondent_phone")),
+        respondent_email=respondent_email,
+        respondent_address=clean_str(data.get("respondent_address")),
         ip_address=meta.get("ip_address"),
         user_agent=(meta.get("user_agent") or "")[:255] or None,
         client_token=client_token,

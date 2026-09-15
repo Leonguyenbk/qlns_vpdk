@@ -192,6 +192,8 @@ class SurveyResponse(TimestampMixin, db.Model):
     )
     respondent_name: Mapped[str | None] = mapped_column(String(255))
     respondent_phone: Mapped[str | None] = mapped_column(String(20))
+    respondent_email: Mapped[str | None] = mapped_column(String(120))
+    respondent_address: Mapped[str | None] = mapped_column(String(255))
     ip_address: Mapped[str | None] = mapped_column(String(64))
     user_agent: Mapped[str | None] = mapped_column(String(255))
     # Token do client sinh (UUID) để chống submit trùng do double-click/mất mạng.
@@ -217,6 +219,8 @@ class SurveyResponse(TimestampMixin, db.Model):
             "employee_name": self.employee.full_name if self.employee else None,
             "respondent_name": self.respondent_name,
             "respondent_phone": self.respondent_phone,
+            "respondent_email": self.respondent_email,
+            "respondent_address": self.respondent_address,
             "submitted_at": _iso(self.submitted_at),
         }
         if include_answers:

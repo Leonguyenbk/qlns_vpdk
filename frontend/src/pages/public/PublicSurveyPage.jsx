@@ -1,8 +1,8 @@
-import { useState } from "react";
-import { useParams } from "react-router-dom";
+import { useMemo, useState } from "react";
+import { useParams, useSearchParams } from "react-router-dom";
 import { usePublicSurvey, useSubmitSurveyResponse } from "../../hooks/usePublicSurvey";
 import { QuestionRenderer } from "../../components/surveys/QuestionRenderer";
-import { Button, FormField, TextInput } from "../../components/ui/primitives";
+import { Button, FormField, Select, TextInput } from "../../components/ui/primitives";
 import { Spinner } from "../../components/ui/Spinner";
 import { apiErrorMessage } from "../../lib/api";
 
@@ -32,16 +32,31 @@ function buildAnswerItem(question, value) {
 
 export default function PublicSurveyPage() {
   const { slug } = useParams();
+  const [searchParams] = useSearchParams();
   const { data: survey, isLoading, isError, error } = usePublicSurvey(slug);
   const submit = useSubmitSurveyResponse(survey?.id);
   const [answers, setAnswers] = useState({});
   const [errors, setErrors] = useState({});
   const [respondentName, setRespondentName] = useState("");
   const [respondentPhone, setRespondentPhone] = useState("");
+  const [respondentEmail, setRespondentEmail] = useState("");
+  const [respondentAddress, setRespondentAddress] = useState("");
   const [done, setDone] = useState(false);
   const [clientToken] = useState(makeClientToken);
 
   const questions = survey?.questions || [];
+  const branches = survey?.branches || [];
+
+  // Mã QR dán tại chi nhánh mang theo ?branch=<mã hoặc id chi nhánh> — tự chọn
+  // sẵn để người dân không phải chọn tay; nếu không khớp branch nào thì vẫn
+  // để trống cho người dân tự chọn (link chung, không dán ở chi nhánh cụ thể).
+  const branchParam = searchParams.get("branch");
+  const presetBranch = useMemo(() => {
+    if (!branchParam) return null;
+    return branches.find((b) => String(b.id) === branchParam || b.code === branchParam) || null;
+  }, [branches, branchParam]);
+  const [branchId, setBranchId] = useState("");
+  const effectiveBranchId = presetBranch ? presetBranch.id : branchId;
 
   const setAnswer = (qid, value) => {
     setAnswers((a) => ({ ...a, [qid]: value }));
@@ -50,6 +65,9 @@ export default function PublicSurveyPage() {
 
   const onSubmit = async () => {
     const nextErrors = {};
+    if (branches.length > 0 && !effectiveBranchId) {
+      nextErrors._branch = "Vui lòng chọn chi nhánh được khảo sát.";
+    }
     for (const q of questions) {
       if (q.is_required && !isAnswered(q.question_type, answers[q.id])) {
         nextErrors[q.id] = "Câu hỏi này là bắt buộc.";
@@ -58,7 +76,10 @@ export default function PublicSurveyPage() {
     if (Object.keys(nextErrors).length) {
       setErrors(nextErrors);
       const firstId = questions.find((q) => nextErrors[q.id])?.id;
-      document.getElementById(`q-${firstId}`)?.scrollIntoView({ behavior: "smooth", block: "center" });
+      document.getElementById(nextErrors._branch ? "q-branch" : `q-${firstId}`)?.scrollIntoView({
+        behavior: "smooth",
+        block: "center",
+      });
       return;
     }
     const items = questions
@@ -67,8 +88,11 @@ export default function PublicSurveyPage() {
     try {
       await submit.mutateAsync({
         client_token: clientToken,
+        branch_id: effectiveBranchId || undefined,
         respondent_name: respondentName || undefined,
         respondent_phone: respondentPhone || undefined,
+        respondent_email: respondentEmail || undefined,
+        respondent_address: respondentAddress || undefined,
         answers: items,
       });
       setDone(true);
@@ -134,6 +158,27 @@ export default function PublicSurveyPage() {
         </div>
       )}
 
+      {branches.length > 0 && (
+        <div className="mb-5" id="q-branch">
+          <FormField label="Chi nhánh được khảo sát" required error={errors._branch}>
+            {presetBranch ? (
+              <div className="rounded-lg border border-rule bg-canvas px-3 py-2 text-sm text-ink">
+                {presetBranch.name}
+              </div>
+            ) : (
+              <Select value={branchId} onChange={(e) => { setBranchId(e.target.value); setErrors((er) => ({ ...er, _branch: null })); }}>
+                <option value="">-- Chọn chi nhánh --</option>
+                {branches.map((b) => (
+                  <option key={b.id} value={b.id}>
+                    {b.name}
+                  </option>
+                ))}
+              </Select>
+            )}
+          </FormField>
+        </div>
+      )}
+
       {survey.is_anonymous === false && (
         <div className="mb-5 grid gap-3">
           <FormField label="Họ và tên">
@@ -141,6 +186,12 @@ export default function PublicSurveyPage() {
           </FormField>
           <FormField label="Số điện thoại">
             <TextInput value={respondentPhone} onChange={(e) => setRespondentPhone(e.target.value)} />
+          </FormField>
+          <FormField label="Email">
+            <TextInput value={respondentEmail} onChange={(e) => setRespondentEmail(e.target.value)} />
+          </FormField>
+          <FormField label="Địa chỉ" hint="Nếu có">
+            <TextInput value={respondentAddress} onChange={(e) => setRespondentAddress(e.target.value)} />
           </FormField>
         </div>
       )}

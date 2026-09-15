@@ -13,6 +13,9 @@ import { SurveyFilterBar } from "./SurveyFilterBar";
 
 function ResponseCard({ response }) {
   const [open, setOpen] = useState(false);
+  const contact = [response.respondent_phone, response.respondent_email, response.respondent_address]
+    .filter(Boolean)
+    .join(" · ");
   return (
     <Card className="p-4">
       <button type="button" className="flex w-full items-center justify-between gap-3 text-left" onClick={() => setOpen((o) => !o)}>
@@ -28,6 +31,7 @@ function ResponseCard({ response }) {
       </button>
       {open && (
         <div className="mt-3 grid gap-2 border-t border-rule pt-3">
+          {contact && <p className="text-xs text-muted">{contact}</p>}
           {response.answers.map((a) => (
             <div key={a.id} className="text-sm">
               <p className="text-ink-2">{a.answer_text ?? a.option_text ?? a.answer_number ?? "—"}</p>

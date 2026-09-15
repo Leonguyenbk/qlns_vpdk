@@ -97,6 +97,43 @@ def test_full_flow_create_publish_submit_view_results(client, admin_user, auth_h
     assert stats["overview"]["average_score"] == 5.0
 
 
+def test_public_payload_lists_branches_and_accepts_respondent_contact(
+    client, admin_user, auth_header, make_unit
+):
+    headers = auth_header("admin_test")
+    branch = make_unit("KS-BRANCH", name="CN Khảo sát", unit_type="BRANCH")
+    survey = _create_survey(client, headers)
+    q = _add_choice_question(client, headers, survey["id"])
+    client.post(f"/api/surveys/{survey['id']}/status", headers=headers, json={"status": "active"})
+
+    public = client.get(f"/api/public/surveys/{survey['slug']}").get_json()["data"]
+    assert {"id": branch.id, "code": branch.code, "name": branch.name} in public["branches"]
+
+    opt_id = q["options"][0]["id"]
+    resp = client.post(
+        f"/api/public/surveys/{survey['id']}/submit",
+        json={
+            "branch_id": branch.id,
+            "respondent_name": "Nguyễn Văn A",
+            "respondent_phone": "0905123456",
+            "respondent_email": "a@example.com",
+            "respondent_address": "123 Lê Duẩn",
+            "answers": [{"question_id": q["id"], "option_id": opt_id}],
+        },
+    )
+    assert resp.status_code == 201, resp.get_json()
+    data = resp.get_json()["data"]
+    assert data["branch_id"] == branch.id
+    assert data["respondent_email"] == "a@example.com"
+    assert data["respondent_address"] == "123 Lê Duẩn"
+
+    bad_email = client.post(
+        f"/api/public/surveys/{survey['id']}/submit",
+        json={"respondent_email": "not-an-email", "answers": [{"question_id": q["id"], "option_id": opt_id}]},
+    )
+    assert bad_email.status_code == 422
+
+
 def test_edit_question_after_response_creates_revision_and_preserves_history(
     client, admin_user, auth_header
 ):

@@ -38,7 +38,7 @@ def build_workbook(survey, responses: list) -> io.BytesIO:
     ws1.title = "Danh sách lượt khảo sát"
     headers1 = [
         "STT", "Ngày khảo sát", "Chi nhánh", "Dịch vụ", "Quầy", "Cán bộ",
-        "Người trả lời", "Số điện thoại",
+        "Người trả lời", "Số điện thoại", "Email", "Địa chỉ",
     ]
     ws1.append(headers1)
     for i, r in enumerate(responses, start=1):
@@ -52,6 +52,8 @@ def build_workbook(survey, responses: list) -> io.BytesIO:
                 r.employee.full_name if r.employee else "",
                 r.respondent_name or "",
                 r.respondent_phone or "",
+                r.respondent_email or "",
+                r.respondent_address or "",
             ]
         )
     _style_header(ws1)
