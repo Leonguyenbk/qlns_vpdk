@@ -140,6 +140,11 @@ _STAFF_SELF_SERVICE = [TASK_VIEW_OWN, KPI_VIEW_OWN, KPI_SELF_ASSESS]
 # quan (khác VIEWER, vốn có thêm employee.view/unit.view/position.view).
 ROLE_STAFF = "STAFF"
 
+# Vai trò module Khảo sát — gán thêm cho viên chức được giao biên tập khảo sát
+# cụ thể (không giữ chức vụ quản lý nên không thuộc ORG_PERSONNEL/OFFICE_LEADER).
+# Không có quyền export/delete/xem mọi chi nhánh — phạm vi hẹp hơn ORG_PERSONNEL.
+ROLE_SURVEY_EDITOR = "SURVEY_EDITOR"
+
 ROLE_DEFINITIONS: dict[str, dict] = {
     ROLE_SYSTEM_ADMIN: {
         "name": "Quản trị hệ thống",
@@ -287,5 +292,16 @@ ROLE_DEFINITIONS: dict[str, dict] = {
         "danh sách nhân sự/đơn vị toàn cơ quan.",
         "is_system": True,
         "permissions": [*_STAFF_SELF_SERVICE],
+    },
+    ROLE_SURVEY_EDITOR: {
+        "name": "Biên tập khảo sát",
+        "description": "Gán thêm cho viên chức được giao soạn/biên tập khảo sát: tạo khảo sát, "
+        "quản lý câu hỏi/phương án, xem thống kê — không xóa khảo sát, không xuất Excel, không "
+        "xem thống kê ngoài phạm vi được giao.",
+        "is_system": True,
+        "permissions": [
+            SURVEY_VIEW, SURVEY_CREATE, SURVEY_UPDATE, SURVEY_MANAGE_QUESTIONS,
+            SURVEY_VIEW_STATISTICS,
+        ],
     },
 }

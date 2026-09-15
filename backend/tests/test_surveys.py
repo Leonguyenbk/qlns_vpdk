@@ -265,6 +265,32 @@ def test_missing_permission_is_forbidden(client, make_user, auth_header):
     assert resp.status_code == 403
 
 
+def test_survey_editor_role_can_edit_but_not_delete_or_export(client, admin_user, auth_header, make_user):
+    make_user("survey_editor_test", role_code="SURVEY_EDITOR")
+    editor_headers = auth_header("survey_editor_test")
+
+    created = client.post(
+        "/api/surveys",
+        headers=editor_headers,
+        json={"title": "Khảo sát do biên tập viên tạo"},
+    )
+    assert created.status_code == 201, created.get_json()
+    survey = created.get_json()["data"]
+
+    question = client.post(
+        f"/api/surveys/{survey['id']}/questions",
+        headers=editor_headers,
+        json={"question_text": "Bạn hài lòng chứ?", "question_type": "yes_no"},
+    )
+    assert question.status_code == 201, question.get_json()
+
+    stats = client.get(f"/api/surveys/{survey['id']}/responses", headers=editor_headers)
+    assert stats.status_code == 200
+
+    assert client.delete(f"/api/surveys/{survey['id']}", headers=editor_headers).status_code == 403
+    assert client.get(f"/api/surveys/{survey['id']}/export", headers=editor_headers).status_code == 403
+
+
 def test_single_choice_requires_at_least_two_options(client, admin_user, auth_header):
     headers = auth_header("admin_test")
     survey = _create_survey(client, headers)
