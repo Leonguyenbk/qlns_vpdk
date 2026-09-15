@@ -94,7 +94,12 @@ export default function SurveyQuestionsPage() {
         </div>
       )}
 
-      <AddQuestionModal open={showAdd} onClose={() => setShowAdd(false)} onCreate={onCreate} />
+      <AddQuestionModal
+        open={showAdd}
+        onClose={() => setShowAdd(false)}
+        onCreate={onCreate}
+        existingQuestions={questions || []}
+      />
       <PreviewModal survey={showPreview ? survey : null} onClose={() => setShowPreview(false)} />
     </div>
   );

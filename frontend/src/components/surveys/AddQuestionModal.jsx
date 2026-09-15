@@ -8,15 +8,31 @@ import { IconTrash } from "../ui/icons";
 
 const EMPTY = { question_text: "", question_type: "single_choice", is_required: false };
 
-export function AddQuestionModal({ open, onClose, onCreate }) {
+export function AddQuestionModal({ open, onClose, onCreate, existingQuestions = [] }) {
   const [form, setForm] = useState(EMPTY);
   const [options, setOptions] = useState(["", ""]);
+  const [copyFromId, setCopyFromId] = useState("");
   const [saving, setSaving] = useState(false);
   const hasOptions = QUESTION_TYPES_WITH_OPTIONS.has(form.question_type);
+
+  // Câu hỏi khác trong khảo sát đã có sẵn phương án trả lời — dùng để sao chép,
+  // tránh gõ lại cùng 1 thang đo (vd. "Rất hài lòng".."Rất không hài lòng") nhiều lần.
+  const sourceQuestions = existingQuestions.filter(
+    (q) => QUESTION_TYPES_WITH_OPTIONS.has(q.question_type) && (q.options || []).some((o) => o.is_active)
+  );
 
   const reset = () => {
     setForm(EMPTY);
     setOptions(["", ""]);
+    setCopyFromId("");
+  };
+
+  const copyOptionsFrom = (questionId) => {
+    setCopyFromId(questionId);
+    const source = sourceQuestions.find((q) => String(q.id) === String(questionId));
+    if (!source) return;
+    const texts = source.options.filter((o) => o.is_active).map((o) => o.option_text);
+    if (texts.length) setOptions(texts);
   };
 
   const submit = async () => {
@@ -94,6 +110,20 @@ export function AddQuestionModal({ open, onClose, onCreate }) {
         {hasOptions && (
           <FormField label="Phương án trả lời" required>
             <div className="grid gap-2">
+              {sourceQuestions.length > 0 && (
+                <Select
+                  value={copyFromId}
+                  onChange={(e) => copyOptionsFrom(e.target.value)}
+                  className="mb-1 text-xs"
+                >
+                  <option value="">-- Sao chép phương án từ câu hỏi khác (tuỳ chọn) --</option>
+                  {sourceQuestions.map((q) => (
+                    <option key={q.id} value={q.id}>
+                      {q.question_text.length > 60 ? `${q.question_text.slice(0, 60)}…` : q.question_text}
+                    </option>
+                  ))}
+                </Select>
+              )}
               {options.map((o, i) => (
                 <div key={i} className="flex items-center gap-2">
                   <TextInput

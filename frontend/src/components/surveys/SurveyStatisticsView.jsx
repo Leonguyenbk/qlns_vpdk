@@ -1,7 +1,12 @@
 import { useState } from "react";
+import toast from "react-hot-toast";
 import { useSurveyStatistics } from "../../hooks/useSurveyResponses";
+import { exportSurvey } from "../../hooks/useSurveys";
+import { useCan } from "../Can";
+import { PERMISSIONS } from "../../lib/constants";
+import { apiErrorMessage } from "../../lib/api";
 import { formatDate } from "../../lib/format";
-import { Card } from "../ui/primitives";
+import { Button, Card } from "../ui/primitives";
 import { LoadingState, ErrorState, EmptyState } from "../ui/DataStates";
 import { SurveyFilterBar } from "./SurveyFilterBar";
 import { KpiTile } from "./charts/KpiTile";
@@ -81,10 +86,23 @@ function QuestionStatCard({ question }) {
 
 export function SurveyStatisticsView({ surveyId }) {
   const [filters, setFilters] = useState({ preset: "", date_from: "", date_to: "", branch_id: "" });
+  const [exporting, setExporting] = useState(false);
+  const { can } = useCan();
   const params = Object.fromEntries(Object.entries(filters).filter(([, v]) => v));
   const { data, isLoading, isError, error, refetch } = useSurveyStatistics(surveyId, params);
 
   const setFilter = (patch) => setFilters((f) => ({ ...f, ...patch }));
+
+  const onExport = async () => {
+    setExporting(true);
+    try {
+      await exportSurvey(surveyId, params);
+    } catch (err) {
+      toast.error(apiErrorMessage(err, "Xuất Excel thất bại"));
+    } finally {
+      setExporting(false);
+    }
+  };
 
   if (isLoading) return <LoadingState />;
   if (isError) return <ErrorState error={error} onRetry={refetch} />;
@@ -96,7 +114,14 @@ export function SurveyStatisticsView({ surveyId }) {
 
   return (
     <div>
-      <SurveyFilterBar filters={filters} onChange={setFilter} />
+      <div className="mb-1 flex items-start justify-between gap-3">
+        <SurveyFilterBar filters={filters} onChange={setFilter} />
+        {can(PERMISSIONS.SURVEY_EXPORT) && (
+          <Button variant="secondary" onClick={onExport} disabled={exporting}>
+            {exporting ? "Đang xuất…" : "Xuất Excel"}
+          </Button>
+        )}
+      </div>
 
       <div className="mb-6 grid grid-cols-2 gap-3 md:grid-cols-5">
         <KpiTile label="Tổng lượt khảo sát" value={overview.total_responses} />

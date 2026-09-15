@@ -20,6 +20,75 @@ RATING_LABELS = {
     1: "Rất không hài lòng",
 }
 
+# Khảo sát thực tế thường dùng câu hỏi "single_choice" với 5 phương án đúng nhãn
+# mức độ hài lòng thay vì kiểu "rating" — coi các câu hỏi như vậy tương đương
+# rating khi tính điểm trung bình/tỷ lệ hài lòng tổng quan và theo chi nhánh.
+_SATISFACTION_LEVEL_BY_LABEL = {label.lower(): level for level, label in RATING_LABELS.items()}
+
+
+def _normalize_label(text: str | None) -> str:
+    return (text or "").strip().lower()
+
+
+def _satisfaction_sources(survey_id: int) -> tuple[list[int], dict[int, int]]:
+    """Trả về (id câu hỏi kiểu rating, {option_id: mức 1-5}) cho các câu hỏi
+    single_choice có ĐÚNG 5 phương án đang hoạt động, khớp trọn vẹn 5 nhãn hài
+    lòng (không thừa, không thiếu) — tránh nhầm với câu hỏi 2 lựa chọn tình cờ
+    trùng chữ "Hài lòng/Không hài lòng" nhưng không phải thang 5 mức."""
+    questions = (
+        db.session.query(SurveyQuestion)
+        .filter(SurveyQuestion.survey_id == survey_id, SurveyQuestion.is_active.is_(True))
+        .all()
+    )
+    rating_question_ids: list[int] = []
+    option_level_map: dict[int, int] = {}
+    for q in questions:
+        if q.question_type == "rating":
+            rating_question_ids.append(q.id)
+        elif q.question_type == "single_choice":
+            active_options = [o for o in q.options if o.is_active]
+            levels = {
+                _SATISFACTION_LEVEL_BY_LABEL.get(_normalize_label(o.option_text))
+                for o in active_options
+            }
+            if levels == set(RATING_LABELS):
+                for o in active_options:
+                    option_level_map[o.id] = _SATISFACTION_LEVEL_BY_LABEL[
+                        _normalize_label(o.option_text)
+                    ]
+    return rating_question_ids, option_level_map
+
+
+def _satisfaction_values_by_response(
+    response_ids: list[int], rating_question_ids: list[int], option_level_map: dict[int, int]
+) -> dict[int, list[int]]:
+    """{response_id: [mức 1-5, ...]} gộp từ câu hỏi rating thật + single_choice hài lòng."""
+    values_by_response: dict[int, list[int]] = defaultdict(list)
+    if rating_question_ids:
+        rows = (
+            db.session.query(SurveyAnswer.response_id, SurveyAnswer.answer_number)
+            .filter(
+                SurveyAnswer.response_id.in_(response_ids),
+                SurveyAnswer.question_id.in_(rating_question_ids),
+            )
+            .all()
+        )
+        for rid, value in rows:
+            if value is not None:
+                values_by_response[rid].append(round(value))
+    if option_level_map:
+        rows = (
+            db.session.query(SurveyAnswer.response_id, SurveyAnswer.option_id)
+            .filter(
+                SurveyAnswer.response_id.in_(response_ids),
+                SurveyAnswer.option_id.in_(option_level_map.keys()),
+            )
+            .all()
+        )
+        for rid, option_id in rows:
+            values_by_response[rid].append(option_level_map[option_id])
+    return values_by_response
+
 
 def _scoped_response_ids(survey_id: int, args, *, actor, scope) -> list[int]:
     q = db.session.query(SurveyResponse.id).filter(SurveyResponse.survey_id == survey_id)
@@ -31,15 +100,19 @@ def _scoped_response_ids(survey_id: int, args, *, actor, scope) -> list[int]:
 def get_statistics(survey_id: int, args, *, actor, scope) -> dict:
     get_survey_or_404(survey_id)
     response_ids = _scoped_response_ids(survey_id, args, actor=actor, scope=scope)
+    rating_qids, option_level_map = _satisfaction_sources(survey_id)
+    values_by_response = _satisfaction_values_by_response(response_ids, rating_qids, option_level_map)
     return {
-        "overview": _overview(survey_id, response_ids),
+        "overview": _overview(survey_id, response_ids, values_by_response),
         "by_question": _by_question(survey_id, response_ids),
         "time_series": _time_series(response_ids),
-        "by_branch": _by_branch(response_ids),
+        "by_branch": _by_branch(response_ids, values_by_response),
     }
 
 
-def _overview(survey_id: int, response_ids: list[int]) -> dict:
+def _overview(
+    survey_id: int, response_ids: list[int], values_by_response: dict[int, list[int]]
+) -> dict:
     total_responses = len(response_ids)
     if not total_responses:
         return {
@@ -82,17 +155,7 @@ def _overview(survey_id: int, response_ids: list[int]) -> dict:
     else:
         completion_rate = 100.0
 
-    rating_values = [
-        round(v[0])
-        for v in db.session.query(SurveyAnswer.answer_number)
-        .join(SurveyQuestion, SurveyQuestion.id == SurveyAnswer.question_id)
-        .filter(
-            SurveyAnswer.response_id.in_(response_ids),
-            SurveyQuestion.question_type == "rating",
-        )
-        .all()
-        if v[0] is not None
-    ]
+    rating_values = [v for rid in response_ids for v in values_by_response.get(rid, [])]
     total_ratings = len(rating_values)
     satisfied = sum(1 for v in rating_values if v >= 4)
     dissatisfied = sum(1 for v in rating_values if v <= 2)
@@ -251,7 +314,7 @@ def _time_series(response_ids: list[int]) -> list[dict]:
     return [{"date": str(d), "count": c} for d, c in rows]
 
 
-def _by_branch(response_ids: list[int]) -> list[dict]:
+def _by_branch(response_ids: list[int], values_by_response: dict[int, list[int]]) -> list[dict]:
     if not response_ids:
         return []
     rows = (
@@ -269,17 +332,14 @@ def _by_branch(response_ids: list[int]) -> list[dict]:
             .all()
         )
 
-    ratings_by_branch: dict[int | None, list[float]] = defaultdict(list)
-    rating_rows = (
-        db.session.query(SurveyResponse.branch_id, SurveyAnswer.answer_number)
-        .join(SurveyAnswer, SurveyAnswer.response_id == SurveyResponse.id)
-        .join(SurveyQuestion, SurveyQuestion.id == SurveyAnswer.question_id)
-        .filter(SurveyResponse.id.in_(response_ids), SurveyQuestion.question_type == "rating")
+    response_branch = dict(
+        db.session.query(SurveyResponse.id, SurveyResponse.branch_id)
+        .filter(SurveyResponse.id.in_(response_ids))
         .all()
     )
-    for branch_id, value in rating_rows:
-        if value is not None:
-            ratings_by_branch[branch_id].append(round(value))
+    ratings_by_branch: dict[int | None, list[int]] = defaultdict(list)
+    for rid, values in values_by_response.items():
+        ratings_by_branch[response_branch.get(rid)].extend(values)
 
     result = []
     for branch_id, total in rows:
