@@ -5,6 +5,7 @@ import { useAuth } from "../auth/AuthContext";
 import { PERMISSIONS } from "../lib/constants";
 import { Avatar } from "./ui/primitives";
 import { CommandPalette } from "./CommandPalette";
+import Footer from "./footer";
 import {
   IconOverview,
   IconPeople,
@@ -371,6 +372,8 @@ export function Layout() {
             <Outlet />
           </div>
         </main>
+
+        <Footer />
       </div>
 
       <CommandPalette open={paletteOpen} setOpen={setPaletteOpen} items={paletteItems} />
