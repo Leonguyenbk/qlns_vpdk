@@ -328,6 +328,33 @@ def test_survey_editor_role_can_edit_but_not_delete_or_export(client, admin_user
     assert client.get(f"/api/surveys/{survey['id']}/export", headers=editor_headers).status_code == 403
 
 
+def test_office_leader_can_view_stats_but_not_create_or_edit_surveys(
+    client, admin_user, auth_header, make_user
+):
+    admin_headers = auth_header("admin_test")
+    survey = _create_survey(client, admin_headers)
+    _add_choice_question(client, admin_headers, survey["id"])
+    client.post(f"/api/surveys/{survey['id']}/status", headers=admin_headers, json={"status": "active"})
+
+    make_user("office_leader_test", role_code="OFFICE_LEADER")
+    leader_headers = auth_header("office_leader_test")
+
+    assert client.get(f"/api/surveys/{survey['id']}", headers=leader_headers).status_code == 200
+    assert client.get(
+        f"/api/surveys/{survey['id']}/responses", headers=leader_headers
+    ).status_code == 200
+    assert client.get(
+        f"/api/surveys/{survey['id']}/statistics", headers=leader_headers
+    ).status_code == 200
+
+    assert client.post("/api/surveys", headers=leader_headers, json={"title": "X"}).status_code == 403
+    assert client.put(
+        f"/api/surveys/{survey['id']}", headers=leader_headers, json={"title": "Y"}
+    ).status_code == 403
+    assert client.delete(f"/api/surveys/{survey['id']}", headers=leader_headers).status_code == 403
+    assert client.get(f"/api/surveys/{survey['id']}/export", headers=leader_headers).status_code == 403
+
+
 def test_single_choice_requires_at_least_two_options(client, admin_user, auth_header):
     headers = auth_header("admin_test")
     survey = _create_survey(client, headers)

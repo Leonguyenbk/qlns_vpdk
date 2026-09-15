@@ -236,15 +236,15 @@ ROLE_DEFINITIONS: dict[str, dict] = {
         "name": "Lãnh đạo Văn phòng",
         "description": "Giám đốc/Phó Giám đốc VPĐKĐĐ: giao việc, nghiệm thu, xem toàn bộ "
         "nhiệm vụ và KPI, quyết định xếp loại chất lượng và khoá kỳ đánh giá "
-        "(thẩm quyền tập trung theo khoản 3 Điều 13 Nghị định số 233/2026/NĐ-CP).",
+        "(thẩm quyền tập trung theo khoản 3 Điều 13 Nghị định số 233/2026/NĐ-CP). Với "
+        "khảo sát: chỉ xem kết quả/thống kê toàn Văn phòng — không soạn/xuất bản khảo sát "
+        "(việc đó do Bộ phận tổ chức cán bộ hoặc người được giao vai trò Biên tập khảo sát).",
         "is_system": True,
         "permissions": [
             TASK_VIEW_ALL, TASK_CREATE, TASK_ASSIGN, TASK_MANAGE, TASK_ACCEPT,
             KPI_VIEW_ALL, KPI_REVIEW, KPI_APPROVE, KPI_PERIOD_MANAGE, KPI_ADJUST,
             KPI_CRITERIA_MANAGE, UNIT_VIEW, EMPLOYEE_VIEW,
-            SURVEY_VIEW, SURVEY_CREATE, SURVEY_UPDATE, SURVEY_DELETE,
-            SURVEY_MANAGE_QUESTIONS, SURVEY_VIEW_STATISTICS, SURVEY_EXPORT,
-            SURVEY_MANAGE_ALL_BRANCHES,
+            SURVEY_VIEW, SURVEY_VIEW_STATISTICS, SURVEY_MANAGE_ALL_BRANCHES,
             *_STAFF_SELF_SERVICE,
         ],
     },
