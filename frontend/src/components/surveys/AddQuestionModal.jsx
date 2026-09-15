@@ -6,10 +6,11 @@ import { QUESTION_TYPE_LABELS, QUESTION_TYPES_WITH_OPTIONS } from "../../lib/con
 import { apiErrorMessage } from "../../lib/api";
 import { IconTrash } from "../ui/icons";
 
-const EMPTY = { question_text: "", question_type: "single_choice", is_required: false };
+const EMPTY = { question_text: "", question_type: "single_choice", is_required: false, section: "" };
 
 export function AddQuestionModal({ open, onClose, onCreate, existingQuestions = [] }) {
-  const [form, setForm] = useState(EMPTY);
+  const lastSection = existingQuestions[existingQuestions.length - 1]?.section || "";
+  const [form, setForm] = useState({ ...EMPTY, section: lastSection });
   const [options, setOptions] = useState(["", ""]);
   const [copyFromId, setCopyFromId] = useState("");
   const [saving, setSaving] = useState(false);
@@ -20,9 +21,11 @@ export function AddQuestionModal({ open, onClose, onCreate, existingQuestions = 
   const sourceQuestions = existingQuestions.filter(
     (q) => QUESTION_TYPES_WITH_OPTIONS.has(q.question_type) && (q.options || []).some((o) => o.is_active)
   );
+  // Danh sách "Phần" đã dùng trong khảo sát, gợi ý để không gõ lại/gõ sai tên phần.
+  const sectionOptions = [...new Set(existingQuestions.map((q) => q.section).filter(Boolean))];
 
   const reset = () => {
-    setForm(EMPTY);
+    setForm({ ...EMPTY, section: lastSection });
     setOptions(["", ""]);
     setCopyFromId("");
   };
@@ -51,6 +54,7 @@ export function AddQuestionModal({ open, onClose, onCreate, existingQuestions = 
         question_text: form.question_text.trim(),
         question_type: form.question_type,
         is_required: form.is_required,
+        section: form.section.trim() || null,
         options: hasOptions ? opts.map((option_text) => ({ option_text })) : [],
       });
       reset();
@@ -79,6 +83,21 @@ export function AddQuestionModal({ open, onClose, onCreate, existingQuestions = 
       }
     >
       <div className="grid gap-4">
+        <FormField label="Phần" hint="Để nhóm nhiều câu hỏi lại, vd. &quot;Phần 1. Tiếp cận dịch vụ&quot; — bỏ trống nếu không cần chia phần">
+          <TextInput
+            list="survey-section-options"
+            value={form.section}
+            onChange={(e) => setForm((f) => ({ ...f, section: e.target.value }))}
+            placeholder="Vd: Phần 1. Tiếp cận dịch vụ"
+          />
+          {sectionOptions.length > 0 && (
+            <datalist id="survey-section-options">
+              {sectionOptions.map((s) => (
+                <option key={s} value={s} />
+              ))}
+            </datalist>
+          )}
+        </FormField>
         <FormField label="Nội dung câu hỏi" required>
           <Textarea
             rows={2}

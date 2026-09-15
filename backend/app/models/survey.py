@@ -112,6 +112,10 @@ class SurveyQuestion(TimestampMixin, db.Model):
     is_required: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     sort_order: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    # Tên "Phần" để nhóm câu hỏi khi hiển thị/xuất báo cáo (vd. "Phần 1. Tiếp cận
+    # dịch vụ"). Chỉ là nhãn tổ chức — không ảnh hưởng ý nghĩa dữ liệu lịch sử
+    # nên luôn sửa tại chỗ, không kích hoạt cơ chế "revision" như question_text.
+    section: Mapped[str | None] = mapped_column(String(255))
 
     survey: Mapped["Survey"] = relationship("Survey", back_populates="questions")
     options: Mapped[list["SurveyOption"]] = relationship(
@@ -130,6 +134,7 @@ class SurveyQuestion(TimestampMixin, db.Model):
             "is_required": self.is_required,
             "is_active": self.is_active,
             "sort_order": self.sort_order,
+            "section": self.section,
             "created_at": _iso(self.created_at),
             "updated_at": _iso(self.updated_at),
         }

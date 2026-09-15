@@ -1,7 +1,7 @@
 import { useState } from "react";
 import toast from "react-hot-toast";
 import { useSurveyStatistics } from "../../hooks/useSurveyResponses";
-import { exportSurvey } from "../../hooks/useSurveys";
+import { exportSurveySummary } from "../../hooks/useSurveys";
 import { useCan } from "../Can";
 import { PERMISSIONS } from "../../lib/constants";
 import { apiErrorMessage } from "../../lib/api";
@@ -96,7 +96,7 @@ export function SurveyStatisticsView({ surveyId }) {
   const onExport = async () => {
     setExporting(true);
     try {
-      await exportSurvey(surveyId, params);
+      await exportSurveySummary(surveyId, params);
     } catch (err) {
       toast.error(apiErrorMessage(err, "Xuất Excel thất bại"));
     } finally {
@@ -184,9 +184,19 @@ export function SurveyStatisticsView({ surveyId }) {
       <h3 className="mb-3 font-display text-base font-semibold text-ink">Thống kê theo câu hỏi</h3>
       {by_question.length ? (
         <div className="grid gap-4">
-          {by_question.map((q) => (
-            <QuestionStatCard key={q.id} question={q} />
-          ))}
+          {by_question.map((q, i) => {
+            const showSectionHeader = q.section && q.section !== by_question[i - 1]?.section;
+            return (
+              <div key={q.id}>
+                {showSectionHeader && (
+                  <h4 className="mb-2 mt-2 font-display text-sm font-semibold text-ink first:mt-0">
+                    {q.section}
+                  </h4>
+                )}
+                <QuestionStatCard question={q} />
+              </div>
+            );
+          })}
         </div>
       ) : (
         <EmptyState title="Khảo sát chưa có câu hỏi đang hoạt động" />

@@ -288,20 +288,24 @@ class SurveyOptionInputSchema(ApiSchema):
 
 
 class SurveyQuestionCreateSchema(ApiSchema):
+    nullable_fields = {"section"}
     question_text = fields.String(required=True, error_messages=required)
     question_type = fields.String(
         required=True, validate=validate.OneOf(sorted(QUESTION_TYPES)), error_messages=required
     )
     is_required = fields.Boolean(load_default=False)
     is_active = fields.Boolean(load_default=True)
+    section = fields.String(allow_none=True)
     options = fields.List(fields.Nested(SurveyOptionInputSchema), load_default=list)
 
 
 class SurveyQuestionUpdateSchema(ApiSchema):
+    nullable_fields = {"section"}
     question_text = fields.String()
     question_type = fields.String(validate=validate.OneOf(sorted(QUESTION_TYPES)))
     is_required = fields.Boolean()
     is_active = fields.Boolean()
+    section = fields.String(allow_none=True)
 
 
 class SurveyOptionCreateSchema(ApiSchema):

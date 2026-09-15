@@ -5,6 +5,7 @@ from collections import defaultdict
 
 from sqlalchemy import func
 
+from ..exports.survey_export import build_summary_workbook
 from ..extensions import db
 from ..models import OrganizationUnit
 from ..models.survey import SurveyAnswer, SurveyQuestion, SurveyResponse
@@ -359,3 +360,20 @@ def _by_branch(response_ids: list[int], values_by_response: dict[int, list[int]]
         )
     result.sort(key=lambda r: r["total_responses"], reverse=True)
     return result
+
+
+def export_summary(survey_id: int, args, *, actor, scope):
+    """Xuất Excel bảng TỔNG HỢP tỷ lệ theo câu hỏi (tôn trọng bộ lọc hiện tại),
+    không có thông tin người trả lời — khác với `survey_response_service.export_responses`
+    (danh sách từng lượt + chi tiết từng câu trả lời)."""
+    survey = get_survey_or_404(survey_id)
+    stats = get_statistics(survey_id, args, actor=actor, scope=scope)
+
+    scope_label = "Toàn hệ thống"
+    branch_id = args.get("branch_id")
+    if branch_id:
+        branch = db.session.get(OrganizationUnit, int(branch_id))
+        if branch:
+            scope_label = f"Chi nhánh {branch.name}"
+
+    return build_summary_workbook(survey, stats, scope_label=scope_label)

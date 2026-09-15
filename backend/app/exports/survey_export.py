@@ -86,3 +86,100 @@ def build_workbook(survey, responses: list) -> io.BytesIO:
     wb.save(buf)
     buf.seek(0)
     return buf
+
+
+def build_summary_workbook(survey, stats: dict, *, scope_label: str | None = None) -> io.BytesIO:
+    """Xuất bảng TỔNG HỢP tỷ lệ theo từng câu hỏi (không có thông tin người trả lời).
+
+    `stats` là kết quả của `survey_statistics_service.get_statistics()` — tôn
+    trọng đúng bộ lọc (thời gian/chi nhánh) đã áp dụng khi gọi, nên khi lọc theo
+    1 chi nhánh thì sheet "Tổng hợp" chỉ phản ánh chi nhánh đó; không lọc thì là
+    số liệu toàn hệ thống.
+    """
+    wb = Workbook()
+    overview = stats["overview"]
+
+    ws1 = wb.active
+    ws1.title = "Tổng hợp"
+    ws1.append([survey.title])
+    ws1.append([f"Phạm vi: {scope_label or 'Toàn hệ thống'}"])
+    ws1.append([f"Tổng số lượt khảo sát: {overview['total_responses']}"])
+    avg = overview.get("average_score")
+    ws1.append(
+        [
+            f"Điểm trung bình: {avg if avg is not None else '—'}/5"
+            f" · Tỷ lệ hài lòng: {overview['satisfaction_rate']}%"
+            f" · Tỷ lệ không hài lòng: {overview['dissatisfaction_rate']}%"
+        ]
+    )
+    ws1.append([])
+    header_row = ws1.max_row + 1
+    headers = ["Phần", "Câu hỏi", "Phương án / Chỉ số", "Số lượng", "Tỷ lệ (%)"]
+    ws1.append(headers)
+    for cell in ws1[header_row]:
+        cell.font = _HEADER_FONT
+        cell.fill = _HEADER_FILL
+
+    for q in stats["by_question"]:
+        section = q.get("section") or ""
+        qtext = q["question_text"]
+        st = q["stats"]
+        first = True
+
+        def _row(option_label, count, percentage):
+            nonlocal first
+            ws1.append(
+                [
+                    section if first else "",
+                    qtext if first else "",
+                    option_label,
+                    count if count != "" else "",
+                    percentage if percentage != "" else "",
+                ]
+            )
+            first = False
+
+        if st["type"] == "choice":
+            if st["options"]:
+                for opt in st["options"]:
+                    _row(opt["option_text"], opt["count"], opt["percentage"])
+            else:
+                _row("(chưa có phản hồi)", 0, 0)
+        elif st["type"] == "yes_no":
+            _row("Có", st["yes_count"], st["yes_percentage"])
+            _row("Không", st["no_count"], st["no_percentage"])
+        elif st["type"] == "rating":
+            for b in st["breakdown"]:
+                _row(b["label"], b["count"], b["percentage"])
+            _row("Điểm trung bình", "", st["average"] if st["average"] is not None else "")
+        elif st["type"] == "number":
+            _row("Trung bình", "", st["average"] if st["average"] is not None else "")
+            _row("Nhỏ nhất", "", st["min"] if st["min"] is not None else "")
+            _row("Lớn nhất", "", st["max"] if st["max"] is not None else "")
+        else:  # open_text
+            _row(f"{st['total_respondents']} ý kiến (xem chi tiết trong hệ thống)", "", "")
+
+    for col, width in zip(range(1, 6), (22, 46, 40, 12, 12)):
+        ws1.column_dimensions[get_column_letter(col)].width = width
+
+    ws2 = wb.create_sheet("Theo chi nhánh")
+    headers2 = ["Chi nhánh", "Tổng lượt", "Điểm trung bình", "Tỷ lệ hài lòng (%)", "Tỷ lệ không hài lòng (%)"]
+    ws2.append(headers2)
+    for b in stats["by_branch"]:
+        ws2.append(
+            [
+                b["branch_name"],
+                b["total_responses"],
+                b["average_score"] if b["average_score"] is not None else "",
+                b["satisfaction_rate"],
+                b["dissatisfaction_rate"],
+            ]
+        )
+    _style_header(ws2)
+    for col in range(1, len(headers2) + 1):
+        ws2.column_dimensions[get_column_letter(col)].width = 24
+
+    buf = io.BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+    return buf

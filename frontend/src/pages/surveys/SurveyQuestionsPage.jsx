@@ -43,6 +43,9 @@ export default function SurveyQuestionsPage() {
     toast.success("Đã thêm câu hỏi");
   };
 
+  const sectionOptions = [...new Set((questions || []).map((q) => q.section).filter(Boolean))];
+  let sectionCounter = 0;
+
   return (
     <div className="mx-auto max-w-3xl">
       <PageHeader
@@ -78,9 +81,28 @@ export default function SurveyQuestionsPage() {
         <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
           <SortableContext items={questions.map((q) => `question-${q.id}`)} strategy={verticalListSortingStrategy}>
             <div className="grid gap-4">
-              {questions.map((q, i) => (
-                <QuestionCard key={q.id} question={q} mutations={mutations} canManage={canManage} index={i} />
-              ))}
+              {questions.map((q, i) => {
+                const prevSection = questions[i - 1]?.section || "";
+                const curSection = q.section || "";
+                if (curSection !== prevSection) sectionCounter = 0;
+                sectionCounter += 1;
+                return (
+                  <div key={q.id}>
+                    {q.section && q.section !== prevSection && (
+                      <h3 className="mb-2 mt-1 font-display text-sm font-semibold text-ink first:mt-0">
+                        {q.section}
+                      </h3>
+                    )}
+                    <QuestionCard
+                      question={q}
+                      mutations={mutations}
+                      canManage={canManage}
+                      index={sectionCounter - 1}
+                      sectionOptions={sectionOptions}
+                    />
+                  </div>
+                );
+              })}
             </div>
           </SortableContext>
         </DndContext>

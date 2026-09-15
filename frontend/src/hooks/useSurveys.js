@@ -43,6 +43,15 @@ export function exportSurvey(id, params) {
   return downloadFile(`/surveys/${id}/export`, { params, fallbackName: `khao-sat-${id}.xlsx` });
 }
 
+/** Xuất bảng TỔNG HỢP tỷ lệ theo câu hỏi (toàn hệ thống hoặc theo chi nhánh nếu
+ * có lọc) — không có thông tin người trả lời, khác với `exportSurvey`. */
+export function exportSurveySummary(id, params) {
+  return downloadFile(`/surveys/${id}/statistics/export`, {
+    params,
+    fallbackName: `tong-hop-khao-sat-${id}.xlsx`,
+  });
+}
+
 export function useSurveyBranchLimits(surveyId) {
   return useQuery({
     queryKey: ["surveys", surveyId, "branch-limits"],

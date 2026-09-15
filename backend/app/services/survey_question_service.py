@@ -70,6 +70,7 @@ def _clone_question(q: SurveyQuestion) -> SurveyQuestion:
         is_required=q.is_required,
         is_active=True,
         sort_order=q.sort_order,
+        section=q.section,
     )
     db.session.add(new_q)
     db.session.flush()
@@ -175,6 +176,7 @@ def create_question(survey_id: int, data: dict, *, actor, meta: dict) -> dict:
         question_type=qtype,
         is_required=bool(data.get("is_required", False)),
         is_active=bool(data.get("is_active", True)),
+        section=clean_str(data.get("section")),
         sort_order=_next_question_order(survey_id),
     )
     db.session.add(question)
@@ -230,6 +232,8 @@ def update_question(question_id: int, data: dict, *, actor, meta: dict) -> dict:
         target.is_required = bool(data["is_required"])
     if "is_active" in data:
         target.is_active = bool(data["is_active"])
+    if "section" in data:
+        target.section = clean_str(data["section"])
 
     options_payload = data.get("options")
     if new_type in QUESTION_TYPES_WITH_OPTIONS:
@@ -288,6 +292,7 @@ def duplicate_question(question_id: int, *, actor, meta: dict) -> dict:
         question_type=q.question_type,
         is_required=q.is_required,
         is_active=True,
+        section=q.section,
         sort_order=_next_question_order(q.survey_id),
     )
     db.session.add(new_q)

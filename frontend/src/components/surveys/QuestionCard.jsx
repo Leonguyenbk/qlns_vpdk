@@ -10,16 +10,18 @@ import { IconGrip, IconTrash, IconCopy } from "../ui/icons";
 import { OptionRow } from "./OptionRow";
 import { ConfirmDialog } from "../ui/Modal";
 
-export function QuestionCard({ question, mutations, canManage, index }) {
+export function QuestionCard({ question, mutations, canManage, index, sectionOptions = [] }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: `question-${question.id}`,
   });
   const [text, setText] = useState(question.question_text);
+  const [sectionText, setSectionText] = useState(question.section || "");
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [newOption, setNewOption] = useState("");
   const hasOptions = QUESTION_TYPES_WITH_OPTIONS.has(question.question_type);
 
   useEffect(() => setText(question.question_text), [question.question_text]);
+  useEffect(() => setSectionText(question.section || ""), [question.section]);
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 4 } }));
 
@@ -47,6 +49,17 @@ export function QuestionCard({ question, mutations, canManage, index }) {
     } catch (err) {
       toast.error(apiErrorMessage(err));
       setText(question.question_text);
+    }
+  };
+
+  const saveSection = async () => {
+    const trimmed = sectionText.trim();
+    if (trimmed === (question.section || "")) return;
+    try {
+      await mutations.update.mutateAsync({ id: question.id, body: { section: trimmed || null } });
+    } catch (err) {
+      toast.error(apiErrorMessage(err));
+      setSectionText(question.section || "");
     }
   };
 
@@ -155,9 +168,31 @@ export function QuestionCard({ question, mutations, canManage, index }) {
           </button>
         )}
         <div className="min-w-0 flex-1">
-          <div className="mb-2 flex items-center gap-2 text-xs font-medium text-muted">
+          <div className="mb-1.5 flex flex-wrap items-center gap-2 text-xs font-medium text-muted">
             <span>Câu {index + 1}</span>
             {!question.is_active && <span className="text-danger">(Đã tắt)</span>}
+            {canManage ? (
+              <>
+                <span className="text-[#cbd5e1]">·</span>
+                <input
+                  list={`section-options-${question.id}`}
+                  className="input h-6 w-56 py-0 text-xs"
+                  placeholder="Thuộc phần (tuỳ chọn)"
+                  value={sectionText}
+                  onChange={(e) => setSectionText(e.target.value)}
+                  onBlur={saveSection}
+                />
+                {sectionOptions.length > 0 && (
+                  <datalist id={`section-options-${question.id}`}>
+                    {sectionOptions.map((s) => (
+                      <option key={s} value={s} />
+                    ))}
+                  </datalist>
+                )}
+              </>
+            ) : (
+              question.section && <span>· {question.section}</span>
+            )}
           </div>
           <textarea
             className="input mb-3 text-[0.95rem] font-medium"

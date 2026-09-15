@@ -237,6 +237,19 @@ def export_survey(survey_id: int):
     )
 
 
+@bp.get("/<int:survey_id>/statistics/export")
+@require_permission(perms.SURVEY_EXPORT)
+def export_survey_summary(survey_id: int):
+    actor, scope = actor_and_scope()
+    buf = survey_statistics_service.export_summary(survey_id, request.args, actor=actor, scope=scope)
+    return send_file(
+        buf,
+        mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        as_attachment=True,
+        download_name=f"tong-hop-khao-sat-{survey_id}.xlsx",
+    )
+
+
 # ----------------------------- Công khai (người dân) -----------------------------
 @public_bp.get("/<string:slug>")
 def get_public_survey(slug: str):
