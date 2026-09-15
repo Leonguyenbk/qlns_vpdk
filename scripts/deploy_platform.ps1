@@ -3,14 +3,20 @@
   KHÔNG đụng tới dịch vụ cũ (QLNS_Backend / QLNS_Nginx / server goiso).
 
   Dùng:
-    powershell -File scripts\deploy_platform.ps1 -Port 5050
-    powershell -File scripts\deploy_platform.ps1 -Port 5050 -Update   # chỉ build lại + restart
+    powershell -File scripts\deploy_platform.ps1
+    powershell -File scripts\deploy_platform.ps1 -Update   # chỉ build lại + restart
+
+  QUAN TRỌNG: -Port PHẢI khớp với upstream trong nginx.conf (hiện tại là 5000,
+  xem "upstream platform" trong C:\tools\nginx-1.31.4\conf\nginx.conf) — lệch
+  cổng sẽ làm nginx trả 502 dù PLATFORM_Backend chạy khoẻ mạnh. Chỉ đổi -Port
+  khi ĐÃ cập nhật nginx.conf (và reload nginx) cho khớp, hoặc khi đã hoàn tất
+  cắt chuyển Cloudflare trỏ thẳng vào backend (xem docs/DEPLOYMENT.md mục 4-5).
 
   Điều kiện: đã có backend\.env (DATABASE_URL, SECRET_KEY, JWT_SECRET_KEY...),
   đã chạy  flask --app wsgi db upgrade  và các script di trú (xem docs/MIGRATION.md).
 #>
 param(
-  [int]$Port = 5050,
+  [int]$Port = 5000,
   [string]$Root = (Split-Path -Parent $PSScriptRoot),
   [switch]$Update
 )

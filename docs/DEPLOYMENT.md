@@ -3,6 +3,17 @@
 Một tiến trình Waitress phục vụ tất cả (Portal React + toàn bộ giao diện gọi số + API JSON).
 Reverse proxy (Cloudflare Tunnel) chỉ chuyển hostname → cổng nội bộ.
 
+> **Trạng thái thật hiện tại (xác nhận 2026-09-15):** việc "cắt chuyển" ở mục 4
+> (Cloudflare trỏ thẳng vào `:5050`, bỏ nginx) **CHƯA được thực hiện**. Production
+> hiện vẫn chạy qua `QLNS_Nginx` (`C:\tools\nginx-1.31.4\conf\nginx.conf`, lắng
+> nghe `:8080`, Cloudflare Tunnel trỏ vào đây) → forward vào **`127.0.0.1:5000`**
+> (không phải 5050!). `PLATFORM_Backend` PHẢI chạy đúng cổng nginx đang trỏ tới
+> (`5000`) — chạy `deploy_platform.ps1` với `-Port 5050` (như ví dụ cũ ở mục 3)
+> sẽ làm site 502 vì lệch cổng với nginx. **Trước khi deploy, luôn kiểm tra
+> `nginx.conf` xem `upstream platform` đang trỏ cổng nào rồi truyền đúng `-Port`
+> đó.** Chỉ dùng luồng "trỏ thẳng `:5050`, bỏ nginx" ở mục 4-5 khi thật sự đã
+> quyết định hoàn tất việc đó (đổi cả nginx lẫn Cloudflare cùng lúc).
+
 ## 0. Yêu cầu
 
 - Python 3.12+ (đã chạy tốt trên 3.14 với `SQLAlchemy==2.0.52`).
@@ -40,10 +51,11 @@ cd backend
 ## 3. Cài dịch vụ platform (không đụng dịch vụ cũ)
 
 ```powershell
-powershell -File scripts\deploy_platform.ps1 -Port 5050
+powershell -File scripts\deploy_platform.ps1
 ```
-Tạo `PLATFORM_Backend` (Auto) chạy `waitress-serve --port=5050 --threads=48 wsgi:app`,
-build `frontend/dist`, kiểm tra `/api/health`.
+Tạo `PLATFORM_Backend` (Auto) chạy `waitress-serve --port=5000 --threads=48 wsgi:app`
+(khớp `nginx.conf` hiện tại — xem cảnh báo đầu file), build `frontend/dist`, kiểm tra
+`/api/health`.
 
 ## 4. Cắt chuyển tên miền (thủ công trên Cloudflare)
 
