@@ -154,7 +154,9 @@ ROLE_DEFINITIONS: dict[str, dict] = {
     },
     ROLE_HR_ADMIN: {
         "name": "Quản trị nhân sự",
-        "description": "Quản lý nhân sự, đơn vị và chức vụ trên toàn hệ thống.",
+        "description": "Quản lý nhân sự, đơn vị, chức vụ và giao việc trên toàn hệ thống — "
+        "không có mục Quản trị hệ thống (tài khoản/vai trò/nhật ký/gọi số/KPI, "
+        "thuộc Quản trị hệ thống/Lãnh đạo Văn phòng).",
         "is_system": True,
         "permissions": [
             EMPLOYEE_VIEW,
@@ -169,9 +171,15 @@ ROLE_DEFINITIONS: dict[str, dict] = {
             UNIT_MANAGE,
             POSITION_VIEW,
             POSITION_MANAGE,
-            AUDIT_VIEW,
             SURVEY_VIEW,
             SURVEY_VIEW_STATISTICS,
+            # Giao việc — quản lý nhân sự thì cần giao/theo dõi việc cho nhân sự
+            # đó, không cần đụng tới quản trị tài khoản/vai trò hay KPI.
+            TASK_VIEW_ALL,
+            TASK_CREATE,
+            TASK_ASSIGN,
+            TASK_MANAGE,
+            TASK_ACCEPT,
             *_STAFF_SELF_SERVICE,
         ],
     },
