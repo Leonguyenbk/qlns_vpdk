@@ -24,6 +24,10 @@ import {
   IconInbox,
   IconSend,
   IconGauge,
+  IconSurvey,
+  IconPlus,
+  IconClipboardList,
+  IconChart,
 } from "./ui/icons";
 
 /* Menu + routing unchanged — only grouped for the sidebar. Each item keeps its
@@ -42,6 +46,25 @@ const NAV_GROUPS = [
       { to: "/employees", label: "Nhân sự", Icon: IconPeople, anyOf: [PERMISSIONS.EMPLOYEE_VIEW] },
       { to: "/units", label: "Cơ cấu đơn vị", Icon: IconOrg, anyOf: [PERMISSIONS.UNIT_VIEW] },
       { to: "/positions", label: "Chức vụ", Icon: IconPosition, anyOf: [PERMISSIONS.POSITION_VIEW] },
+    ],
+  },
+  {
+    title: "Khảo sát",
+    items: [
+      { to: "/surveys", label: "Danh sách khảo sát", Icon: IconSurvey, anyOf: [PERMISSIONS.SURVEY_VIEW] },
+      { to: "/surveys/new", label: "Tạo khảo sát", Icon: IconPlus, anyOf: [PERMISSIONS.SURVEY_CREATE] },
+      {
+        to: "/surveys/results",
+        label: "Kết quả khảo sát",
+        Icon: IconClipboardList,
+        anyOf: [PERMISSIONS.SURVEY_VIEW_STATISTICS],
+      },
+      {
+        to: "/surveys/statistics",
+        label: "Thống kê",
+        Icon: IconChart,
+        anyOf: [PERMISSIONS.SURVEY_VIEW_STATISTICS],
+      },
     ],
   },
   {
@@ -96,6 +119,11 @@ const CRUMBS = {
   "giao-viec": "Giao việc",
   "cong-viec-cua-toi": "Công việc của tôi",
   "viec-toi-da-giao": "Việc tôi đã giao",
+  surveys: "Khảo sát",
+  questions: "Câu hỏi",
+  responses: "Kết quả",
+  statistics: "Thống kê",
+  results: "Kết quả khảo sát",
   "kpi-cua-toi": "KPI của tôi",
   kpi: "KPI",
   moi: "Giao việc mới",

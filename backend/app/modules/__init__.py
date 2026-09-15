@@ -5,7 +5,8 @@
     ├── nhansu/    -> quản lý nhân sự, đơn vị, chức vụ, tài khoản, vai trò, nhật ký
     ├── goiso/     -> gọi số / kiosk (lớp tương thích, giữ nguyên đường dẫn cũ)
     ├── tasks/     -> Giao việc – Theo dõi nhiệm vụ
-    └── kpi/       -> Đánh giá KPI (danh mục sản phẩm, bộ tiêu chí, kỳ, chấm điểm)
+    ├── kpi/       -> Đánh giá KPI (danh mục sản phẩm, bộ tiêu chí, kỳ, chấm điểm)
+    └── surveys/   -> Khảo sát – Đánh giá mức độ hài lòng (quản trị + công khai)
 """
 from __future__ import annotations
 
@@ -40,3 +41,12 @@ def register_blueprints(app: Flask) -> None:
 
     app.register_blueprint(tasks_bp)
     app.register_blueprint(kpi_bp)
+
+    # --- Module Khảo sát – Đánh giá mức độ hài lòng ---
+    from .surveys.routes import bp as surveys_bp
+    from .surveys.routes import options_bp as survey_options_bp
+    from .surveys.routes import public_bp as public_surveys_bp
+    from .surveys.routes import questions_bp as survey_questions_bp
+
+    for bp in (surveys_bp, survey_questions_bp, survey_options_bp, public_surveys_bp):
+        app.register_blueprint(bp)

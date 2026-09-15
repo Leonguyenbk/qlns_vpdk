@@ -189,3 +189,43 @@ export const IconClock = (p) => (
     <path d="M12 7v5l3.2 2" />
   </Icon>
 );
+export const IconTrash = (p) => (
+  <Icon {...p}>
+    <path d="M4 7h16M9 7V4.5A1.5 1.5 0 0 1 10.5 3h3A1.5 1.5 0 0 1 15 4.5V7M6 7l1 13a2 2 0 0 0 2 1.9h6a2 2 0 0 0 2-1.9l1-13" />
+  </Icon>
+);
+export const IconCopy = (p) => (
+  <Icon {...p}>
+    <rect x="9" y="9" width="12" height="12" rx="2" />
+    <path d="M5 15H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v1" />
+  </Icon>
+);
+export const IconGrip = (p) => (
+  <Icon {...p}>
+    <circle cx="9" cy="6" r="1.2" fill="currentColor" stroke="none" />
+    <circle cx="15" cy="6" r="1.2" fill="currentColor" stroke="none" />
+    <circle cx="9" cy="12" r="1.2" fill="currentColor" stroke="none" />
+    <circle cx="15" cy="12" r="1.2" fill="currentColor" stroke="none" />
+    <circle cx="9" cy="18" r="1.2" fill="currentColor" stroke="none" />
+    <circle cx="15" cy="18" r="1.2" fill="currentColor" stroke="none" />
+  </Icon>
+);
+export const IconSurvey = (p) => (
+  <Icon {...p}>
+    <path d="M8 3h8a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2Z" />
+    <path d="M9 8h6M9 12h6M9 16h3" />
+  </Icon>
+);
+export const IconChart = (p) => (
+  <Icon {...p}>
+    <path d="M4 20V10M12 20V4M20 20v-7" />
+    <path d="M2 20h20" />
+  </Icon>
+);
+export const IconClipboardList = (p) => (
+  <Icon {...p}>
+    <rect x="5" y="4" width="14" height="17" rx="2" />
+    <path d="M9 3.5h6a1 1 0 0 1 1 1V6H8V4.5a1 1 0 0 1 1-1Z" />
+    <path d="M9 11h6M9 14.5h6M9 18h3.5" />
+  </Icon>
+);

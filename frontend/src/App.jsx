@@ -47,6 +47,15 @@ import CounterPage from "./pages/goiso/CounterPage";
 import BookingPage from "./pages/goiso/BookingPage";
 import BookingLookupPage from "./pages/goiso/BookingLookupPage";
 
+import SurveyListPage from "./pages/surveys/SurveyListPage";
+import SurveyEditPage from "./pages/surveys/SurveyEditPage";
+import SurveyQuestionsPage from "./pages/surveys/SurveyQuestionsPage";
+import SurveyResponsesPage from "./pages/surveys/SurveyResponsesPage";
+import SurveyStatisticsPage from "./pages/surveys/SurveyStatisticsPage";
+import SurveyResultsHubPage from "./pages/surveys/SurveyResultsHubPage";
+import SurveyStatisticsHubPage from "./pages/surveys/SurveyStatisticsHubPage";
+import PublicSurveyPage from "./pages/public/PublicSurveyPage";
+
 const GOISO_STAFF = [PERMISSIONS.GOISO_COUNTER, PERMISSIONS.GOISO_ADMIN];
 
 export default function App() {
@@ -70,6 +79,9 @@ export default function App() {
       <Route path="/b/:code/cho" element={<BoardPage />} />
       <Route path="/dat-lich" element={<BookingPage />} />
       <Route path="/lich-hen/:token" element={<BookingLookupPage />} />
+
+      {/* Khảo sát – Đánh giá mức độ hài lòng: trang công khai cho người dân, không cần đăng nhập */}
+      <Route path="/khao-sat/:slug" element={<PublicSurveyPage />} />
       <Route
         path="/b/:code/counter"
         element={
@@ -183,6 +195,72 @@ export default function App() {
           element={
             <ProtectedRoute permission={PERMISSIONS.POSITION_VIEW}>
               <PositionsPage />
+            </ProtectedRoute>
+          }
+        />
+
+        {/* Khảo sát – Đánh giá mức độ hài lòng */}
+        <Route
+          path="surveys"
+          element={
+            <ProtectedRoute permission={PERMISSIONS.SURVEY_VIEW}>
+              <SurveyListPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="surveys/new"
+          element={
+            <ProtectedRoute permission={PERMISSIONS.SURVEY_CREATE}>
+              <SurveyEditPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="surveys/results"
+          element={
+            <ProtectedRoute permission={PERMISSIONS.SURVEY_VIEW_STATISTICS}>
+              <SurveyResultsHubPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="surveys/statistics"
+          element={
+            <ProtectedRoute permission={PERMISSIONS.SURVEY_VIEW_STATISTICS}>
+              <SurveyStatisticsHubPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="surveys/:id"
+          element={
+            <ProtectedRoute permission={PERMISSIONS.SURVEY_VIEW}>
+              <SurveyEditPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="surveys/:id/questions"
+          element={
+            <ProtectedRoute permission={PERMISSIONS.SURVEY_VIEW}>
+              <SurveyQuestionsPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="surveys/:id/responses"
+          element={
+            <ProtectedRoute permission={PERMISSIONS.SURVEY_VIEW_STATISTICS}>
+              <SurveyResponsesPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="surveys/:id/statistics"
+          element={
+            <ProtectedRoute permission={PERMISSIONS.SURVEY_VIEW_STATISTICS}>
+              <SurveyStatisticsPage />
             </ProtectedRoute>
           }
         />

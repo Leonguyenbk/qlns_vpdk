@@ -110,3 +110,27 @@ export const positionSchema = z.object({
   is_managerial: z.boolean().optional(),
   is_active: z.boolean().optional(),
 });
+
+export const surveySchema = z.object({
+  title: z.string().trim().min(1, "Tên khảo sát là bắt buộc"),
+  description: z.string().trim().optional().or(z.literal("")),
+  is_anonymous: z.boolean().optional(),
+  start_at: z.string().optional().or(z.literal("")),
+  end_at: z.string().optional().or(z.literal("")),
+});
+
+export const surveyQuestionSchema = z.object({
+  question_text: z.string().trim().min(1, "Nội dung câu hỏi là bắt buộc"),
+  question_type: z.enum([
+    "single_choice",
+    "multiple_choice",
+    "yes_no",
+    "rating",
+    "text",
+    "textarea",
+    "number",
+    "date",
+  ]),
+  is_required: z.boolean().optional(),
+  is_active: z.boolean().optional(),
+});

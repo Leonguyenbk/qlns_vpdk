@@ -85,6 +85,15 @@ export const PERMISSIONS = {
   KPI_CRITERIA_MANAGE: "kpi.criteria_manage",
   KPI_PERIOD_MANAGE: "kpi.period_manage",
   KPI_ADJUST: "kpi.adjust",
+  // Khảo sát
+  SURVEY_VIEW: "survey.view",
+  SURVEY_CREATE: "survey.create",
+  SURVEY_UPDATE: "survey.update",
+  SURVEY_DELETE: "survey.delete",
+  SURVEY_MANAGE_QUESTIONS: "survey.manage_questions",
+  SURVEY_VIEW_STATISTICS: "survey.view_statistics",
+  SURVEY_EXPORT: "survey.export",
+  SURVEY_MANAGE_ALL_BRANCHES: "survey.manage_all_branches",
 };
 
 // Nhóm quyền để cổng ứng dụng quyết định hiện thẻ module nào
@@ -174,4 +183,52 @@ export const CATALOG_STATUS_LABELS = {
   DRAFT: "Dự thảo",
   PILOT: "Thí điểm",
   OFFICIAL: "Chính thức",
+};
+
+// ---- Khảo sát – Đánh giá mức độ hài lòng ----
+
+export const SURVEY_STATUS_LABELS = {
+  draft: "Nháp",
+  active: "Đang hoạt động",
+  paused: "Tạm khóa",
+  closed: "Đã đóng",
+  archived: "Lưu trữ",
+};
+
+export const SURVEY_STATUS_BADGE = {
+  draft: "badge-neutral",
+  active: "badge-ok",
+  paused: "badge-warn",
+  closed: "badge-info",
+  archived: "badge-neutral",
+};
+
+export const QUESTION_TYPE_LABELS = {
+  single_choice: "Một lựa chọn",
+  multiple_choice: "Nhiều lựa chọn",
+  yes_no: "Có / Không",
+  rating: "Đánh giá 1–5",
+  text: "Văn bản ngắn",
+  textarea: "Văn bản dài",
+  number: "Số",
+  date: "Ngày",
+};
+
+export const QUESTION_TYPES_WITH_OPTIONS = new Set(["single_choice", "multiple_choice"]);
+
+export const RATING_LEVEL_LABELS = {
+  5: "Rất hài lòng",
+  4: "Hài lòng",
+  3: "Bình thường",
+  2: "Không hài lòng",
+  1: "Rất không hài lòng",
+};
+
+export const DATE_PRESET_LABELS = {
+  today: "Hôm nay",
+  "7d": "7 ngày",
+  "30d": "30 ngày",
+  this_month: "Tháng này",
+  this_quarter: "Quý này",
+  this_year: "Năm nay",
 };

@@ -14,6 +14,7 @@ from ..models.enums import (
     GENDERS,
     UNIT_TYPES,
 )
+from ..models.survey import QUESTION_TYPES
 
 
 class ApiSchema(Schema):
@@ -242,6 +243,100 @@ class RoleUpdateSchema(RoleBaseSchema):
     pass
 
 
+class SurveyCreateSchema(ApiSchema):
+    nullable_fields = {"description", "start_at", "end_at"}
+    title = fields.String(required=True, error_messages=required)
+    description = fields.String(allow_none=True)
+    is_anonymous = fields.Boolean(load_default=True)
+    start_at = fields.DateTime(allow_none=True)
+    end_at = fields.DateTime(allow_none=True)
+
+
+class SurveyUpdateSchema(ApiSchema):
+    nullable_fields = {"description", "start_at", "end_at"}
+    title = fields.String()
+    description = fields.String(allow_none=True)
+    is_anonymous = fields.Boolean()
+    start_at = fields.DateTime(allow_none=True)
+    end_at = fields.DateTime(allow_none=True)
+
+
+class SurveyStatusSchema(ApiSchema):
+    status = fields.String(
+        required=True,
+        validate=validate.OneOf(["draft", "active", "paused", "closed", "archived"]),
+        error_messages=required,
+    )
+
+
+class SurveyOptionInputSchema(ApiSchema):
+    nullable_fields = {"option_value"}
+    option_text = fields.String(required=True, error_messages=required)
+    option_value = fields.String(allow_none=True)
+
+
+class SurveyQuestionCreateSchema(ApiSchema):
+    question_text = fields.String(required=True, error_messages=required)
+    question_type = fields.String(
+        required=True, validate=validate.OneOf(sorted(QUESTION_TYPES)), error_messages=required
+    )
+    is_required = fields.Boolean(load_default=False)
+    is_active = fields.Boolean(load_default=True)
+    options = fields.List(fields.Nested(SurveyOptionInputSchema), load_default=list)
+
+
+class SurveyQuestionUpdateSchema(ApiSchema):
+    question_text = fields.String()
+    question_type = fields.String(validate=validate.OneOf(sorted(QUESTION_TYPES)))
+    is_required = fields.Boolean()
+    is_active = fields.Boolean()
+
+
+class SurveyOptionCreateSchema(ApiSchema):
+    nullable_fields = {"option_value"}
+    option_text = fields.String(required=True, error_messages=required)
+    option_value = fields.String(allow_none=True)
+
+
+class SurveyOptionUpdateSchema(ApiSchema):
+    nullable_fields = {"option_value"}
+    option_text = fields.String()
+    option_value = fields.String(allow_none=True)
+
+
+class ReorderItemSchema(ApiSchema):
+    id = fields.Integer(required=True, strict=True, error_messages=required)
+    sort_order = fields.Integer(required=True, strict=True, error_messages=required)
+
+
+class ReorderSchema(ApiSchema):
+    items = fields.List(fields.Nested(ReorderItemSchema), required=True, error_messages=required)
+
+
+class SurveyAnswerItemSchema(ApiSchema):
+    nullable_fields = {"option_id", "answer_text", "answer_number"}
+    question_id = fields.Integer(required=True, strict=True, error_messages=required)
+    option_id = fields.Integer(allow_none=True, strict=True)
+    option_ids = fields.List(fields.Integer(strict=True))
+    answer_text = fields.String(allow_none=True)
+    answer_number = fields.Float(allow_none=True)
+
+
+class SurveySubmitSchema(ApiSchema):
+    nullable_fields = {
+        "respondent_name", "respondent_phone", "branch_id", "service_id",
+        "counter_id", "employee_id", "client_token",
+    }
+    respondent_name = fields.String(allow_none=True)
+    respondent_phone = fields.String(allow_none=True)
+    branch_id = fields.Integer(allow_none=True, strict=True)
+    service_id = fields.Integer(allow_none=True, strict=True)
+    counter_id = fields.Integer(allow_none=True, strict=True)
+    employee_id = fields.Integer(allow_none=True, strict=True)
+    client_token = fields.String(allow_none=True)
+    answers = fields.List(fields.Nested(SurveyAnswerItemSchema), required=True, error_messages=required)
+
+
 login_schema = LoginSchema()
 change_password_schema = ChangePasswordSchema()
 employee_create_schema = EmployeeCreateSchema()
@@ -260,3 +355,13 @@ user_roles_schema = UserRolesSchema()
 user_scopes_schema = UserScopesSchema()
 role_create_schema = RoleCreateSchema()
 role_update_schema = RoleUpdateSchema()
+
+survey_create_schema = SurveyCreateSchema()
+survey_update_schema = SurveyUpdateSchema()
+survey_status_schema = SurveyStatusSchema()
+survey_question_create_schema = SurveyQuestionCreateSchema()
+survey_question_update_schema = SurveyQuestionUpdateSchema()
+survey_option_create_schema = SurveyOptionCreateSchema()
+survey_option_update_schema = SurveyOptionUpdateSchema()
+reorder_schema = ReorderSchema()
+survey_submit_schema = SurveySubmitSchema()

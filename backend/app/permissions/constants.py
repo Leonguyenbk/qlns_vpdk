@@ -53,6 +53,16 @@ KPI_CRITERIA_MANAGE = "kpi.criteria_manage"  # quản lý bộ tiêu chí, danh 
 KPI_PERIOD_MANAGE = "kpi.period_manage"  # mở/khoá/mở lại kỳ đánh giá
 KPI_ADJUST = "kpi.adjust"                # điều chỉnh/thay thế kết quả đã khoá (Mẫu số 15)
 
+# --- Nhóm quyền Khảo sát – Đánh giá mức độ hài lòng ---
+SURVEY_VIEW = "survey.view"
+SURVEY_CREATE = "survey.create"
+SURVEY_UPDATE = "survey.update"
+SURVEY_DELETE = "survey.delete"
+SURVEY_MANAGE_QUESTIONS = "survey.manage_questions"
+SURVEY_VIEW_STATISTICS = "survey.view_statistics"
+SURVEY_EXPORT = "survey.export"
+SURVEY_MANAGE_ALL_BRANCHES = "survey.manage_all_branches"
+
 
 PERMISSION_DEFINITIONS: list[tuple[str, str]] = [
     (EMPLOYEE_VIEW, "Xem danh sách và hồ sơ nhân sự"),
@@ -91,6 +101,14 @@ PERMISSION_DEFINITIONS: list[tuple[str, str]] = [
     (KPI_CRITERIA_MANAGE, "KPI: quản lý bộ tiêu chí, danh mục sản phẩm, hệ số Kn/CAP"),
     (KPI_PERIOD_MANAGE, "KPI: mở/khoá/mở lại kỳ đánh giá"),
     (KPI_ADJUST, "KPI: điều chỉnh/thay thế kết quả đã khoá"),
+    (SURVEY_VIEW, "Khảo sát: xem danh sách và chi tiết"),
+    (SURVEY_CREATE, "Khảo sát: tạo cuộc khảo sát mới"),
+    (SURVEY_UPDATE, "Khảo sát: sửa thông tin, xuất bản, tạm khóa, đóng"),
+    (SURVEY_DELETE, "Khảo sát: xóa khảo sát chưa có dữ liệu"),
+    (SURVEY_MANAGE_QUESTIONS, "Khảo sát: quản lý câu hỏi và phương án trả lời"),
+    (SURVEY_VIEW_STATISTICS, "Khảo sát: xem thống kê và kết quả"),
+    (SURVEY_EXPORT, "Khảo sát: xuất dữ liệu ra Excel"),
+    (SURVEY_MANAGE_ALL_BRANCHES, "Khảo sát: xem/thống kê mọi chi nhánh, không giới hạn theo phạm vi đơn vị"),
 ]
 
 ALL_PERMISSIONS = [code for code, _ in PERMISSION_DEFINITIONS]
@@ -147,6 +165,8 @@ ROLE_DEFINITIONS: dict[str, dict] = {
             POSITION_VIEW,
             POSITION_MANAGE,
             AUDIT_VIEW,
+            SURVEY_VIEW,
+            SURVEY_VIEW_STATISTICS,
             *_STAFF_SELF_SERVICE,
         ],
     },
@@ -162,6 +182,8 @@ ROLE_DEFINITIONS: dict[str, dict] = {
             EMPLOYEE_TRANSFER,
             UNIT_VIEW,
             POSITION_VIEW,
+            SURVEY_VIEW,
+            SURVEY_VIEW_STATISTICS,
             *_STAFF_SELF_SERVICE,
         ],
     },
@@ -181,14 +203,22 @@ ROLE_DEFINITIONS: dict[str, dict] = {
         "description": "Toàn quyền module gọi số: cấu hình dịch vụ/quầy/màn hình, "
         "chi nhánh, thiết bị kiosk, đặt lịch trên toàn hệ thống.",
         "is_system": True,
-        "permissions": [GOISO_VIEW, GOISO_COUNTER, GOISO_ADMIN, UNIT_VIEW, *_STAFF_SELF_SERVICE],
+        "permissions": [
+            GOISO_VIEW, GOISO_COUNTER, GOISO_ADMIN, UNIT_VIEW,
+            SURVEY_VIEW, SURVEY_VIEW_STATISTICS, SURVEY_EXPORT, SURVEY_MANAGE_ALL_BRANCHES,
+            *_STAFF_SELF_SERVICE,
+        ],
     },
     ROLE_GOISO_BRANCH_ADMIN: {
         "name": "Quản trị Gọi số chi nhánh",
         "description": "Quản trị gọi số trong phạm vi chi nhánh được phân công "
         "(cấu hình dịch vụ/quầy/màn hình, trực quầy). Phạm vi giới hạn theo đơn vị.",
         "is_system": True,
-        "permissions": [GOISO_VIEW, GOISO_COUNTER, GOISO_ADMIN, *_STAFF_SELF_SERVICE],
+        "permissions": [
+            GOISO_VIEW, GOISO_COUNTER, GOISO_ADMIN,
+            SURVEY_VIEW, SURVEY_VIEW_STATISTICS,
+            *_STAFF_SELF_SERVICE,
+        ],
     },
     ROLE_GOISO_COUNTER: {
         "name": "Nhân viên Gọi số (trực cửa)",
@@ -207,6 +237,9 @@ ROLE_DEFINITIONS: dict[str, dict] = {
             TASK_VIEW_ALL, TASK_CREATE, TASK_ASSIGN, TASK_MANAGE, TASK_ACCEPT,
             KPI_VIEW_ALL, KPI_REVIEW, KPI_APPROVE, KPI_PERIOD_MANAGE, KPI_ADJUST,
             KPI_CRITERIA_MANAGE, UNIT_VIEW, EMPLOYEE_VIEW,
+            SURVEY_VIEW, SURVEY_CREATE, SURVEY_UPDATE, SURVEY_DELETE,
+            SURVEY_MANAGE_QUESTIONS, SURVEY_VIEW_STATISTICS, SURVEY_EXPORT,
+            SURVEY_MANAGE_ALL_BRANCHES,
             *_STAFF_SELF_SERVICE,
         ],
     },
@@ -219,6 +252,7 @@ ROLE_DEFINITIONS: dict[str, dict] = {
             TASK_VIEW_ALL, TASK_TEMPLATE_MANAGE,
             KPI_VIEW_ALL, KPI_AGGREGATE, KPI_CRITERIA_MANAGE, KPI_PERIOD_MANAGE,
             UNIT_VIEW, EMPLOYEE_VIEW,
+            SURVEY_VIEW, SURVEY_VIEW_STATISTICS,
             *_STAFF_SELF_SERVICE,
         ],
     },
@@ -231,6 +265,7 @@ ROLE_DEFINITIONS: dict[str, dict] = {
             TASK_VIEW_ALL, TASK_CREATE, TASK_ASSIGN, TASK_MANAGE, TASK_ACCEPT,
             KPI_VIEW_ALL, KPI_REVIEW,
             UNIT_VIEW, EMPLOYEE_VIEW,
+            SURVEY_VIEW, SURVEY_VIEW_STATISTICS,
             *_STAFF_SELF_SERVICE,
         ],
     },
