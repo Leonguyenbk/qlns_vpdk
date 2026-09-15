@@ -17,13 +17,14 @@ function UserEditor({ user, roles, units, onClose }) {
   const { update, setRoles, setScopes, resetPassword } = useUserMutations();
   const [roleIds, setRoleIds] = useState(user.roles.map((r) => r.id));
   const [active, setActive] = useState(user.is_active);
+  const [employeeId, setEmployeeId] = useState(user.employee_id);
   const [scopes, setScopeList] = useState(
     user.unit_scopes.map((s) => ({ scope_type: s.scope_type, unit_id: s.unit_id || "" }))
   );
 
   const save = async () => {
     try {
-      await update.mutateAsync({ id: user.id, body: { is_active: active } });
+      await update.mutateAsync({ id: user.id, body: { is_active: active, employee_id: employeeId } });
       await setRoles.mutateAsync({ id: user.id, role_ids: roleIds });
       await setScopes.mutateAsync({
         id: user.id,
@@ -71,6 +72,13 @@ function UserEditor({ user, roles, units, onClose }) {
           <input type="checkbox" checked={active} onChange={(e) => setActive(e.target.checked)} /> Tài
           khoản đang hoạt động
         </label>
+
+        <FormField
+          label="Liên kết hồ sơ nhân sự"
+          hint="Độc lập hoặc liên kết đều được — chọn để tài khoản thấy đúng &quot;Công việc của tôi&quot;/&quot;KPI của tôi&quot; theo hồ sơ nhân sự"
+        >
+          <EmployeePicker value={employeeId} onChange={(id) => setEmployeeId(id)} />
+        </FormField>
 
         <div>
           <p className="label">Vai trò</p>
