@@ -7,7 +7,8 @@ import { Spinner } from "./ui/Spinner";
  * Lưu ý: đây chỉ là lớp bảo vệ trải nghiệm; backend vẫn luôn kiểm tra quyền.
  */
 export function ProtectedRoute({ children, permission, anyOf }) {
-  const { isAuthenticated, loading, hasPermission, hasAnyPermission } = useAuth();
+  const { isAuthenticated, loading, hasPermission, hasAnyPermission } =
+    useAuth();
   const location = useLocation();
 
   if (loading) {

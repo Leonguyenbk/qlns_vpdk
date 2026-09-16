@@ -1,5 +1,11 @@
 import { useEffect, useRef, useState } from "react";
-import { Link, NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
+import {
+  Link,
+  NavLink,
+  Outlet,
+  useLocation,
+  useNavigate,
+} from "react-router-dom";
 import clsx from "clsx";
 import { useAuth } from "../auth/AuthContext";
 import { PERMISSIONS, MODULE_PERMS } from "../lib/constants";
@@ -41,43 +47,45 @@ const NAV_GROUPS = [
         exact: true,
         anyOf: MODULE_PERMS.NHANSU,
       },
-    ],
-  },
-  {
-    title: "Quản lý",
-    items: [
-      { to: "/employees", label: "Nhân sự", Icon: IconPeople, anyOf: [PERMISSIONS.EMPLOYEE_VIEW] },
-      { to: "/units", label: "Cơ cấu đơn vị", Icon: IconOrg, anyOf: [PERMISSIONS.UNIT_VIEW] },
-      { to: "/positions", label: "Chức vụ", Icon: IconPosition, anyOf: [PERMISSIONS.POSITION_VIEW] },
-    ],
-  },
-  {
-    title: "Khảo sát",
-    items: [
-      { to: "/surveys", label: "Danh sách khảo sát", Icon: IconSurvey, anyOf: [PERMISSIONS.SURVEY_VIEW] },
-      { to: "/surveys/new", label: "Tạo khảo sát", Icon: IconPlus, anyOf: [PERMISSIONS.SURVEY_CREATE] },
-      {
-        to: "/surveys/results",
-        label: "Kết quả khảo sát",
-        Icon: IconClipboardList,
-        anyOf: [PERMISSIONS.SURVEY_VIEW_STATISTICS],
-      },
-      {
-        to: "/surveys/statistics",
-        label: "Thống kê",
-        Icon: IconChart,
-        anyOf: [PERMISSIONS.SURVEY_VIEW_STATISTICS],
-      },
-    ],
-  },
-  {
-    title: null,
-    items: [
       {
         to: "/cong-viec",
         label: "Công việc",
         Icon: IconTask,
         anyOf: MODULE_PERMS.WORK,
+      },
+    ],
+  },
+  {
+    title: "Quản lý",
+    items: [
+      {
+        to: "/employees",
+        label: "Nhân sự",
+        Icon: IconPeople,
+        anyOf: [PERMISSIONS.EMPLOYEE_VIEW],
+      },
+      {
+        to: "/units",
+        label: "Cơ cấu đơn vị",
+        Icon: IconOrg,
+        anyOf: [PERMISSIONS.UNIT_VIEW],
+      },
+      {
+        to: "/positions",
+        label: "Chức vụ",
+        Icon: IconPosition,
+        anyOf: [PERMISSIONS.POSITION_VIEW],
+      },
+    ],
+  },
+  {
+    title: "Khảo sát",
+    items: [
+      {
+        to: "/surveys",
+        label: "Danh sách khảo sát",
+        Icon: IconSurvey,
+        anyOf: [PERMISSIONS.SURVEY_VIEW],
       },
     ],
   },
@@ -151,7 +159,7 @@ function SidebarItem({ item, collapsed, onNavigate }) {
           collapsed && "justify-center px-0",
           isActive
             ? "font-semibold text-white shadow-[var(--shadow-active)]"
-            : "font-medium text-[#475569] hover:translate-x-0.5 hover:bg-[#f1f5f9] hover:text-accent-text"
+            : "font-medium text-[#475569] hover:translate-x-0.5 hover:bg-[#f1f5f9] hover:text-accent-text",
         )
       }
       style={({ isActive }) =>
@@ -164,7 +172,9 @@ function SidebarItem({ item, collapsed, onNavigate }) {
             size={19}
             className={clsx(
               "shrink-0 transition-colors",
-              isActive ? "text-white" : "text-[#64748b] group-hover/item:text-[#6366f1]"
+              isActive
+                ? "text-white"
+                : "text-[#64748b] group-hover/item:text-[#6366f1]",
             )}
           />
           {!collapsed && <span className="truncate">{label}</span>}
@@ -218,7 +228,9 @@ function UserMenu({ user, onLogout, collapsed }) {
             <span className="block max-w-[11rem] truncate text-sm font-medium text-[#334155]">
               {user?.full_name}
             </span>
-            <span className="block max-w-[11rem] truncate text-xs text-[#94a3b8]">{roles}</span>
+            <span className="block max-w-[11rem] truncate text-xs text-[#94a3b8]">
+              {roles}
+            </span>
           </span>
         )}
         <IconChevronDown size={15} className="hidden text-[#94a3b8] sm:block" />
@@ -231,7 +243,9 @@ function UserMenu({ user, onLogout, collapsed }) {
           style={{ zIndex: "var(--z-header)" }}
         >
           <div className="border-b border-rule px-4 py-3">
-            <p className="truncate text-sm font-medium text-ink">{user?.full_name}</p>
+            <p className="truncate text-sm font-medium text-ink">
+              {user?.full_name}
+            </p>
             <p className="truncate text-xs text-muted">{roles}</p>
           </div>
           <Link
@@ -294,7 +308,11 @@ export function Layout() {
   })).filter((g) => g.items.length > 0);
 
   const paletteItems = visibleGroups.flatMap((g) =>
-    g.items.map((it) => ({ to: it.to, label: it.label, icon: <it.Icon size={16} /> }))
+    g.items.map((it) => ({
+      to: it.to,
+      label: it.label,
+      icon: <it.Icon size={16} />,
+    })),
   );
 
   const crumbs = location.pathname
@@ -319,7 +337,7 @@ export function Layout() {
           "border-r border-rule transition-[width,transform] duration-[250ms] ease-[cubic-bezier(0.4,0,0.2,1)]",
           "md:static md:translate-x-0",
           railWidth,
-          mobileOpen ? "translate-x-0" : "-translate-x-full"
+          mobileOpen ? "translate-x-0" : "-translate-x-full",
         )}
         style={{ zIndex: "var(--z-rail)" }}
       >
@@ -373,16 +391,22 @@ export function Layout() {
             </div>
           ))}
 
-          {hasAnyPermission([PERMISSIONS.GOISO_COUNTER]) && user?.goiso_branch_code && (
-            <div className="mt-3">
-              {!collapsed && (
-                <p className="px-6 pb-1.5 pt-1 text-[11px] font-semibold uppercase tracking-[0.08em] text-[#94a3b8]">
-                  Gọi số
-                </p>
-              )}
-              {/* Quản trị gọi số nay ở trong trang Quản trị chung (/admin) ở trên.
+          {hasAnyPermission([PERMISSIONS.GOISO_COUNTER]) &&
+            user?.goiso_branch_code && (
+              <div className="mt-3">
+                {!collapsed && (
+                  <p className="px-6 pb-1.5 pt-1 text-[11px] font-semibold uppercase tracking-[0.08em] text-[#94a3b8]">
+                    Gọi số
+                  </p>
+                )}
+                {/* Quản trị gọi số nay ở trong trang Quản trị chung (/admin) ở trên.
                  Chỉ còn link riêng tới bàn gọi số — trang React toàn màn hình (không sidebar). */}
-              {[{ href: `/b/${user.goiso_branch_code}/counter`, label: "Bàn gọi số" }].map((it) => (
+                {[
+                  {
+                    href: `/b/${user.goiso_branch_code}/counter`,
+                    label: "Bàn gọi số",
+                  },
+                ].map((it) => (
                   <a
                     key={it.href}
                     href={it.href}
@@ -392,20 +416,24 @@ export function Layout() {
                     {!collapsed && <span className="truncate">{it.label}</span>}
                   </a>
                 ))}
-            </div>
-          )}
+              </div>
+            )}
         </nav>
 
         {/* Collapse toggle — desktop only */}
         <button
           className={clsx(
             "hidden items-center gap-2 border-t border-rule px-4 py-3 text-sm text-[#64748b] transition-colors hover:bg-[#f1f5f9] hover:text-accent-text md:flex",
-            collapsed && "justify-center px-0"
+            collapsed && "justify-center px-0",
           )}
           onClick={() => setCollapsed((c) => !c)}
           aria-label={collapsed ? "Mở rộng thanh bên" : "Thu gọn thanh bên"}
         >
-          {collapsed ? <IconChevronRight size={18} /> : <IconChevronLeft size={18} />}
+          {collapsed ? (
+            <IconChevronRight size={18} />
+          ) : (
+            <IconChevronLeft size={18} />
+          )}
           {!collapsed && <span>Thu gọn</span>}
         </button>
       </aside>
@@ -424,7 +452,10 @@ export function Layout() {
       <div className="flex min-w-0 flex-1 flex-col">
         <header
           className="sticky top-0 flex h-16 items-center gap-3 border-b border-rule px-4 backdrop-blur-[12px] md:px-6"
-          style={{ zIndex: "var(--z-header)", background: "var(--color-paper-blur)" }}
+          style={{
+            zIndex: "var(--z-header)",
+            background: "var(--color-paper-blur)",
+          }}
         >
           <button
             className="rounded-lg border border-rule bg-[#f8fafc] p-2 text-[#64748b] transition-colors hover:bg-[#eef2ff] hover:text-accent-text md:hidden"
@@ -435,8 +466,14 @@ export function Layout() {
           </button>
 
           {/* Breadcrumb */}
-          <nav aria-label="Breadcrumb" className="flex min-w-0 items-center gap-1.5 text-sm">
-            <Link to="/" className="shrink-0 text-[#94a3b8] transition-colors hover:text-accent-text">
+          <nav
+            aria-label="Breadcrumb"
+            className="flex min-w-0 items-center gap-1.5 text-sm"
+          >
+            <Link
+              to="/"
+              className="shrink-0 text-[#94a3b8] transition-colors hover:text-accent-text"
+            >
               Dashboard
             </Link>
             {crumbs.map((c, i) => (
@@ -445,7 +482,9 @@ export function Layout() {
                 <span
                   className={clsx(
                     "truncate",
-                    i === crumbs.length - 1 ? "font-medium text-[#334155]" : "text-[#94a3b8]"
+                    i === crumbs.length - 1
+                      ? "font-medium text-[#334155]"
+                      : "text-[#94a3b8]",
                   )}
                 >
                   {c}
@@ -479,7 +518,11 @@ export function Layout() {
         </main>
       </div>
 
-      <CommandPalette open={paletteOpen} setOpen={setPaletteOpen} items={paletteItems} />
+      <CommandPalette
+        open={paletteOpen}
+        setOpen={setPaletteOpen}
+        items={paletteItems}
+      />
     </div>
   );
 }

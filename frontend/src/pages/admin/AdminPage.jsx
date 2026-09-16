@@ -9,7 +9,11 @@ import { PageHeader } from "../../components/ui/primitives";
 const TABS = [
   { to: "users", label: "Tài khoản", anyOf: [PERMISSIONS.USER_VIEW] },
   { to: "roles", label: "Vai trò & quyền", anyOf: [PERMISSIONS.ROLE_VIEW] },
-  { to: "audit-logs", label: "Nhật ký hệ thống", anyOf: [PERMISSIONS.AUDIT_VIEW] },
+  {
+    to: "audit-logs",
+    label: "Nhật ký hệ thống",
+    anyOf: [PERMISSIONS.AUDIT_VIEW],
+  },
   {
     to: "goiso/branches",
     label: "Gọi số · Chi nhánh",
@@ -25,9 +29,21 @@ const TABS = [
     label: "Gọi số · Thiết bị",
     anyOf: [PERMISSIONS.GOISO_ADMIN],
   },
-  { to: "kpi/ky-danh-gia", label: "KPI · Kỳ đánh giá", anyOf: [PERMISSIONS.KPI_PERIOD_MANAGE] },
-  { to: "kpi/bo-tieu-chi", label: "KPI · Bộ tiêu chí", anyOf: [PERMISSIONS.KPI_CRITERIA_MANAGE] },
-  { to: "kpi/danh-muc-san-pham", label: "KPI · Danh mục sản phẩm", anyOf: [PERMISSIONS.KPI_CRITERIA_MANAGE] },
+  {
+    to: "kpi/ky-danh-gia",
+    label: "KPI · Kỳ đánh giá",
+    anyOf: [PERMISSIONS.KPI_PERIOD_MANAGE],
+  },
+  {
+    to: "kpi/bo-tieu-chi",
+    label: "KPI · Bộ tiêu chí",
+    anyOf: [PERMISSIONS.KPI_CRITERIA_MANAGE],
+  },
+  {
+    to: "kpi/danh-muc-san-pham",
+    label: "KPI · Danh mục sản phẩm",
+    anyOf: [PERMISSIONS.KPI_CRITERIA_MANAGE],
+  },
 ];
 
 /* /admin trần (không chọn tab) -> tự vào tab đầu tiên mà tài khoản có quyền,
@@ -50,7 +66,9 @@ export default function AdminPage() {
         subtitle="Tài khoản, phân quyền, nhật ký và cấu hình gọi số — tất cả trong một trang."
       />
       {tabs.length === 0 ? (
-        <p className="text-sm text-muted">Bạn chưa được cấp quyền quản trị mục nào.</p>
+        <p className="text-sm text-muted">
+          Bạn chưa được cấp quyền quản trị mục nào.
+        </p>
       ) : (
         <>
           <div className="mb-6 flex flex-wrap gap-1 border-b border-rule">
@@ -63,7 +81,7 @@ export default function AdminPage() {
                     "-mb-px rounded-t-lg border-b-2 px-4 py-2.5 text-sm font-medium transition-colors",
                     isActive
                       ? "border-[color:var(--color-accent)] text-accent-text"
-                      : "border-transparent text-muted hover:text-ink-2"
+                      : "border-transparent text-muted hover:text-ink-2",
                   )
                 }
               >

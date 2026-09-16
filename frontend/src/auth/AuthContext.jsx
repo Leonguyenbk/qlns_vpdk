@@ -1,4 +1,11 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
 import { api, authEvents } from "../lib/api";
 import { tokenStore } from "../lib/tokenStore";
 
@@ -52,7 +59,7 @@ export function AuthProvider({ children }) {
         await api.post(
           "/auth/logout",
           {},
-          { headers: { Authorization: `Bearer ${refresh}` }, _skipAuth: true }
+          { headers: { Authorization: `Bearer ${refresh}` }, _skipAuth: true },
         );
       }
     } catch {

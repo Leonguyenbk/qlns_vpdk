@@ -3,12 +3,26 @@ import { Link, useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
 import { useSurveys, useSurveyMutations } from "../../hooks/useSurveys";
 import { useCan } from "../../components/Can";
-import { PERMISSIONS, SURVEY_STATUS_LABELS, SURVEY_STATUS_BADGE } from "../../lib/constants";
+import {
+  PERMISSIONS,
+  SURVEY_STATUS_LABELS,
+  SURVEY_STATUS_BADGE,
+} from "../../lib/constants";
 import { apiErrorMessage } from "../../lib/api";
 import { formatDate } from "../../lib/format";
-import { PageHeader, Button, Badge, TextInput, Select } from "../../components/ui/primitives";
+import {
+  PageHeader,
+  Button,
+  Badge,
+  TextInput,
+  Select,
+} from "../../components/ui/primitives";
 import { Table, Pagination } from "../../components/ui/Table";
-import { LoadingState, EmptyState, ErrorState } from "../../components/ui/DataStates";
+import {
+  LoadingState,
+  EmptyState,
+  ErrorState,
+} from "../../components/ui/DataStates";
 import { ConfirmDialog } from "../../components/ui/Modal";
 import { QRCodeModal } from "../../components/surveys/QRCodeModal";
 
@@ -74,7 +88,10 @@ export default function SurveyListPage() {
       key: "title",
       header: "Tên khảo sát",
       render: (r) => (
-        <Link to={`/surveys/${r.id}`} className="font-medium text-brand-700 hover:underline">
+        <Link
+          to={`/surveys/${r.id}`}
+          className="font-medium text-brand-700 hover:underline"
+        >
           {r.title}
         </Link>
       ),
@@ -82,14 +99,38 @@ export default function SurveyListPage() {
     {
       key: "status",
       header: "Trạng thái",
-      render: (r) => <Badge className={SURVEY_STATUS_BADGE[r.status]}>{SURVEY_STATUS_LABELS[r.status]}</Badge>,
+      render: (r) => (
+        <Badge className={SURVEY_STATUS_BADGE[r.status]}>
+          {SURVEY_STATUS_LABELS[r.status]}
+        </Badge>
+      ),
     },
-    { key: "question_count", header: "Số câu hỏi", render: (r) => r.question_count ?? 0 },
-    { key: "response_count", header: "Lượt phản hồi", render: (r) => r.response_count ?? 0 },
-    { key: "start_at", header: "Bắt đầu", render: (r) => formatDate(r.start_at) },
+    {
+      key: "question_count",
+      header: "Số câu hỏi",
+      render: (r) => r.question_count ?? 0,
+    },
+    {
+      key: "response_count",
+      header: "Lượt phản hồi",
+      render: (r) => r.response_count ?? 0,
+    },
+    {
+      key: "start_at",
+      header: "Bắt đầu",
+      render: (r) => formatDate(r.start_at),
+    },
     { key: "end_at", header: "Kết thúc", render: (r) => formatDate(r.end_at) },
-    { key: "created_by_name", header: "Người tạo", render: (r) => r.created_by_name || "—" },
-    { key: "created_at", header: "Ngày tạo", render: (r) => formatDate(r.created_at) },
+    {
+      key: "created_by_name",
+      header: "Người tạo",
+      render: (r) => r.created_by_name || "—",
+    },
+    {
+      key: "created_at",
+      header: "Ngày tạo",
+      render: (r) => formatDate(r.created_at),
+    },
     {
       key: "actions",
       header: "",
@@ -98,16 +139,28 @@ export default function SurveyListPage() {
         const next = NEXT_STATUS[r.status];
         return (
           <div className="flex flex-wrap justify-end gap-1">
-            <Button variant="ghost" className="px-2 py-1 text-xs" onClick={() => navigate(`/surveys/${r.id}/questions`)}>
+            <Button
+              variant="ghost"
+              className="px-2 py-1 text-xs"
+              onClick={() => navigate(`/surveys/${r.id}/questions`)}
+            >
               Câu hỏi
             </Button>
             {can(PERMISSIONS.SURVEY_VIEW_STATISTICS) && (
-              <Button variant="ghost" className="px-2 py-1 text-xs" onClick={() => navigate(`/surveys/${r.id}/statistics`)}>
+              <Button
+                variant="ghost"
+                className="px-2 py-1 text-xs"
+                onClick={() => navigate(`/surveys/${r.id}/statistics`)}
+              >
                 Thống kê
               </Button>
             )}
             {r.status === "active" && (
-              <Button variant="ghost" className="px-2 py-1 text-xs" onClick={() => setQrSurvey(r)}>
+              <Button
+                variant="ghost"
+                className="px-2 py-1 text-xs"
+                onClick={() => setQrSurvey(r)}
+              >
                 QR
               </Button>
             )}
@@ -124,22 +177,31 @@ export default function SurveyListPage() {
               <Button
                 variant="ghost"
                 className="px-2 py-1 text-xs"
-                onClick={() => onChangeStatus(r, PAUSE_STATUS.status, PAUSE_STATUS.label)}
+                onClick={() =>
+                  onChangeStatus(r, PAUSE_STATUS.status, PAUSE_STATUS.label)
+                }
               >
                 {PAUSE_STATUS.label}
               </Button>
             )}
-            {can(PERMISSIONS.SURVEY_UPDATE) && (r.status === "active" || r.status === "paused") && (
+            {can(PERMISSIONS.SURVEY_UPDATE) &&
+              (r.status === "active" || r.status === "paused") && (
+                <Button
+                  variant="ghost"
+                  className="px-2 py-1 text-xs text-red-600"
+                  onClick={() =>
+                    onChangeStatus(r, CLOSE_STATUS.status, CLOSE_STATUS.label)
+                  }
+                >
+                  {CLOSE_STATUS.label}
+                </Button>
+              )}
+            {can(PERMISSIONS.SURVEY_CREATE) && (
               <Button
                 variant="ghost"
-                className="px-2 py-1 text-xs text-red-600"
-                onClick={() => onChangeStatus(r, CLOSE_STATUS.status, CLOSE_STATUS.label)}
+                className="px-2 py-1 text-xs"
+                onClick={() => onDuplicate(r)}
               >
-                {CLOSE_STATUS.label}
-              </Button>
-            )}
-            {can(PERMISSIONS.SURVEY_CREATE) && (
-              <Button variant="ghost" className="px-2 py-1 text-xs" onClick={() => onDuplicate(r)}>
                 Sao chép
               </Button>
             )}
@@ -163,8 +225,32 @@ export default function SurveyListPage() {
       <PageHeader
         title="Khảo sát – Đánh giá mức độ hài lòng"
         subtitle="Quản lý các cuộc khảo sát, câu hỏi và kết quả đánh giá của người dân"
-        actions={can(PERMISSIONS.SURVEY_CREATE) && <Button onClick={() => navigate("/surveys/new")}>+ Tạo khảo sát</Button>}
       />
+
+      {/* ── Thanh điều hướng nhanh ── */}
+      <div className="mb-4 flex flex-wrap items-center gap-2">
+        {can(PERMISSIONS.SURVEY_CREATE) && (
+          <Button onClick={() => navigate("/surveys/new")}>
+            + Tạo khảo sát
+          </Button>
+        )}
+        {can(PERMISSIONS.SURVEY_VIEW_STATISTICS) && (
+          <Button
+            variant="outline"
+            onClick={() => navigate("/surveys/results")}
+          >
+            📋 Kết quả khảo sát
+          </Button>
+        )}
+        {can(PERMISSIONS.SURVEY_VIEW_STATISTICS) && (
+          <Button
+            variant="outline"
+            onClick={() => navigate("/surveys/statistics")}
+          >
+            📊 Thống kê
+          </Button>
+        )}
+      </div>
 
       <div className="mb-4 flex flex-wrap items-end gap-3">
         <div className="min-w-[220px] flex-1">
@@ -174,7 +260,11 @@ export default function SurveyListPage() {
             onChange={(e) => setFilter({ keyword: e.target.value })}
           />
         </div>
-        <Select value={filters.status} onChange={(e) => setFilter({ status: e.target.value })} className="w-48">
+        <Select
+          value={filters.status}
+          onChange={(e) => setFilter({ status: e.target.value })}
+          className="w-48"
+        >
           <option value="">Tất cả trạng thái</option>
           {Object.entries(SURVEY_STATUS_LABELS).map(([v, l]) => (
             <option key={v} value={v}>
@@ -199,13 +289,18 @@ export default function SurveyListPage() {
                   title="Chưa có cuộc khảo sát nào"
                   action={
                     can(PERMISSIONS.SURVEY_CREATE) && (
-                      <Button onClick={() => navigate("/surveys/new")}>+ Tạo khảo sát</Button>
+                      <Button onClick={() => navigate("/surveys/new")}>
+                        + Tạo khảo sát
+                      </Button>
                     )
                   }
                 />
               }
             />
-            <Pagination pagination={data?.pagination} onChange={(page) => setFilters((f) => ({ ...f, page }))} />
+            <Pagination
+              pagination={data?.pagination}
+              onChange={(page) => setFilters((f) => ({ ...f, page }))}
+            />
           </>
         )}
       </div>

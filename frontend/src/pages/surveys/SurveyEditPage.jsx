@@ -3,13 +3,27 @@ import { useNavigate, useParams } from "react-router-dom";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import toast from "react-hot-toast";
-import { useSurvey, useSurveyMutations, exportSurvey } from "../../hooks/useSurveys";
+import {
+  useSurvey,
+  useSurveyMutations,
+  exportSurvey,
+} from "../../hooks/useSurveys";
 import { useCan } from "../../components/Can";
-import { PERMISSIONS, SURVEY_STATUS_LABELS, SURVEY_STATUS_BADGE } from "../../lib/constants";
+import {
+  PERMISSIONS,
+  SURVEY_STATUS_LABELS,
+  SURVEY_STATUS_BADGE,
+} from "../../lib/constants";
 import { surveySchema } from "../../schemas";
 import { apiErrorMessage } from "../../lib/api";
 import {
-  PageHeader, Button, Badge, Card, FormField, TextInput, Textarea,
+  PageHeader,
+  Button,
+  Badge,
+  Card,
+  FormField,
+  TextInput,
+  Textarea,
 } from "../../components/ui/primitives";
 import { LoadingState, ErrorState } from "../../components/ui/DataStates";
 import { QRCodeModal } from "../../components/surveys/QRCodeModal";
@@ -52,7 +66,10 @@ export default function SurveyEditPage() {
     handleSubmit,
     reset,
     formState: { errors },
-  } = useForm({ resolver: zodResolver(surveySchema), defaultValues: { is_anonymous: true } });
+  } = useForm({
+    resolver: zodResolver(surveySchema),
+    defaultValues: { is_anonymous: true },
+  });
 
   useEffect(() => {
     if (survey) {
@@ -67,8 +84,11 @@ export default function SurveyEditPage() {
     }
   }, [survey, reset]);
 
-  const locked = survey && (survey.status === "closed" || survey.status === "archived");
-  const canEdit = isNew ? can(PERMISSIONS.SURVEY_CREATE) : can(PERMISSIONS.SURVEY_UPDATE);
+  const locked =
+    survey && (survey.status === "closed" || survey.status === "archived");
+  const canEdit = isNew
+    ? can(PERMISSIONS.SURVEY_CREATE)
+    : can(PERMISSIONS.SURVEY_UPDATE);
 
   const onSubmit = async (values) => {
     const body = {
@@ -131,6 +151,13 @@ export default function SurveyEditPage() {
   return (
     <div className="grid gap-6 lg:grid-cols-3">
       <div className="lg:col-span-2">
+        <button
+          type="button"
+          onClick={() => navigate("/surveys")}
+          className="mb-4 flex items-center gap-1.5 text-sm text-muted hover:text-accent-text transition-colors"
+        >
+          ← Quay lại Danh sách khảo sát
+        </button>
         <PageHeader
           title={isNew ? "Tạo khảo sát" : "Sửa khảo sát"}
           subtitle={!isNew && `/khao-sat/${survey?.slug}`}
@@ -149,35 +176,66 @@ export default function SurveyEditPage() {
                 Khảo sát đã đóng/lưu trữ nên không thể sửa thông tin.
               </p>
             )}
-            <FormField label="Tên khảo sát" required error={errors.title?.message}>
-              <TextInput {...register("title")} error={errors.title} disabled={locked || !canEdit} />
+            <FormField
+              label="Tên khảo sát"
+              required
+              error={errors.title?.message}
+            >
+              <TextInput
+                {...register("title")}
+                error={errors.title}
+                disabled={locked || !canEdit}
+              />
             </FormField>
             <FormField
               label="Lời chào"
               hint="Hiển thị đầu trang khảo sát công khai, trước khi chọn chi nhánh/nhập thông tin"
               error={errors.welcome_message?.message}
             >
-              <Textarea {...register("welcome_message")} disabled={locked || !canEdit} rows={2} />
+              <Textarea
+                {...register("welcome_message")}
+                disabled={locked || !canEdit}
+                rows={2}
+              />
             </FormField>
             <FormField label="Mô tả ngắn" error={errors.description?.message}>
-              <Textarea {...register("description")} disabled={locked || !canEdit} rows={3} />
+              <Textarea
+                {...register("description")}
+                disabled={locked || !canEdit}
+                rows={3}
+              />
             </FormField>
             <div className="grid grid-cols-2 gap-4">
               <FormField label="Ngày bắt đầu">
-                <TextInput type="datetime-local" {...register("start_at")} disabled={locked || !canEdit} />
+                <TextInput
+                  type="datetime-local"
+                  {...register("start_at")}
+                  disabled={locked || !canEdit}
+                />
               </FormField>
               <FormField label="Ngày kết thúc">
-                <TextInput type="datetime-local" {...register("end_at")} disabled={locked || !canEdit} />
+                <TextInput
+                  type="datetime-local"
+                  {...register("end_at")}
+                  disabled={locked || !canEdit}
+                />
               </FormField>
             </div>
             <label className="flex items-center gap-2 text-sm">
-              <input type="checkbox" {...register("is_anonymous")} disabled={locked || !canEdit} />
-              Khảo sát ẩn danh (không bắt buộc nhập họ tên/SĐT — người dân vẫn luôn thấy ô nhập,
-              chỉ khác là không bắt buộc điền)
+              <input
+                type="checkbox"
+                {...register("is_anonymous")}
+                disabled={locked || !canEdit}
+              />
+              Khảo sát ẩn danh (không bắt buộc nhập họ tên/SĐT — người dân vẫn
+              luôn thấy ô nhập, chỉ khác là không bắt buộc điền)
             </label>
             {canEdit && !locked && (
               <div>
-                <Button type="submit" disabled={create.isPending || update.isPending}>
+                <Button
+                  type="submit"
+                  disabled={create.isPending || update.isPending}
+                >
                   {isNew ? "Tạo khảo sát" : "Lưu thay đổi"}
                 </Button>
               </div>
@@ -191,7 +249,10 @@ export default function SurveyEditPage() {
           <Card>
             <h3 className="mb-3 font-semibold text-slate-800">Thao tác</h3>
             <div className="grid gap-2">
-              <Button variant="secondary" onClick={() => navigate(`/surveys/${id}/questions`)}>
+              <Button
+                variant="secondary"
+                onClick={() => navigate(`/surveys/${id}/questions`)}
+              >
                 Quản lý câu hỏi
               </Button>
               <Button variant="secondary" onClick={() => setShowPreview(true)}>
@@ -203,17 +264,27 @@ export default function SurveyEditPage() {
                 </Button>
               )}
               {can(PERMISSIONS.SURVEY_VIEW_STATISTICS) && (
-                <Button variant="secondary" onClick={() => navigate(`/surveys/${id}/statistics`)}>
+                <Button
+                  variant="secondary"
+                  onClick={() => navigate(`/surveys/${id}/statistics`)}
+                >
                   Xem thống kê
                 </Button>
               )}
               {can(PERMISSIONS.SURVEY_VIEW_STATISTICS) && (
-                <Button variant="secondary" onClick={() => navigate(`/surveys/${id}/responses`)}>
+                <Button
+                  variant="secondary"
+                  onClick={() => navigate(`/surveys/${id}/responses`)}
+                >
                   Kết quả khảo sát
                 </Button>
               )}
               {can(PERMISSIONS.SURVEY_EXPORT) && (
-                <Button variant="secondary" onClick={onExport} disabled={exporting}>
+                <Button
+                  variant="secondary"
+                  onClick={onExport}
+                  disabled={exporting}
+                >
                   {exporting ? "Đang xuất…" : "Xuất Excel"}
                 </Button>
               )}
@@ -225,33 +296,58 @@ export default function SurveyEditPage() {
             </div>
           </Card>
 
-          {can(PERMISSIONS.SURVEY_UPDATE) && (next || survey.status === "active" || survey.status === "paused") && (
-            <Card>
-              <h3 className="mb-3 font-semibold text-slate-800">Vòng đời khảo sát</h3>
-              <div className="grid gap-2">
-                {next && (
-                  <Button onClick={() => onChangeStatus(next.status, next.label)}>{next.label}</Button>
-                )}
-                {survey.status === "active" && (
-                  <Button variant="secondary" onClick={() => onChangeStatus("paused", "Tạm khóa")}>
-                    Tạm khóa
-                  </Button>
-                )}
-                {(survey.status === "active" || survey.status === "paused") && (
-                  <Button variant="danger" onClick={() => onChangeStatus("closed", "Đóng khảo sát")}>
-                    Đóng khảo sát
-                  </Button>
-                )}
-              </div>
-            </Card>
-          )}
+          {can(PERMISSIONS.SURVEY_UPDATE) &&
+            (next ||
+              survey.status === "active" ||
+              survey.status === "paused") && (
+              <Card>
+                <h3 className="mb-3 font-semibold text-slate-800">
+                  Vòng đời khảo sát
+                </h3>
+                <div className="grid gap-2">
+                  {next && (
+                    <Button
+                      onClick={() => onChangeStatus(next.status, next.label)}
+                    >
+                      {next.label}
+                    </Button>
+                  )}
+                  {survey.status === "active" && (
+                    <Button
+                      variant="secondary"
+                      onClick={() => onChangeStatus("paused", "Tạm khóa")}
+                    >
+                      Tạm khóa
+                    </Button>
+                  )}
+                  {(survey.status === "active" ||
+                    survey.status === "paused") && (
+                    <Button
+                      variant="danger"
+                      onClick={() => onChangeStatus("closed", "Đóng khảo sát")}
+                    >
+                      Đóng khảo sát
+                    </Button>
+                  )}
+                </div>
+              </Card>
+            )}
 
-          <BranchLimitsCard surveyId={id} canEdit={can(PERMISSIONS.SURVEY_UPDATE) && !locked} />
+          <BranchLimitsCard
+            surveyId={id}
+            canEdit={can(PERMISSIONS.SURVEY_UPDATE) && !locked}
+          />
         </div>
       )}
 
-      <QRCodeModal survey={showQr ? survey : null} onClose={() => setShowQr(false)} />
-      <PreviewModal survey={showPreview ? survey : null} onClose={() => setShowPreview(false)} />
+      <QRCodeModal
+        survey={showQr ? survey : null}
+        onClose={() => setShowQr(false)}
+      />
+      <PreviewModal
+        survey={showPreview ? survey : null}
+        onClose={() => setShowPreview(false)}
+      />
     </div>
   );
 }
