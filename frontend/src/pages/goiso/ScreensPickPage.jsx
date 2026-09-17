@@ -67,7 +67,7 @@ export default function ScreensPickPage() {
         <p className="mb-1 text-sm text-slate-500">Mở đúng màn hình cho TV / màn hình phụ tại vị trí này.</p>
         <p className="mb-5 text-sm text-slate-500">
           <b>Màn hình phụ</b>: mở cửa sổ hiển thị sang màn hình thứ 2 rồi chạm một lần để bật toàn màn hình + âm thanh.
-          Cần Chrome hoặc Edge; lần đầu trình duyệt hỏi quyền "quản lý cửa sổ trên mọi màn hình", chọn <b>Cho phép</b>.
+          Cần Chrome hoặc Edge; lần đầu trình duyệt hỏi quyền &quot;quản lý cửa sổ trên mọi màn hình&quot;, chọn <b>Cho phép</b>.
         </p>
 
         {screens?.length > 0 ? (
@@ -96,7 +96,7 @@ export default function ScreensPickPage() {
         ) : (
           <div className="mb-6 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
             Chi nhánh chưa cấu hình màn hình theo khu. Quản trị viên vào <b>Quản trị → Gọi số → Chi nhánh → Cấu hình → Màn hình</b> để thêm.
-            Trong lúc đó có thể dùng "Màn hình đầy đủ" bên dưới.
+            Trong lúc đó có thể dùng &quot;Màn hình đầy đủ&quot; bên dưới.
           </div>
         )}
 

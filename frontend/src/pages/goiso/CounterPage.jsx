@@ -22,7 +22,7 @@ export default function CounterPage() {
   const [connLost, setConnLost] = useState(false);
   const [busy, setBusy] = useState(false);
   const [specific, setSpecific] = useState("");
-  const [nowTick, setNowTick] = useState(0);
+  const [, setNowTick] = useState(0);
 
   const pollRef = useRef(null);
 

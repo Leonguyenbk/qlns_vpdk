@@ -6,7 +6,7 @@ import { useScore, useScoreMutations } from "../../hooks/useKpi";
 import { apiErrorMessage } from "../../lib/api";
 import { formatDateTime } from "../../lib/format";
 import { PERMISSIONS, KPI_SCORE_STATUS_LABELS, KPI_SCORE_STATUS_BADGE } from "../../lib/constants";
-import { PageHeader, Button, Badge, TextInput, Textarea } from "../../components/ui/primitives";
+import { PageHeader, Button, Badge, TextInput } from "../../components/ui/primitives";
 import { LoadingState, ErrorState } from "../../components/ui/DataStates";
 
 function DetailRow({ d }) {

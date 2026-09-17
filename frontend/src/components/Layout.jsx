@@ -19,7 +19,6 @@ import {
   IconPosition,
   IconKey,
   IconShield,
-  IconLog,
   IconMenu,
   IconClose,
   IconLogout,
@@ -29,9 +28,6 @@ import {
   IconSearch,
   IconTask,
   IconSurvey,
-  IconPlus,
-  IconClipboardList,
-  IconChart,
 } from "./ui/icons";
 
 /* Menu + routing unchanged — only grouped for the sidebar. Each item keeps its

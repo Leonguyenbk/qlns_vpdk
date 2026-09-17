@@ -6,6 +6,8 @@ import { Button, FormField, Select, TextInput } from "../../components/ui/primit
 import { Spinner } from "../../components/ui/Spinner";
 import { apiErrorMessage } from "../../lib/api";
 
+const EMPTY_LIST = [];
+
 function makeClientToken() {
   try {
     return crypto.randomUUID();
@@ -44,8 +46,8 @@ export default function PublicSurveyPage() {
   const [done, setDone] = useState(false);
   const [clientToken] = useState(makeClientToken);
 
-  const questions = survey?.questions || [];
-  const branches = survey?.branches || [];
+  const questions = survey?.questions || EMPTY_LIST;
+  const branches = survey?.branches || EMPTY_LIST;
 
   // Mã QR dán tại chi nhánh mang theo ?branch=<mã hoặc id chi nhánh> — tự chọn
   // sẵn để người dân không phải chọn tay; nếu không khớp branch nào thì vẫn

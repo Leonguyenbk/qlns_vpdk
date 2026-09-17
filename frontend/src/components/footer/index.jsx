@@ -7,32 +7,6 @@ const OFFICE = {
   query: "46 Phan Bội Châu, Phường Buôn Ma Thuột, Tỉnh Đắk Lắk",
 };
 
-function IconShieldCheck({ className = "h-10 w-10" }) {
-  return (
-    <svg
-      className={className}
-      viewBox="0 0 40 48"
-      fill="none"
-      xmlns="http://www.w3.org/2000/svg"
-      aria-hidden="true"
-    >
-      <path
-        d="M20 2L4 8v14c0 12.5 6.8 20.8 16 24 9.2-3.2 16-11.5 16-24V8L20 2z"
-        stroke="currentColor"
-        strokeWidth="2"
-        strokeLinejoin="round"
-      />
-      <path
-        d="M12.5 23.5l5 5 10-11"
-        stroke="currentColor"
-        strokeWidth="2.2"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </svg>
-  );
-}
-
 /**
  * Bản đồ Google — dùng Embed API nếu có VITE_GOOGLE_MAPS_API_KEY,
  * không thì fallback query embed (không cần key).
@@ -122,20 +96,7 @@ export default function Footer() {
       {/* Footer bottom — 3 cột */}
       <div className="bg-[#002244] border-t border-[#1a4a7a] -mx-4 mt-6 text-center text-[#cce0ff] px-4 py-5 text-[12px] leading-relaxed sm:-mx-6 sm:px-6 md:-mx-8 md:px-8 md:py-6">
         <div className="flex justify-center items-center">
-        <p>© 2026 Ủy ban nhân dân phường Buôn Ma Thuột.</p>
-          {/* <div className="flex items-start gap-3 md:border-r md:border-white/20 md:pr-5">
-            <IconShieldCheck className="mt-0.5 h-9 w-9 shrink-0 text-white sm:h-10 sm:w-10" />
-            <div className="min-w-0 space-y-1.5">
-              <p>© Bản quyền thuộc về Văn phòng đăng ký đất đai tỉnh Đắk Lắk</p>
-              <p>
-                Địa chỉ: 46 Phan Bội Châu, Phường Buôn Ma Thuột, Tỉnh Đắk Lắk, Việt Nam
-              </p>
-              <p className="text-white/85">
-                Ghi rõ nguồn &quot;Văn phòng đăng ký đất đai tỉnh Đắk Lắk&quot; khi phát hành
-                lại thông tin từ website này.
-              </p>
-            </div>
-          </div> */}
+          <p>© 2026 Ủy ban nhân dân phường Buôn Ma Thuột.</p>
         </div>
       </div>
     </footer>
