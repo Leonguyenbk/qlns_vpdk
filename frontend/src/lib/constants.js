@@ -64,6 +64,10 @@ export const PERMISSIONS = {
   ROLE_VIEW: "role.view",
   ROLE_MANAGE: "role.manage",
   AUDIT_VIEW: "audit.view",
+  ANNOUNCEMENT_VIEW: "announcement.view",
+  ANNOUNCEMENT_CREATE: "announcement.create",
+  ANNOUNCEMENT_PUBLISH: "announcement.publish",
+  ANNOUNCEMENT_MANAGE: "announcement.manage",
   GOISO_VIEW: "goiso.view",
   GOISO_COUNTER: "goiso.counter",
   GOISO_ADMIN: "goiso.admin",
@@ -96,7 +100,7 @@ export const PERMISSIONS = {
   SURVEY_MANAGE_ALL_BRANCHES: "survey.manage_all_branches",
 };
 
-// Nhóm quyền để cổng ứng dụng quyết định hiện thẻ module nào
+// Nhóm quyền để điều hướng và hiển thị các module trên sidebar
 export const MODULE_PERMS = {
   NHANSU: ["employee.view", "unit.view", "position.view"],
   GOISO: ["goiso.view", "goiso.counter", "goiso.admin"],

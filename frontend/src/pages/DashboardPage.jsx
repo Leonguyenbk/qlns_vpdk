@@ -193,11 +193,12 @@ export default function DashboardPage() {
           style={{ backgroundImage: "var(--gradient-brand)" }}
         />
         <div className="relative">
+          <p className="eyebrow mb-1.5">Nhân sự</p>
           <h1 className="text-xl font-bold tracking-tight text-ink">
-            {greeting()}, {user?.full_name || "bạn"}
+            Tổng quan nhân sự
           </h1>
           <p className="mt-1 text-sm text-[#64748b]">
-            Đây là tổng quan hoạt động nhân sự trong phạm vi đơn vị của bạn hôm nay.
+            {greeting()}, {user?.full_name || "bạn"}. Đây là số liệu nhân sự trong phạm vi đơn vị của bạn.
           </p>
         </div>
       </section>

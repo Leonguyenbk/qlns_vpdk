@@ -2,6 +2,13 @@
 from __future__ import annotations
 
 from .audit import AuditLog
+from .announcement import (
+    Announcement,
+    AnnouncementRead,
+    announcement_roles,
+    announcement_units,
+    announcement_users,
+)
 from .employee import Employee, EmployeeAssignment, EmployeeEducation, JobGrade
 from .kpi import (
     KpiCriteriaSet,
@@ -39,6 +46,11 @@ from .user import User
 
 __all__ = [
     "AuditLog",
+    "Announcement",
+    "AnnouncementRead",
+    "announcement_roles",
+    "announcement_units",
+    "announcement_users",
     "Employee",
     "EmployeeAssignment",
     "EmployeeEducation",

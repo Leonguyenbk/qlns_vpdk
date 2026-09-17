@@ -28,6 +28,7 @@ import {
   IconSearch,
   IconTask,
   IconSurvey,
+  IconChart,
 } from "./ui/icons";
 
 /* Menu + routing unchanged — only grouped for the sidebar. Each item keeps its
@@ -37,11 +38,11 @@ const NAV_GROUPS = [
     title: null,
     items: [
       {
-        to: "/nhan-su",
+        to: "/",
         label: "Tổng quan",
         Icon: IconOverview,
         exact: true,
-        anyOf: MODULE_PERMS.NHANSU,
+        anyOf: [PERMISSIONS.ANNOUNCEMENT_VIEW],
       },
       {
         to: "/cong-viec",
@@ -52,11 +53,17 @@ const NAV_GROUPS = [
     ],
   },
   {
-    title: "Quản lý",
+    title: "Nhân sự",
     items: [
       {
+        to: "/nhan-su",
+        label: "Tổng quan nhân sự",
+        Icon: IconChart,
+        anyOf: MODULE_PERMS.NHANSU,
+      },
+      {
         to: "/employees",
-        label: "Nhân sự",
+        label: "Hồ sơ nhân sự",
         Icon: IconPeople,
         anyOf: [PERMISSIONS.EMPLOYEE_VIEW],
       },
@@ -106,9 +113,9 @@ const NAV_GROUPS = [
 
 const CRUMBS = {
   "": "Tổng quan",
-  "nhan-su": "Tổng quan",
+  "nhan-su": "Tổng quan nhân sự",
   "doi-mat-khau": "Đổi mật khẩu",
-  employees: "Nhân sự",
+  employees: "Hồ sơ nhân sự",
   units: "Cơ cấu đơn vị",
   positions: "Chức vụ",
   admin: "Quản trị",
@@ -348,7 +355,7 @@ export function Layout() {
           {!collapsed && (
             <span className="min-w-0">
               <span className="block truncate text-[0.9rem] font-bold leading-tight text-ink">
-                Quản lý nhân sự
+                Cổng nội bộ
               </span>
               <span className="block truncate text-[11px] text-[#94a3b8]">
                 Văn phòng Đăng ký Đất đai

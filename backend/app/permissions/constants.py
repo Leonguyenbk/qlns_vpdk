@@ -28,6 +28,12 @@ ROLE_MANAGE = "role.manage"
 # --- Nhật ký ---
 AUDIT_VIEW = "audit.view"
 
+# --- Bảng tin / thông báo nội bộ ---
+ANNOUNCEMENT_VIEW = "announcement.view"
+ANNOUNCEMENT_CREATE = "announcement.create"
+ANNOUNCEMENT_PUBLISH = "announcement.publish"
+ANNOUNCEMENT_MANAGE = "announcement.manage"
+
 # --- Nhóm quyền Gọi số / Kiosk (module goiso) ---
 GOISO_VIEW = "goiso.view"        # xem hàng đợi, màn hình, bảng chờ, thống kê
 GOISO_COUNTER = "goiso.counter"  # trực một cửa/quầy: gọi số, gọi lại, bỏ qua, hoàn thành
@@ -82,6 +88,10 @@ PERMISSION_DEFINITIONS: list[tuple[str, str]] = [
     (ROLE_VIEW, "Xem vai trò và quyền"),
     (ROLE_MANAGE, "Quản lý vai trò và quyền"),
     (AUDIT_VIEW, "Xem nhật ký thao tác"),
+    (ANNOUNCEMENT_VIEW, "Bảng tin: xem thông báo được gửi tới mình"),
+    (ANNOUNCEMENT_CREATE, "Bảng tin: soạn và chỉnh sửa thông báo của mình"),
+    (ANNOUNCEMENT_PUBLISH, "Bảng tin: phát hành hoặc thu hồi thông báo"),
+    (ANNOUNCEMENT_MANAGE, "Bảng tin: quản lý toàn bộ thông báo và đối tượng nhận"),
     (GOISO_VIEW, "Gọi số: xem hàng đợi, màn hình, bảng chờ, thống kê"),
     (GOISO_COUNTER, "Gọi số: trực một cửa/quầy (gọi, gọi lại, bỏ qua, hoàn thành)"),
     (GOISO_ADMIN, "Gọi số: cấu hình dịch vụ/quầy/màn hình, chi nhánh, thiết bị, đặt lịch"),
@@ -134,6 +144,7 @@ ROLE_TASK_ASSIGNER = "TASK_ASSIGNER"      # Người được uỷ quyền giao 
 # Quyền tự phục vụ tối thiểu — mọi tài khoản có hồ sơ nhân sự đều cần để dùng
 # trang "Công việc của tôi" (mục 5), bất kể đang giữ vai trò module nào khác.
 _STAFF_SELF_SERVICE = [TASK_VIEW_OWN, KPI_VIEW_OWN, KPI_SELF_ASSESS]
+_COMMON_PORTAL = [ANNOUNCEMENT_VIEW]
 
 # Vai trò mặc định cho viên chức không giữ chức vụ quản lý khi tạo tài khoản
 # hàng loạt — CHỈ tự phục vụ, không xem được danh sách nhân sự/đơn vị toàn cơ
@@ -173,6 +184,8 @@ ROLE_DEFINITIONS: dict[str, dict] = {
             POSITION_MANAGE,
             SURVEY_VIEW,
             SURVEY_VIEW_STATISTICS,
+            ANNOUNCEMENT_CREATE,
+            *_COMMON_PORTAL,
             # Giao việc — quản lý nhân sự thì cần giao/theo dõi việc cho nhân sự
             # đó, không cần đụng tới quản trị tài khoản/vai trò hay KPI.
             TASK_VIEW_ALL,
@@ -197,6 +210,7 @@ ROLE_DEFINITIONS: dict[str, dict] = {
             POSITION_VIEW,
             SURVEY_VIEW,
             SURVEY_VIEW_STATISTICS,
+            *_COMMON_PORTAL,
             *_STAFF_SELF_SERVICE,
         ],
     },
@@ -208,6 +222,7 @@ ROLE_DEFINITIONS: dict[str, dict] = {
             EMPLOYEE_VIEW,
             UNIT_VIEW,
             POSITION_VIEW,
+            *_COMMON_PORTAL,
             *_STAFF_SELF_SERVICE,
         ],
     },
@@ -219,6 +234,7 @@ ROLE_DEFINITIONS: dict[str, dict] = {
         "permissions": [
             GOISO_VIEW, GOISO_COUNTER, GOISO_ADMIN, UNIT_VIEW,
             SURVEY_VIEW, SURVEY_VIEW_STATISTICS, SURVEY_EXPORT, SURVEY_MANAGE_ALL_BRANCHES,
+            *_COMMON_PORTAL,
             *_STAFF_SELF_SERVICE,
         ],
     },
@@ -230,6 +246,7 @@ ROLE_DEFINITIONS: dict[str, dict] = {
         "permissions": [
             GOISO_VIEW, GOISO_COUNTER, GOISO_ADMIN,
             SURVEY_VIEW, SURVEY_VIEW_STATISTICS,
+            *_COMMON_PORTAL,
             *_STAFF_SELF_SERVICE,
         ],
     },
@@ -238,7 +255,7 @@ ROLE_DEFINITIONS: dict[str, dict] = {
         "description": "Được giao trực một cửa/quầy: vào trang gọi số, gọi số, gọi lại, "
         "bỏ qua, hoàn thành. Chỉ thao tác trong chi nhánh được phân công.",
         "is_system": True,
-        "permissions": [GOISO_VIEW, GOISO_COUNTER, *_STAFF_SELF_SERVICE],
+        "permissions": [GOISO_VIEW, GOISO_COUNTER, *_COMMON_PORTAL, *_STAFF_SELF_SERVICE],
     },
     ROLE_OFFICE_LEADER: {
         "name": "Lãnh đạo Văn phòng",
@@ -253,6 +270,8 @@ ROLE_DEFINITIONS: dict[str, dict] = {
             KPI_VIEW_ALL, KPI_REVIEW, KPI_APPROVE, KPI_PERIOD_MANAGE, KPI_ADJUST,
             KPI_CRITERIA_MANAGE, UNIT_VIEW, EMPLOYEE_VIEW,
             SURVEY_VIEW, SURVEY_VIEW_STATISTICS, SURVEY_MANAGE_ALL_BRANCHES,
+            ANNOUNCEMENT_CREATE, ANNOUNCEMENT_PUBLISH, ANNOUNCEMENT_MANAGE,
+            *_COMMON_PORTAL,
             *_STAFF_SELF_SERVICE,
         ],
     },
@@ -266,6 +285,8 @@ ROLE_DEFINITIONS: dict[str, dict] = {
             KPI_VIEW_ALL, KPI_AGGREGATE, KPI_CRITERIA_MANAGE, KPI_PERIOD_MANAGE,
             UNIT_VIEW, EMPLOYEE_VIEW,
             SURVEY_VIEW, SURVEY_VIEW_STATISTICS,
+            ANNOUNCEMENT_CREATE,
+            *_COMMON_PORTAL,
             *_STAFF_SELF_SERVICE,
         ],
     },
@@ -279,6 +300,7 @@ ROLE_DEFINITIONS: dict[str, dict] = {
             KPI_VIEW_ALL, KPI_REVIEW,
             UNIT_VIEW, EMPLOYEE_VIEW,
             SURVEY_VIEW, SURVEY_VIEW_STATISTICS,
+            *_COMMON_PORTAL,
             *_STAFF_SELF_SERVICE,
         ],
     },
@@ -291,6 +313,7 @@ ROLE_DEFINITIONS: dict[str, dict] = {
         "is_system": True,
         "permissions": [
             TASK_VIEW_ALL, TASK_CREATE, TASK_ASSIGN, TASK_ACCEPT,
+            *_COMMON_PORTAL,
             *_STAFF_SELF_SERVICE,
         ],
     },
@@ -300,7 +323,7 @@ ROLE_DEFINITIONS: dict[str, dict] = {
         "tác nhiệm vụ và KPI của chính mình (Công việc của tôi, KPI của tôi) — không xem được "
         "danh sách nhân sự/đơn vị toàn cơ quan.",
         "is_system": True,
-        "permissions": [*_STAFF_SELF_SERVICE],
+        "permissions": [*_COMMON_PORTAL, *_STAFF_SELF_SERVICE],
     },
     ROLE_SURVEY_EDITOR: {
         "name": "Biên tập khảo sát",
@@ -311,6 +334,7 @@ ROLE_DEFINITIONS: dict[str, dict] = {
         "permissions": [
             SURVEY_VIEW, SURVEY_CREATE, SURVEY_UPDATE, SURVEY_MANAGE_QUESTIONS,
             SURVEY_VIEW_STATISTICS,
+            *_COMMON_PORTAL,
         ],
     },
 }

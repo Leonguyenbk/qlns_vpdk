@@ -63,6 +63,11 @@ def _clean_db(app):
     # Xóa theo thứ tự phụ thuộc; gồm cả bảng liên kết (SQLite không ép FK).
     for table in (
         "audit_logs",
+        "announcement_reads",
+        "announcement_users",
+        "announcement_roles",
+        "announcement_units",
+        "announcements",
         "notifications",
         "kpi_evaluation_comments",
         "kpi_score_details",

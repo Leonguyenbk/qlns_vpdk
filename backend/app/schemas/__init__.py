@@ -243,6 +243,36 @@ class RoleUpdateSchema(RoleBaseSchema):
     pass
 
 
+class AnnouncementCreateSchema(ApiSchema):
+    nullable_fields = {"expires_at"}
+    title = fields.String(required=True, validate=validate.Length(min=1, max=255), error_messages=required)
+    content = fields.String(required=True, validate=validate.Length(min=1), error_messages=required)
+    category = fields.String(load_default="Thông báo", validate=validate.Length(max=50))
+    audience_type = fields.String(load_default="ALL", validate=validate.OneOf(["ALL", "UNIT", "ROLE", "USER"]))
+    audience_ids = fields.List(fields.Integer(strict=True), load_default=list)
+    is_pinned = fields.Boolean(load_default=False)
+    expires_at = fields.DateTime(allow_none=True)
+
+
+class AnnouncementUpdateSchema(ApiSchema):
+    nullable_fields = {"expires_at"}
+    title = fields.String(validate=validate.Length(min=1, max=255))
+    content = fields.String(validate=validate.Length(min=1))
+    category = fields.String(validate=validate.Length(max=50))
+    audience_type = fields.String(validate=validate.OneOf(["ALL", "UNIT", "ROLE", "USER"]))
+    audience_ids = fields.List(fields.Integer(strict=True))
+    is_pinned = fields.Boolean()
+    expires_at = fields.DateTime(allow_none=True)
+
+
+class AnnouncementStatusSchema(ApiSchema):
+    status = fields.String(
+        required=True,
+        validate=validate.OneOf(["published", "archived"]),
+        error_messages=required,
+    )
+
+
 class SurveyCreateSchema(ApiSchema):
     nullable_fields = {"description", "welcome_message", "start_at", "end_at"}
     title = fields.String(required=True, error_messages=required)
@@ -373,6 +403,9 @@ user_roles_schema = UserRolesSchema()
 user_scopes_schema = UserScopesSchema()
 role_create_schema = RoleCreateSchema()
 role_update_schema = RoleUpdateSchema()
+announcement_create_schema = AnnouncementCreateSchema()
+announcement_update_schema = AnnouncementUpdateSchema()
+announcement_status_schema = AnnouncementStatusSchema()
 
 survey_create_schema = SurveyCreateSchema()
 survey_update_schema = SurveyUpdateSchema()
