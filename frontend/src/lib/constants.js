@@ -103,7 +103,7 @@ export const MODULE_PERMS = {
   ADMIN: ["user.view", "role.view", "audit.view"],
   TASKS: ["task.view_own", "task.view_all", "task.create", "task.assign", "task.manage", "task.accept"],
   KPI: ["kpi.view_own", "kpi.view_all", "kpi.criteria_manage", "kpi.period_manage"],
-  // Trang Công việc (gộp Giao việc + KPI) — dùng chung cho sidebar, route và thẻ ở cổng ứng dụng
+  // Trang Công việc (gộp Giao việc + KPI) — dùng chung cho sidebar và điều hướng trang chủ
   WORK: ["task.view_all", "task.view_own", "task.create", "task.assign", "kpi.view_own"],
 };
 

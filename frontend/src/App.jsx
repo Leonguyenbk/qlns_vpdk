@@ -1,11 +1,11 @@
 import { Navigate, Route, Routes } from "react-router-dom";
+import { useAuth } from "./auth/AuthContext";
 import { Layout } from "./components/Layout";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 import { PERMISSIONS, MODULE_PERMS } from "./lib/constants";
 
 import LoginPage from "./pages/LoginPage";
 import LogoutPage from "./pages/LogoutPage";
-import PortalPage from "./pages/PortalPage";
 import ChangePasswordPage from "./pages/ChangePasswordPage";
 import DashboardPage from "./pages/DashboardPage";
 import EmployeeListPage from "./pages/employees/EmployeeListPage";
@@ -59,18 +59,43 @@ import PublicSurveyPage from "./pages/public/PublicSurveyPage";
 
 const GOISO_STAFF = [PERMISSIONS.GOISO_COUNTER, PERMISSIONS.GOISO_ADMIN];
 
+function HomeRedirect() {
+  const { user, hasAnyPermission } = useAuth();
+
+  if (hasAnyPermission(MODULE_PERMS.NHANSU)) {
+    return <Navigate to="/nhan-su" replace />;
+  }
+  if (hasAnyPermission(MODULE_PERMS.WORK)) {
+    return <Navigate to="/cong-viec" replace />;
+  }
+  if (hasAnyPermission(MODULE_PERMS.ADMIN)) {
+    return <Navigate to="/admin" replace />;
+  }
+  if (hasAnyPermission([PERMISSIONS.GOISO_ADMIN])) {
+    return <Navigate to="/admin/goiso/branches" replace />;
+  }
+  if (hasAnyPermission([PERMISSIONS.GOISO_COUNTER]) && user?.goiso_branch_code) {
+    return <Navigate to={`/b/${user.goiso_branch_code}/counter`} replace />;
+  }
+  if (hasAnyPermission(MODULE_PERMS.GOISO)) {
+    return <Navigate to="/cho" replace />;
+  }
+
+  return <Navigate to="/403" replace />;
+}
+
 export default function App() {
   return (
     <Routes>
       <Route path="/login" element={<LoginPage />} />
       <Route path="/logout" element={<LogoutPage />} />
 
-      {/* Cổng ứng dụng — trang đầu sau đăng nhập */}
+      {/* Vào thẳng module chính; ưu tiên Tổng quan nhân sự nếu tài khoản có quyền. */}
       <Route
         path="/"
         element={
           <ProtectedRoute>
-            <PortalPage />
+            <HomeRedirect />
           </ProtectedRoute>
         }
       />

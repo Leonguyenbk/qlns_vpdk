@@ -36,7 +36,6 @@ const NAV_GROUPS = [
   {
     title: null,
     items: [
-      { to: "/", label: "Cổng ứng dụng", Icon: IconChevronLeft, exact: true },
       {
         to: "/nhan-su",
         label: "Tổng quan",
