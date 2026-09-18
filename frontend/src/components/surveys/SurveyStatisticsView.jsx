@@ -5,7 +5,6 @@ import { exportSurveySummary } from "../../hooks/useSurveys";
 import { useCan } from "../Can";
 import { PERMISSIONS } from "../../lib/constants";
 import { apiErrorMessage } from "../../lib/api";
-import { formatDate } from "../../lib/format";
 import { Button, Card } from "../ui/primitives";
 import { LoadingState, ErrorState, EmptyState } from "../ui/DataStates";
 import { SurveyFilterBar } from "./SurveyFilterBar";
@@ -98,7 +97,7 @@ function QuestionStatCard({ question }) {
 }
 
 export function SurveyStatisticsView({ surveyId }) {
-  const [filters, setFilters] = useState({ preset: "", date_from: "", date_to: "", branch_id: "" });
+  const [filters, setFilters] = useState({ branch_id: "" });
   const [exporting, setExporting] = useState(false);
   const { can } = useCan();
   const params = Object.fromEntries(Object.entries(filters).filter(([, v]) => v));
@@ -121,8 +120,7 @@ export function SurveyStatisticsView({ surveyId }) {
   if (isError) return <ErrorState error={error} onRetry={refetch} />;
   if (!data) return null;
 
-  const { overview, by_question, time_series, by_branch } = data;
-  const maxSeries = Math.max(1, ...time_series.map((t) => t.count));
+  const { overview, by_question, by_branch } = data;
   const topBranches = by_branch.filter((b) => b.rank === 1);
   const branchScores = by_branch.map((b) => b.average_score).filter((score) => score != null);
   const minBranchScore = branchScores.length ? Math.min(...branchScores) : 0;
@@ -136,7 +134,7 @@ export function SurveyStatisticsView({ surveyId }) {
   return (
     <div>
       <div className="mb-1 flex items-start justify-between gap-3">
-        <SurveyFilterBar filters={filters} onChange={setFilter} />
+        <SurveyFilterBar filters={filters} onChange={setFilter} branchOnly />
         {can(PERMISSIONS.SURVEY_EXPORT) && (
           <Button variant="secondary" onClick={onExport} disabled={exporting}>
             {exporting ? "Đang xuất…" : "Xuất Excel"}
@@ -144,7 +142,7 @@ export function SurveyStatisticsView({ surveyId }) {
         )}
       </div>
 
-      <div className="mb-6 grid grid-cols-2 gap-3 md:grid-cols-5">
+      <div className="mb-6 grid grid-cols-2 gap-3 md:grid-cols-3">
         <KpiTile label="Tổng lượt khảo sát" value={overview.total_responses} />
         <KpiTile label="Tỷ lệ hoàn thành" value={`${overview.completion_rate}%`} />
         <KpiTile
@@ -152,36 +150,9 @@ export function SurveyStatisticsView({ surveyId }) {
           value={overview.average_score != null ? overview.average_score : "—"}
           hint={`${overview.score_answer_count || 0} đáp án có gán điểm`}
         />
-        <KpiTile label="Tỷ lệ hài lòng" value={overview.satisfaction_answer_count ? `${overview.satisfaction_rate}%` : "—"} hint="Chỉ tính câu đánh giá 1–5" />
-        <KpiTile label="Tỷ lệ không hài lòng" value={overview.satisfaction_answer_count ? `${overview.dissatisfaction_rate}%` : "—"} hint="Chỉ tính câu đánh giá 1–5" />
       </div>
 
-      {overview.satisfaction_answer_count > 0 && (
-        <Card className="mb-6">
-          <h3 className="mb-3 font-semibold text-slate-800">Phân bố mức độ hài lòng</h3>
-          <RatingBreakdown breakdown={overview.rating_breakdown} />
-        </Card>
-      )}
-
-      <div className="mb-6 grid gap-6 lg:grid-cols-2">
-        <Card>
-          <h3 className="mb-3 font-semibold text-slate-800">Lượt đánh giá theo ngày</h3>
-          {time_series.length ? (
-            <div className="grid max-h-72 gap-2.5 overflow-y-auto">
-              {time_series.map((t) => (
-                <BarRow
-                  key={t.date}
-                  label={formatDate(t.date)}
-                  percentage={(t.count / maxSeries) * 100}
-                  valueLabel={t.count}
-                />
-              ))}
-            </div>
-          ) : (
-            <p className="text-sm text-muted">Chưa có dữ liệu.</p>
-          )}
-        </Card>
-
+      <div className="mb-6">
         <Card>
           <h3 className="mb-3 font-semibold text-slate-800">Xếp hạng điểm theo chi nhánh</h3>
           {by_branch.length ? (
@@ -207,8 +178,7 @@ export function SurveyStatisticsView({ surveyId }) {
                     valueLabel={b.average_score != null ? `${b.average_score} điểm` : "Chưa có điểm"}
                   />
                   <p className="mt-1 text-xs text-muted">
-                    {b.total_responses} lượt · {b.scored_answers || 0} đáp án có điểm · Hài lòng{" "}
-                    {b.satisfaction_rate}% · Không hài lòng {b.dissatisfaction_rate}%
+                    {b.total_responses} lượt · {b.scored_answers || 0} đáp án có điểm
                   </p>
                 </div>
               ))}
