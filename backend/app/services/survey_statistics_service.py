@@ -4,6 +4,7 @@ from __future__ import annotations
 from collections import defaultdict
 
 from sqlalchemy import func
+from sqlalchemy.orm import joinedload
 
 from ..exports.survey_export import build_summary_workbook
 from ..extensions import db
@@ -11,6 +12,7 @@ from ..models import OrganizationUnit
 from ..models.survey import SurveyAnswer, SurveyOption, SurveyQuestion, SurveyResponse
 from .survey_filters import apply_branch_scope, apply_response_filters
 from .survey_question_service import list_questions
+from .survey_scoring import max_possible_score
 from .survey_service import get_survey_or_404
 
 RATING_LABELS = {
@@ -208,6 +210,17 @@ def _scoped_response_ids(survey_id: int, args, *, actor, scope) -> list[int]:
     return [r[0] for r in q.all()]
 
 
+def _survey_max_possible_score(survey_id: int) -> float | None:
+    questions = (
+        db.session.query(SurveyQuestion)
+        .options(joinedload(SurveyQuestion.options))
+        .filter(SurveyQuestion.survey_id == survey_id, SurveyQuestion.is_active.is_(True))
+        .all()
+    )
+    ceiling = max_possible_score(questions)
+    return round(ceiling, 2) if ceiling is not None else None
+
+
 def get_statistics(survey_id: int, args, *, actor, scope) -> dict:
     get_survey_or_404(survey_id)
     response_ids = _scoped_response_ids(survey_id, args, actor=actor, scope=scope)
@@ -230,14 +243,15 @@ def get_statistics(survey_id: int, args, *, actor, scope) -> dict:
     satisfaction_by_response = _score_values_by_response(
         response_ids, rating_qids, satisfaction_option_map, use_recorded_scores=False
     )
+    max_score = _survey_max_possible_score(survey_id)
     return {
         "overview": _overview(
-            survey_id, response_ids, values_by_response, satisfaction_by_response
+            survey_id, response_ids, values_by_response, satisfaction_by_response, max_score
         ),
         "by_question": _by_question(survey_id, response_ids),
         "time_series": _time_series(response_ids),
         "by_branch": _by_branch(
-            response_ids, values_by_response, satisfaction_by_response
+            response_ids, values_by_response, satisfaction_by_response, max_score
         ),
     }
 
@@ -247,6 +261,7 @@ def _overview(
     response_ids: list[int],
     values_by_response: dict[int, list[float]],
     satisfaction_by_response: dict[int, list[float]],
+    max_score: float | None = None,
 ) -> dict:
     total_responses = len(response_ids)
     if not total_responses:
@@ -258,6 +273,9 @@ def _overview(
             "satisfaction_answer_count": 0,
             "satisfaction_rate": 0,
             "dissatisfaction_rate": 0,
+            "max_possible_score": max_score,
+            "average_total_score": None,
+            "average_percentage": None,
             "rating_breakdown": [
                 {"level": lvl, "label": lbl, "count": 0, "percentage": 0}
                 for lvl, lbl in sorted(RATING_LABELS.items(), reverse=True)
@@ -294,6 +312,11 @@ def _overview(
 
     score_values = [v for rid in response_ids for v in values_by_response.get(rid, [])]
     total_scores = len(score_values)
+    response_totals = [sum(values_by_response.get(rid, [])) for rid in response_ids]
+    average_total_score = round(sum(response_totals) / total_responses, 2)
+    average_percentage = (
+        round(average_total_score / max_score * 100, 1) if max_score else None
+    )
     satisfaction_values = [
         v for rid in response_ids for v in satisfaction_by_response.get(rid, [])
     ]
@@ -318,6 +341,9 @@ def _overview(
         "completion_rate": completion_rate,
         "average_score": round(sum(score_values) / total_scores, 2) if total_scores else None,
         "score_answer_count": total_scores,
+        "max_possible_score": max_score,
+        "average_total_score": average_total_score,
+        "average_percentage": average_percentage,
         "satisfaction_rate": round(satisfied / total_satisfaction * 100, 1)
         if total_satisfaction
         else 0,
@@ -576,6 +602,7 @@ def _by_branch(
     response_ids: list[int],
     values_by_response: dict[int, list[float]],
     satisfaction_by_response: dict[int, list[float]],
+    max_score: float | None = None,
 ) -> list[dict]:
     if not response_ids:
         return []
@@ -605,11 +632,27 @@ def _by_branch(
     satisfaction_by_branch: dict[int | None, list[float]] = defaultdict(list)
     for rid, values in satisfaction_by_response.items():
         satisfaction_by_branch[response_branch.get(rid)].extend(values)
+    responses_by_branch: dict[int | None, list[int]] = defaultdict(list)
+    for rid in response_ids:
+        responses_by_branch[response_branch.get(rid)].append(rid)
 
     result = []
     for branch_id, total in rows:
         values = ratings_by_branch.get(branch_id, [])
         tv = len(values)
+        branch_response_totals = [
+            sum(values_by_response.get(rid, [])) for rid in responses_by_branch.get(branch_id, [])
+        ]
+        average_total_score = (
+            round(sum(branch_response_totals) / len(branch_response_totals), 2)
+            if branch_response_totals
+            else None
+        )
+        average_percentage = (
+            round(average_total_score / max_score * 100, 1)
+            if max_score and average_total_score is not None
+            else None
+        )
         satisfaction_values = satisfaction_by_branch.get(branch_id, [])
         satisfaction_total = len(satisfaction_values)
         satisfied = sum(1 for v in satisfaction_values if v >= 4)
@@ -621,6 +664,9 @@ def _by_branch(
                 "total_responses": total,
                 "average_score": round(sum(values) / tv, 2) if tv else None,
                 "scored_answers": tv,
+                "max_possible_score": max_score,
+                "average_total_score": average_total_score,
+                "average_percentage": average_percentage,
                 "satisfaction_rate": round(satisfied / satisfaction_total * 100, 1)
                 if satisfaction_total
                 else 0,

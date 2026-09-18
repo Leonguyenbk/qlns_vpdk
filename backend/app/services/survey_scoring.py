@@ -14,6 +14,81 @@ def deduction_score(max_score, zero_score_at, selected_scores):
     return max(0.0, float(max_score) - sum(selected_scores))
 
 
+RATING_MAX = 5.0
+
+
+def _question_ceiling(question, children_by_parent):
+    """Điểm tối đa MỘT câu hỏi có thể đạt (đã gộp câu hỏi phụ thay nhánh kích
+    hoạt, giống lúc chấm điểm thật ở `record_scores`) — None nếu câu hỏi
+    không cấu hình điểm (không đóng góp vào tổng)."""
+    children = children_by_parent.get(question.id, [])
+
+    def branch_value(own_value, *, trigger_answer=None, trigger_option_id=None):
+        for child in children:
+            if (trigger_answer is not None and child.trigger_answer == trigger_answer) or (
+                trigger_option_id is not None and child.trigger_option_id == trigger_option_id
+            ):
+                return _question_ceiling(child, children_by_parent)
+        return own_value
+
+    if question.question_type == "rating":
+        return RATING_MAX
+    if question.question_type == "yes_no":
+        values = [
+            v
+            for v in (
+                branch_value(question.yes_score, trigger_answer="yes"),
+                branch_value(question.no_score, trigger_answer="no"),
+            )
+            if v is not None
+        ]
+        return max(values) if values else None
+    if question.question_type == "multiple_choice" and question.scoring_mode == "deduction":
+        return float(question.max_score or 0)
+    if question.question_type in ("single_choice", "multiple_choice"):
+        active_options = [o for o in question.options if o.is_active]
+        satisfaction_fallback = {}
+        if question.question_type == "single_choice":
+            labels = {
+                SATISFACTION_LEVELS.get(o.option_text.strip().lower()) for o in active_options
+            }
+            if labels == {1, 2, 3, 4, 5}:
+                satisfaction_fallback = {
+                    o.id: float(SATISFACTION_LEVELS[o.option_text.strip().lower()])
+                    for o in active_options
+                }
+        values = []
+        for o in active_options:
+            own_value = o.score if o.score is not None else satisfaction_fallback.get(o.id)
+            value = branch_value(own_value, trigger_option_id=o.id)
+            if value is not None:
+                values.append(value)
+        if not values:
+            return None
+        if question.question_type == "single_choice":
+            return max(values)
+        return sum(v for v in values if v > 0)
+    return None
+
+
+def max_possible_score(questions) -> float | None:
+    """Tổng điểm tối đa MỘT lượt phản hồi có thể đạt được với bộ câu hỏi hiện tại
+    của khảo sát — cộng điểm tối đa từng câu hỏi gốc (không tính câu hỏi phụ
+    riêng, vì điểm của nó đã gộp vào câu cha khi nhánh tương ứng được chọn)."""
+    children_by_parent = defaultdict(list)
+    for q in questions:
+        if q.parent_question_id:
+            children_by_parent[q.parent_question_id].append(q)
+    total = None
+    for q in questions:
+        if q.parent_question_id:
+            continue
+        ceiling = _question_ceiling(q, children_by_parent)
+        if ceiling is not None:
+            total = (total or 0.0) + ceiling
+    return total
+
+
 def legacy_answer_score(answer):
     if answer.option is not None:
         return answer.option.score

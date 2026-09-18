@@ -132,6 +132,17 @@ def build_summary_workbook(survey, stats: dict, *, scope_label: str | None = Non
             f" · Tỷ lệ không hài lòng: {overview['dissatisfaction_rate']}%"
         ]
     )
+    max_score = overview.get("max_possible_score")
+    if max_score is not None:
+        total_avg = overview.get("average_total_score")
+        pct = overview.get("average_percentage")
+        ws1.append(
+            [
+                f"Điểm tối đa có thể đạt: {max_score}"
+                f" · Tổng điểm trung bình thực nhận: {total_avg if total_avg is not None else '—'}"
+                f" ({pct if pct is not None else '—'}%)"
+            ]
+        )
     ws1.append([])
     header_row = ws1.max_row + 1
     headers = ["Phần", "Câu hỏi", "Phương án / Chỉ số", "Điểm", "Số lượng", "Tỷ lệ (%)"]
@@ -205,6 +216,7 @@ def build_summary_workbook(survey, stats: dict, *, scope_label: str | None = Non
     ws2 = wb.create_sheet("Theo chi nhánh")
     headers2 = [
         "Xếp hạng", "Chi nhánh", "Tổng lượt", "Số đáp án có điểm", "Điểm trung bình",
+        "Điểm tối đa", "Tổng điểm TB thực nhận", "Tỷ lệ đạt (%)",
         "Tỷ lệ hài lòng (%)", "Tỷ lệ không hài lòng (%)",
     ]
     ws2.append(headers2)
@@ -216,6 +228,9 @@ def build_summary_workbook(survey, stats: dict, *, scope_label: str | None = Non
                 b["total_responses"],
                 b.get("scored_answers", 0),
                 b["average_score"] if b["average_score"] is not None else "",
+                b.get("max_possible_score") if b.get("max_possible_score") is not None else "",
+                b.get("average_total_score") if b.get("average_total_score") is not None else "",
+                b.get("average_percentage") if b.get("average_percentage") is not None else "",
                 b["satisfaction_rate"],
                 b["dissatisfaction_rate"],
             ]

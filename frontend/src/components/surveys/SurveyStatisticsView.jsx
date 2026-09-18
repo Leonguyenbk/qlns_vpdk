@@ -156,6 +156,17 @@ export function SurveyStatisticsView({ surveyId }) {
           value={overview.average_score != null ? overview.average_score : "—"}
           hint={`${overview.score_answer_count || 0} đáp án có gán điểm`}
         />
+        {overview.max_possible_score != null && (
+          <KpiTile
+            label="Tổng điểm TB / Tối đa"
+            value={`${overview.average_total_score} / ${overview.max_possible_score}`}
+            hint={
+              overview.average_percentage != null
+                ? `Đạt ${overview.average_percentage}% điểm tối đa`
+                : undefined
+            }
+          />
+        )}
       </div>
 
       <div className="mb-6">
@@ -173,6 +184,8 @@ export function SurveyStatisticsView({ surveyId }) {
                   </p>
                   <p className="text-sm text-emerald-800">
                     {topBranches[0].average_score} điểm
+                    {topBranches[0].max_possible_score != null &&
+                      ` · Tổng điểm TB ${topBranches[0].average_total_score}/${topBranches[0].max_possible_score} (${topBranches[0].average_percentage}%)`}
                   </p>
                 </div>
               )}
@@ -185,6 +198,8 @@ export function SurveyStatisticsView({ surveyId }) {
                   />
                   <p className="mt-1 text-xs text-muted">
                     {b.total_responses} lượt · {b.scored_answers || 0} đáp án có điểm
+                    {b.max_possible_score != null &&
+                      ` · Tổng điểm TB ${b.average_total_score}/${b.max_possible_score} (${b.average_percentage}%)`}
                   </p>
                 </div>
               ))}

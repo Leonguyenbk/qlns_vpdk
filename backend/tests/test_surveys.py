@@ -283,6 +283,14 @@ def test_conditional_question_is_required_only_when_triggered_and_scores_child(
         f"/api/surveys/{survey['id']}/statistics", headers=headers
     ).get_json()["data"]
     assert stats["overview"]["average_score"] == 7.0
+    # Tối đa = 10 (nhánh "Có" tự đạt 10, cao hơn trần nhánh "Không" + câu hỏi phụ = 4).
+    assert stats["overview"]["max_possible_score"] == 10.0
+    assert stats["overview"]["average_total_score"] == 7.0
+    assert stats["overview"]["average_percentage"] == 70.0
+    branch_row = stats["by_branch"][0]
+    assert branch_row["max_possible_score"] == 10.0
+    assert branch_row["average_total_score"] == 7.0
+    assert branch_row["average_percentage"] == 70.0
 
 
 def test_trigger_branch_or_option_score_always_locked_to_null(client, admin_user, auth_header):
@@ -411,6 +419,10 @@ def test_multiple_choice_deduction_scores_none_one_two_and_threshold(
     ).get_json()["data"]
     assert stats["overview"]["average_score"] == 5.25
     assert stats["overview"]["score_answer_count"] == 4
+    # Tối đa = 10 (max_score câu trừ điểm, đạt được khi không chọn phương án nào).
+    assert stats["overview"]["max_possible_score"] == 10.0
+    assert stats["overview"]["average_total_score"] == 5.25
+    assert stats["overview"]["average_percentage"] == 52.5
     question_stats = stats["by_question"][0]["stats"]
     assert question_stats["average_score"] == 5.25
     assert question_stats["scored_answers"] == 4
