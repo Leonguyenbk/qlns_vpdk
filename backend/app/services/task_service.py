@@ -468,12 +468,18 @@ def _current_open_period(period_id: int | None) -> KpiPeriod:
             raise BusinessRuleError("Kỳ đánh giá không hợp lệ hoặc đã khoá.")
         return period
     today = date.today()
-    period = (
+    candidates = (
         db.session.query(KpiPeriod)
         .filter(KpiPeriod.status == "OPEN", KpiPeriod.start_date <= today, KpiPeriod.end_date >= today)
-        .order_by(KpiPeriod.start_date.desc())
-        .first()
+        .all()
     )
+    # Nếu nhiều kỳ đang mở song song (vd. vừa có kỳ Quý để theo dõi vừa có kỳ
+    # Năm để xếp loại chính thức), ưu tiên kỳ có phạm vi HẸP NHẤT — nếu lỡ gắn
+    # vào kỳ Năm, hạn nhiệm vụ tự khai rơi vào cuối năm sẽ KHÔNG được tính vào
+    # kỳ Quý đang theo dõi (khoảng ngày không trùng), làm mất khối lượng đã khai.
+    _GRANULARITY_RANK = {"MONTH": 0, "QUARTER": 1, "YEAR": 2}
+    candidates.sort(key=lambda p: (_GRANULARITY_RANK.get(p.period_type, 9), -p.start_date.toordinal()))
+    period = candidates[0] if candidates else None
     if period is None:
         raise BusinessRuleError("Chưa có kỳ đánh giá KPI nào đang mở để tự khai khối lượng.")
     return period

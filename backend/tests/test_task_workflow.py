@@ -307,3 +307,39 @@ def test_self_report_quantity_requires_open_period(client, auth_header, make_uni
     )
     assert resp.status_code == 400
     assert "kỳ đánh giá" in resp.get_json()["message"]
+
+
+def test_self_report_prefers_narrower_period_when_multiple_open(
+    client, auth_header, make_unit, make_position, make_staff
+):
+    """Khi vừa có kỳ Năm (xếp loại chính thức) vừa có kỳ Quý/Tháng (theo dõi)
+    đang mở song song, tự khai phải rơi vào kỳ HẸP NHẤT — nếu gắn nhầm vào kỳ
+    Năm, khối lượng khai trong quý này sẽ không được tính vào kỳ Quý đang theo
+    dõi vì khoảng ngày không khớp (xem _current_open_period)."""
+    root, branch, staff_pos, head_pos = _make_org(make_unit, make_position)
+    head = make_staff("head11", branch, head_pos, ROLE_UNIT_HEAD)
+    staff = make_staff("staff11", branch, staff_pos, ROLE_VIEWER)
+    product = Product(group_code="N1", code="N1.SR3", name="Chuyển hồ sơ tiếp nhận 3", created_by=head.id)
+    db.session.add(product)
+    db.session.flush()
+
+    today = date.today()
+    year_period = KpiPeriod(
+        code=f"{today.year}", period_type="YEAR",
+        start_date=date(today.year, 1, 1), end_date=date(today.year, 12, 31),
+        status="OPEN", created_by=head.id,
+    )
+    quarter_period = KpiPeriod(
+        code=f"{today.year}-Qx", period_type="QUARTER",
+        start_date=today - timedelta(days=1), end_date=today + timedelta(days=1),
+        status="OPEN", created_by=head.id,
+    )
+    db.session.add_all([year_period, quarter_period])
+    db.session.commit()
+
+    resp = client.post(
+        "/api/tasks/self-report", headers=auth_header("staff11"),
+        json={"product_id": product.id, "quantity": 7},
+    )
+    assert resp.status_code == 201, resp.get_json()
+    assert resp.get_json()["data"]["original_deadline"] == quarter_period.end_date.isoformat()
