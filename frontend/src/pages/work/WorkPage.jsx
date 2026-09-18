@@ -28,11 +28,7 @@ export default function WorkPage() {
 
   return (
     <div>
-      <PageHeader
-        eyebrow="Giao việc – Theo dõi nhiệm vụ – Đánh giá KPI"
-        title="Công việc"
-        subtitle="Nhiệm vụ được giao, việc đã giao cho người khác và kết quả KPI — tất cả trong một trang."
-      />
+      <PageHeader title="Công việc" />
       {tabs.length === 0 ? (
         <p className="text-sm text-muted">Bạn chưa được cấp quyền mục nào trong Công việc.</p>
       ) : (
