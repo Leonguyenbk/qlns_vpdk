@@ -10,7 +10,7 @@ from __future__ import annotations
 from sqlalchemy import func
 
 from ..common.exceptions import BusinessRuleError, NotFoundError, ValidationError
-from ..common.utils import clean_str, ensure_aware, parse_date, parse_pagination, utcnow, validate_email
+from ..common.utils import clean_str, ensure_aware, parse_date, parse_pagination, utcnow, validate_id_number
 from ..exports.survey_export import build_workbook
 from ..extensions import db
 from ..models import Employee, OrganizationUnit
@@ -248,8 +248,8 @@ def submit_response(survey_id: int, data: dict, *, meta: dict) -> tuple[dict, bo
     employee_id = data.get("employee_id")
     if employee_id is not None and db.session.get(Employee, employee_id) is None:
         raise ValidationError("Cán bộ không hợp lệ.")
-    respondent_email = clean_str(data.get("respondent_email"))
-    validate_email(respondent_email, "respondent_email")
+    respondent_id_number = clean_str(data.get("respondent_id_number"))
+    validate_id_number(respondent_id_number, "respondent_id_number")
     respondent_name = clean_str(data.get("respondent_name"))
     respondent_phone = clean_str(data.get("respondent_phone"))
     if not survey.is_anonymous:
@@ -257,6 +257,8 @@ def submit_response(survey_id: int, data: dict, *, meta: dict) -> tuple[dict, bo
             raise ValidationError("Vui lòng nhập họ và tên.")
         if not respondent_phone:
             raise ValidationError("Vui lòng nhập số điện thoại.")
+        if not respondent_id_number:
+            raise ValidationError("Vui lòng nhập số CCCD/CMND.")
 
     response = SurveyResponse(
         survey_id=survey.id,
@@ -266,7 +268,7 @@ def submit_response(survey_id: int, data: dict, *, meta: dict) -> tuple[dict, bo
         employee_id=employee_id,
         respondent_name=respondent_name,
         respondent_phone=respondent_phone,
-        respondent_email=respondent_email,
+        respondent_id_number=respondent_id_number,
         respondent_address=clean_str(data.get("respondent_address")),
         ip_address=meta.get("ip_address"),
         user_agent=(meta.get("user_agent") or "")[:255] or None,

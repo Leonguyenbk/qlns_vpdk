@@ -406,12 +406,12 @@ class SurveyAnswerItemSchema(ApiSchema):
 
 class SurveySubmitSchema(ApiSchema):
     nullable_fields = {
-        "respondent_name", "respondent_phone", "respondent_email", "respondent_address",
+        "respondent_name", "respondent_phone", "respondent_id_number", "respondent_address",
         "branch_id", "service_id", "counter_id", "employee_id", "client_token",
     }
     respondent_name = fields.String(allow_none=True)
     respondent_phone = fields.String(allow_none=True)
-    respondent_email = fields.String(allow_none=True)
+    respondent_id_number = fields.String(allow_none=True)
     respondent_address = fields.String(allow_none=True)
     branch_id = fields.Integer(allow_none=True, strict=True)
     service_id = fields.Integer(allow_none=True, strict=True)

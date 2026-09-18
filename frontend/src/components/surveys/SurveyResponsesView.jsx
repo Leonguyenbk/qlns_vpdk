@@ -13,7 +13,7 @@ import { SurveyFilterBar } from "./SurveyFilterBar";
 
 function ResponseCard({ response }) {
   const [open, setOpen] = useState(false);
-  const contact = [response.respondent_phone, response.respondent_email, response.respondent_address]
+  const contact = [response.respondent_phone, response.respondent_id_number, response.respondent_address]
     .filter(Boolean)
     .join(" · ");
   return (

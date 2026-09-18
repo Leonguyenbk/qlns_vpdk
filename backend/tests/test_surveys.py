@@ -116,7 +116,7 @@ def test_public_payload_lists_branches_and_accepts_respondent_contact(
             "branch_id": branch.id,
             "respondent_name": "Nguyễn Văn A",
             "respondent_phone": "0905123456",
-            "respondent_email": "a@example.com",
+            "respondent_id_number": "012345678901",
             "respondent_address": "123 Lê Duẩn",
             "answers": [{"question_id": q["id"], "option_id": opt_id}],
         },
@@ -124,14 +124,14 @@ def test_public_payload_lists_branches_and_accepts_respondent_contact(
     assert resp.status_code == 201, resp.get_json()
     data = resp.get_json()["data"]
     assert data["branch_id"] == branch.id
-    assert data["respondent_email"] == "a@example.com"
+    assert data["respondent_id_number"] == "012345678901"
     assert data["respondent_address"] == "123 Lê Duẩn"
 
-    bad_email = client.post(
+    bad_id_number = client.post(
         f"/api/public/surveys/{survey['id']}/submit",
-        json={"respondent_email": "not-an-email", "answers": [{"question_id": q["id"], "option_id": opt_id}]},
+        json={"respondent_id_number": "12345", "answers": [{"question_id": q["id"], "option_id": opt_id}]},
     )
-    assert bad_email.status_code == 422
+    assert bad_id_number.status_code == 422
 
 
 def test_edit_question_after_response_creates_revision_and_preserves_history(
@@ -729,7 +729,7 @@ def test_publish_requires_at_least_one_active_question(client, admin_user, auth_
     assert resp.status_code == 422
 
 
-def test_non_anonymous_survey_requires_name_and_phone(client, admin_user, auth_header):
+def test_non_anonymous_survey_requires_name_phone_and_id_number(client, admin_user, auth_header):
     headers = auth_header("admin_test")
     created = client.post(
         "/api/surveys",
@@ -748,7 +748,7 @@ def test_non_anonymous_survey_requires_name_and_phone(client, admin_user, auth_h
     )
     assert missing.status_code == 422
 
-    ok = client.post(
+    missing_id_number = client.post(
         f"/api/public/surveys/{survey['id']}/submit",
         json={
             "respondent_name": "Trần Thị B",
@@ -756,7 +756,29 @@ def test_non_anonymous_survey_requires_name_and_phone(client, admin_user, auth_h
             "answers": [{"question_id": q["id"], "option_id": opt_id}],
         },
     )
-    assert ok.status_code == 201, ok.get_json()
+    assert missing_id_number.status_code == 422
+
+    ok_cmnd = client.post(
+        f"/api/public/surveys/{survey['id']}/submit",
+        json={
+            "respondent_name": "Trần Thị B",
+            "respondent_phone": "0909000111",
+            "respondent_id_number": "123456789",
+            "answers": [{"question_id": q["id"], "option_id": opt_id}],
+        },
+    )
+    assert ok_cmnd.status_code == 201, ok_cmnd.get_json()
+
+    ok_cccd = client.post(
+        f"/api/public/surveys/{survey['id']}/submit",
+        json={
+            "respondent_name": "Trần Thị B",
+            "respondent_phone": "0909000111",
+            "respondent_id_number": "079123456789",
+            "answers": [{"question_id": q["id"], "option_id": opt_id}],
+        },
+    )
+    assert ok_cccd.status_code == 201, ok_cccd.get_json()
 
 
 def test_branch_quota_locks_branch_once_full(client, admin_user, auth_header, make_unit):

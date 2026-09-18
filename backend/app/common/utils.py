@@ -9,6 +9,8 @@ from .exceptions import ValidationError
 
 EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 PHONE_RE = re.compile(r"^[0-9+()\-\s]{8,20}$")
+# CCCD: đúng 12 số (được phép có số 0 đầu). CMND cũ: đúng 9 số.
+ID_NUMBER_RE = re.compile(r"^(\d{9}|\d{12})$")
 
 
 def utcnow() -> datetime:
@@ -64,6 +66,11 @@ def validate_email(value: str | None, field: str = "email") -> None:
 def validate_phone(value: str | None, field: str = "phone") -> None:
     if value and not PHONE_RE.match(value):
         raise ValidationError(f"Trường '{field}' không đúng định dạng số điện thoại.")
+
+
+def validate_id_number(value: str | None, field: str = "respondent_id_number") -> None:
+    if value and not ID_NUMBER_RE.match(value):
+        raise ValidationError(f"Trường '{field}' phải là CCCD 12 số hoặc CMND 9 số.")
 
 
 def clean_str(value: Any) -> str | None:

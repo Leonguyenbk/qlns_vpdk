@@ -13,6 +13,8 @@ import {
 } from "../../lib/surveyQuestions";
 
 const EMPTY_LIST = [];
+// CCCD: đúng 12 số (được phép có số 0 đầu). CMND cũ: đúng 9 số.
+const ID_NUMBER_RE = /^(\d{9}|\d{12})$/;
 
 function makeClientToken() {
   try {
@@ -40,7 +42,7 @@ export default function PublicSurveyPage() {
   const [errors, setErrors] = useState({});
   const [respondentName, setRespondentName] = useState("");
   const [respondentPhone, setRespondentPhone] = useState("");
-  const [respondentEmail, setRespondentEmail] = useState("");
+  const [respondentIdNumber, setRespondentIdNumber] = useState("");
   const [respondentAddress, setRespondentAddress] = useState("");
   const [done, setDone] = useState(false);
   const [clientToken] = useState(makeClientToken);
@@ -77,6 +79,11 @@ export default function PublicSurveyPage() {
     if (requireContact && !respondentPhone.trim()) {
       nextErrors._phone = "Vui lòng nhập số điện thoại.";
     }
+    if (requireContact && !respondentIdNumber.trim()) {
+      nextErrors._idNumber = "Vui lòng nhập số CCCD/CMND.";
+    } else if (respondentIdNumber.trim() && !ID_NUMBER_RE.test(respondentIdNumber.trim())) {
+      nextErrors._idNumber = "CCCD phải đủ 12 số hoặc CMND đủ 9 số.";
+    }
     for (const q of visibleQuestions) {
       if (q.is_required && !isQuestionAnswered(q, questionValue(q, answers))) {
         nextErrors[q.id] = "Câu hỏi này là bắt buộc.";
@@ -86,7 +93,7 @@ export default function PublicSurveyPage() {
       setErrors(nextErrors);
       const anchorId = nextErrors._branch
         ? "q-branch"
-        : nextErrors._name || nextErrors._phone
+        : nextErrors._name || nextErrors._phone || nextErrors._idNumber
           ? "q-contact"
           : `q-${questions.find((q) => nextErrors[q.id])?.id}`;
       document.getElementById(anchorId)?.scrollIntoView({ behavior: "smooth", block: "center" });
@@ -101,7 +108,7 @@ export default function PublicSurveyPage() {
         branch_id: effectiveBranchId || undefined,
         respondent_name: respondentName || undefined,
         respondent_phone: respondentPhone || undefined,
-        respondent_email: respondentEmail || undefined,
+        respondent_id_number: respondentIdNumber || undefined,
         respondent_address: respondentAddress || undefined,
         answers: items,
       });
@@ -210,8 +217,17 @@ export default function PublicSurveyPage() {
         <FormField label="Số điện thoại" required={requireContact} error={errors._phone}>
           <TextInput value={respondentPhone} onChange={(e) => { setRespondentPhone(e.target.value); setErrors((er) => ({ ...er, _phone: null })); }} />
         </FormField>
-        <FormField label="Email" hint="Nếu có">
-          <TextInput value={respondentEmail} onChange={(e) => setRespondentEmail(e.target.value)} />
+        <FormField label="Số CCCD/CMND" required={requireContact} error={errors._idNumber}>
+          <TextInput
+            value={respondentIdNumber}
+            inputMode="numeric"
+            maxLength={12}
+            placeholder="CCCD 12 số hoặc CMND 9 số"
+            onChange={(e) => {
+              setRespondentIdNumber(e.target.value.replace(/\D/g, ""));
+              setErrors((er) => ({ ...er, _idNumber: null }));
+            }}
+          />
         </FormField>
         <FormField label="Địa chỉ" hint="Nếu có">
           <TextInput value={respondentAddress} onChange={(e) => setRespondentAddress(e.target.value)} />
