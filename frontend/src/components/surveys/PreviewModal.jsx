@@ -3,6 +3,7 @@ import { Modal } from "../ui/Modal";
 import { QuestionRenderer } from "./QuestionRenderer";
 import { LoadingState, EmptyState } from "../ui/DataStates";
 import { useSurveyQuestions } from "../../hooks/useSurveyQuestions";
+import { visibleSurveyQuestions, updateSurveyAnswer, questionValue } from "../../lib/surveyQuestions";
 
 /** Xem trước khảo sát như người dân sẽ thấy — chỉ tương tác cục bộ, không gửi dữ liệu. */
 export function PreviewModal({ survey, onClose }) {
@@ -18,13 +19,14 @@ export function PreviewModal({ survey, onClose }) {
         <EmptyState title="Khảo sát chưa có câu hỏi" />
       ) : (
         <div className="grid gap-6">
-          {questions.map((q) => (
-            <QuestionRenderer
-              key={q.id}
-              question={q}
-              value={answers[q.id] ?? (q.question_type === "multiple_choice" ? [] : null)}
-              onChange={(v) => setAnswers((a) => ({ ...a, [q.id]: v }))}
-            />
+          {visibleSurveyQuestions(questions, answers).map((q) => (
+            <div key={q.id} className={q.parent_question_id ? "ml-3 border-l-2 border-rule pl-4" : ""}>
+              <QuestionRenderer
+                question={q}
+                value={questionValue(q, answers)}
+                onChange={(v) => setAnswers((a) => updateSurveyAnswer(questions, a, q.id, v))}
+              />
+            </div>
           ))}
         </div>
       )}

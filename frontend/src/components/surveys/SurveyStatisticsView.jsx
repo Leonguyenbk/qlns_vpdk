@@ -22,7 +22,13 @@ function QuestionStatCard({ question }) {
           {stats.average_score != null && (
             <p className="mb-3 text-sm text-ink-2">
               Điểm trung bình: <span className="font-semibold text-ink">{stats.average_score}</span>
-              <span className="ml-1 text-xs text-muted">({stats.scored_answers} đáp án có điểm)</span>
+              <span className="ml-1 text-xs text-muted">({stats.scored_answers} lượt có điểm)</span>
+            </p>
+          )}
+          {stats.scoring_mode === "deduction" && (
+            <p className="mb-3 text-xs text-muted">
+              Điểm tối đa: {stats.max_score}
+              {stats.zero_score_at ? ` · Từ ${stats.zero_score_at} lựa chọn: 0 điểm` : ""}
             </p>
           )}
           {stats.options.length ? (
@@ -30,7 +36,7 @@ function QuestionStatCard({ question }) {
               {stats.options.map((o) => (
                 <BarRow
                   key={o.option_id}
-                  label={`${o.option_text}${o.score != null ? ` · ${o.score} điểm` : ""}`}
+                  label={`${o.option_text}${o.score != null ? ` · ${stats.scoring_mode === "deduction" ? "trừ " : ""}${o.score} điểm` : ""}`}
                   percentage={o.percentage}
                   valueLabel={`${o.count} · ${o.percentage}%`}
                 />

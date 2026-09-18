@@ -155,6 +155,16 @@ class SurveyQuestion(TimestampMixin, db.Model):
     )
     yes_score: Mapped[float | None] = mapped_column(Float)
     no_score: Mapped[float | None] = mapped_column(Float)
+    scoring_mode: Mapped[str] = mapped_column(String(20), default="standard", nullable=False)
+    max_score: Mapped[float | None] = mapped_column(Float)
+    zero_score_at: Mapped[int | None] = mapped_column(Integer)
+    parent_question_id: Mapped[int | None] = mapped_column(
+        ForeignKey("survey_questions.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    trigger_option_id: Mapped[int | None] = mapped_column(
+        ForeignKey("survey_options.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    trigger_answer: Mapped[str | None] = mapped_column(String(20))
 
     survey: Mapped["Survey"] = relationship("Survey", back_populates="questions")
     section_record: Mapped["SurveySection | None"] = relationship(
@@ -165,6 +175,7 @@ class SurveyQuestion(TimestampMixin, db.Model):
         back_populates="question",
         cascade="all, delete-orphan",
         order_by="SurveyOption.sort_order",
+        foreign_keys="SurveyOption.question_id",
     )
 
     def to_dict(
@@ -185,12 +196,18 @@ class SurveyQuestion(TimestampMixin, db.Model):
             "sort_order": self.sort_order,
             "section": self.section_record.title if self.section_record else self.section,
             "section_id": self.section_id,
+            "parent_question_id": self.parent_question_id,
+            "trigger_option_id": self.trigger_option_id,
+            "trigger_answer": self.trigger_answer,
+            "scoring_mode": self.scoring_mode,
             "created_at": _iso(self.created_at),
             "updated_at": _iso(self.updated_at),
         }
         if include_scores:
             data["yes_score"] = self.yes_score
             data["no_score"] = self.no_score
+            data["max_score"] = self.max_score
+            data["zero_score_at"] = self.zero_score_at
         if include_options:
             opts = self.options
             if only_active_options:
@@ -218,7 +235,9 @@ class SurveyOption(TimestampMixin, db.Model):
     sort_order: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
 
-    question: Mapped["SurveyQuestion"] = relationship("SurveyQuestion", back_populates="options")
+    question: Mapped["SurveyQuestion"] = relationship(
+        "SurveyQuestion", back_populates="options", foreign_keys=[question_id]
+    )
 
     def to_dict(self, *, include_score: bool = True) -> dict:
         data = {
@@ -316,6 +335,10 @@ class SurveyAnswer(TimestampMixin, db.Model):
     )
     answer_text: Mapped[str | None] = mapped_column(Text)
     answer_number: Mapped[float | None] = mapped_column(Float)
+    # Freeze the effective score when submitted; NULL can mean intentionally unscored.
+    score_recorded: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    earned_score: Mapped[float | None] = mapped_column(Float)
+    score_in_total: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
 
     response: Mapped["SurveyResponse"] = relationship("SurveyResponse", back_populates="answers")
     question = relationship("SurveyQuestion")

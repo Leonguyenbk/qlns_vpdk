@@ -5,6 +5,12 @@ import { QuestionRenderer } from "../../components/surveys/QuestionRenderer";
 import { Button, FormField, Select, TextInput } from "../../components/ui/primitives";
 import { Spinner } from "../../components/ui/Spinner";
 import { apiErrorMessage } from "../../lib/api";
+import {
+  isQuestionAnswered,
+  visibleSurveyQuestions,
+  updateSurveyAnswer,
+  questionValue,
+} from "../../lib/surveyQuestions";
 
 const EMPTY_LIST = [];
 
@@ -14,13 +20,6 @@ function makeClientToken() {
   } catch {
     return `t-${Date.now()}-${Math.random().toString(16).slice(2)}`;
   }
-}
-
-function isAnswered(qtype, value) {
-  if (value === null || value === undefined) return false;
-  if (qtype === "multiple_choice") return Array.isArray(value) && value.length > 0;
-  if (qtype === "number" || qtype === "rating") return value !== null;
-  return String(value).trim() !== "";
 }
 
 function buildAnswerItem(question, value) {
@@ -47,6 +46,7 @@ export default function PublicSurveyPage() {
   const [clientToken] = useState(makeClientToken);
 
   const questions = survey?.questions || EMPTY_LIST;
+  const visibleQuestions = visibleSurveyQuestions(questions, answers);
   const branches = survey?.branches || EMPTY_LIST;
 
   // Mã QR dán tại chi nhánh mang theo ?branch=<mã hoặc id chi nhánh> — tự chọn
@@ -62,7 +62,7 @@ export default function PublicSurveyPage() {
   const requireContact = survey?.is_anonymous === false;
 
   const setAnswer = (qid, value) => {
-    setAnswers((a) => ({ ...a, [qid]: value }));
+    setAnswers((a) => updateSurveyAnswer(questions, a, qid, value));
     setErrors((e) => ({ ...e, [qid]: null }));
   };
 
@@ -77,8 +77,8 @@ export default function PublicSurveyPage() {
     if (requireContact && !respondentPhone.trim()) {
       nextErrors._phone = "Vui lòng nhập số điện thoại.";
     }
-    for (const q of questions) {
-      if (q.is_required && !isAnswered(q.question_type, answers[q.id])) {
+    for (const q of visibleQuestions) {
+      if (q.is_required && !isQuestionAnswered(q, questionValue(q, answers))) {
         nextErrors[q.id] = "Câu hỏi này là bắt buộc.";
       }
     }
@@ -92,9 +92,9 @@ export default function PublicSurveyPage() {
       document.getElementById(anchorId)?.scrollIntoView({ behavior: "smooth", block: "center" });
       return;
     }
-    const items = questions
-      .filter((q) => isAnswered(q.question_type, answers[q.id]))
-      .map((q) => buildAnswerItem(q, answers[q.id]));
+    const items = visibleQuestions
+      .filter((q) => isQuestionAnswered(q, questionValue(q, answers)))
+      .map((q) => buildAnswerItem(q, questionValue(q, answers)));
     try {
       await submit.mutateAsync({
         client_token: clientToken,
@@ -219,11 +219,15 @@ export default function PublicSurveyPage() {
       </div>
 
       <div className="grid gap-6">
-        {questions.map((q) => (
-          <div key={q.id} id={`q-${q.id}`}>
+        {visibleQuestions.map((q) => (
+          <div
+            key={q.id}
+            id={`q-${q.id}`}
+            className={q.parent_question_id ? "ml-3 border-l-2 border-rule pl-4" : ""}
+          >
             <QuestionRenderer
               question={q}
-              value={answers[q.id] ?? (q.question_type === "multiple_choice" ? [] : null)}
+              value={questionValue(q, answers)}
               onChange={(v) => setAnswer(q.id, v)}
               error={errors[q.id]}
               disabled={submit.isPending}

@@ -34,7 +34,7 @@ function ResponseCard({ response }) {
           {contact && <p className="text-xs text-muted">{contact}</p>}
           {response.answers.map((a) => (
             <div key={a.id} className="text-sm">
-              <p className="text-ink-2">{a.answer_text ?? a.option_text ?? a.answer_number ?? "—"}</p>
+              <p className="text-ink-2">{a.answer_text === "__none__" ? "Không chọn phương án nào" : a.answer_text ?? a.option_text ?? a.answer_number ?? "—"}</p>
             </div>
           ))}
         </div>

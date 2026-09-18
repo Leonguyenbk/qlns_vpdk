@@ -21,6 +21,8 @@ def _format_answer(answer) -> str:
     if answer.option_id and answer.option:
         return answer.option.option_text
     if answer.answer_text is not None:
+        if answer.answer_text == "__none__":
+            return "Không chọn phương án nào"
         if answer.answer_text == "yes":
             return "Có"
         if answer.answer_text == "no":
@@ -32,6 +34,8 @@ def _format_answer(answer) -> str:
 
 
 def _answer_score(answer):
+    if answer.score_recorded:
+        return answer.earned_score if answer.score_in_total and answer.earned_score is not None else ""
     if answer.option_id and answer.option and answer.option.score is not None:
         return answer.option.score
     if answer.question and answer.question.question_type == "rating":

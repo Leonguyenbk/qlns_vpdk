@@ -108,6 +108,7 @@ export default function SurveyQuestionsPage() {
                       canManage={canManage}
                       index={sectionCounter - 1}
                       sections={sections}
+                      questions={questions}
                     />
                   </div>
                 );

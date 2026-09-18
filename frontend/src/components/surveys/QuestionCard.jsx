@@ -10,13 +10,15 @@ import { IconGrip, IconTrash, IconCopy } from "../ui/icons";
 import { OptionRow } from "./OptionRow";
 import { ConfirmDialog } from "../ui/Modal";
 
-export function QuestionCard({ question, mutations, canManage, index, sections = [] }) {
+export function QuestionCard({ question, mutations, canManage, index, sections = [], questions = [] }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: `question-${question.id}`,
   });
   const [text, setText] = useState(question.question_text);
   const [yesScore, setYesScore] = useState(question.yes_score ?? "");
   const [noScore, setNoScore] = useState(question.no_score ?? "");
+  const [maxScore, setMaxScore] = useState(question.max_score ?? "");
+  const [zeroScoreAt, setZeroScoreAt] = useState(question.zero_score_at ?? "");
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [newOption, setNewOption] = useState("");
   const [newOptionScore, setNewOptionScore] = useState("");
@@ -25,6 +27,18 @@ export function QuestionCard({ question, mutations, canManage, index, sections =
   useEffect(() => setText(question.question_text), [question.question_text]);
   useEffect(() => setYesScore(question.yes_score ?? ""), [question.yes_score]);
   useEffect(() => setNoScore(question.no_score ?? ""), [question.no_score]);
+  useEffect(() => setMaxScore(question.max_score ?? ""), [question.max_score]);
+  useEffect(() => setZeroScoreAt(question.zero_score_at ?? ""), [question.zero_score_at]);
+
+  const parentQuestions = questions.filter(
+    (q) =>
+      q.id !== question.id &&
+      q.is_active &&
+      !q.parent_question_id &&
+      q.scoring_mode !== "deduction" &&
+      ["yes_no", "single_choice", "multiple_choice"].includes(q.question_type)
+  );
+  const selectedParent = parentQuestions.find((q) => q.id === question.parent_question_id);
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 4 } }));
 
@@ -80,6 +94,72 @@ export function QuestionCard({ question, mutations, canManage, index, sections =
       toast.error(apiErrorMessage(err));
       setYesScore(question.yes_score ?? "");
       setNoScore(question.no_score ?? "");
+    }
+  };
+
+  const saveDeductionSettings = async () => {
+    const nextMax = maxScore === "" ? null : Number(maxScore);
+    const nextZero = zeroScoreAt === "" ? null : Number(zeroScoreAt);
+    if (nextMax === (question.max_score ?? null) && nextZero === (question.zero_score_at ?? null)) return;
+    try {
+      const resp = await mutations.update.mutateAsync({
+        id: question.id,
+        body: { max_score: nextMax, zero_score_at: nextZero },
+      });
+      notifyRevision(resp.data.data);
+    } catch (err) {
+      toast.error(apiErrorMessage(err));
+      setMaxScore(question.max_score ?? "");
+      setZeroScoreAt(question.zero_score_at ?? "");
+    }
+  };
+
+  const changeScoringMode = async (mode) => {
+    try {
+      const resp = await mutations.update.mutateAsync({
+        id: question.id,
+        body: {
+          scoring_mode: mode,
+          max_score: mode === "deduction" ? question.max_score ?? 0 : null,
+          zero_score_at: mode === "deduction" ? question.zero_score_at : null,
+        },
+      });
+      notifyRevision(resp.data.data);
+    } catch (err) {
+      toast.error(apiErrorMessage(err));
+    }
+  };
+
+  const changeParent = async (parentId) => {
+    const parent = parentQuestions.find((q) => String(q.id) === String(parentId));
+    const body = parent
+      ? {
+          parent_question_id: parent.id,
+          trigger_answer: parent.question_type === "yes_no" ? "yes" : null,
+          trigger_option_id:
+            parent.question_type === "yes_no"
+              ? null
+              : parent.options.find((o) => o.is_active)?.id || null,
+        }
+      : { parent_question_id: null, trigger_answer: null, trigger_option_id: null };
+    try {
+      await mutations.update.mutateAsync({ id: question.id, body });
+    } catch (err) {
+      toast.error(apiErrorMessage(err));
+    }
+  };
+
+  const changeTrigger = async (value) => {
+    try {
+      await mutations.update.mutateAsync({
+        id: question.id,
+        body:
+          selectedParent?.question_type === "yes_no"
+            ? { trigger_answer: value, trigger_option_id: null }
+            : { trigger_option_id: Number(value), trigger_answer: null },
+      });
+    } catch (err) {
+      toast.error(apiErrorMessage(err));
     }
   };
 
@@ -224,6 +304,48 @@ export function QuestionCard({ question, mutations, canManage, index, sections =
             onBlur={saveText}
           />
 
+          {canManage && parentQuestions.length > 0 && (
+            <div className="mb-3 grid gap-2 rounded-lg border border-rule bg-paper-2 p-3 sm:grid-cols-2">
+              {question.parent_question_id && (
+                <p className="text-xs text-muted sm:col-span-2">Điểm câu phụ thay điểm đáp án kích hoạt; chỉ tính một lần trong tổng hợp. Hỗ trợ một cấp câu hỏi phụ.</p>
+              )}
+              <label className="text-xs font-medium text-ink-2">
+                Câu hỏi phụ của
+                <Select
+                  className="mt-1"
+                  value={question.parent_question_id || ""}
+                  onChange={(e) => changeParent(e.target.value)}
+                >
+                  <option value="">Không phải câu hỏi phụ</option>
+                  {parentQuestions.map((q) => (
+                    <option key={q.id} value={q.id}>{q.question_text}</option>
+                  ))}
+                </Select>
+              </label>
+              {selectedParent && (
+                <label className="text-xs font-medium text-ink-2">
+                  Hiển thị khi trả lời
+                  <Select
+                    className="mt-1"
+                    value={question.trigger_answer || question.trigger_option_id || ""}
+                    onChange={(e) => changeTrigger(e.target.value)}
+                  >
+                    {selectedParent.question_type === "yes_no" ? (
+                      <>
+                        <option value="yes">Có</option>
+                        <option value="no">Không</option>
+                      </>
+                    ) : (
+                      selectedParent.options.filter((o) => o.is_active).map((o) => (
+                        <option key={o.id} value={o.id}>{o.option_text}</option>
+                      ))
+                    )}
+                  </Select>
+                </label>
+              )}
+            </div>
+          )}
+
           <div className="mb-3 flex flex-wrap items-center gap-3">
             <Select
               value={question.question_type}
@@ -289,12 +411,64 @@ export function QuestionCard({ question, mutations, canManage, index, sections =
             </div>
           )}
 
+          {question.question_type === "multiple_choice" && (
+            <div className="mb-3 grid gap-2 rounded-lg bg-paper-2 p-3">
+              <label className="text-xs font-medium text-ink-2">
+                Cách tính điểm
+                <Select
+                  className="mt-1"
+                  value={question.scoring_mode || "standard"}
+                  disabled={!canManage}
+                  onChange={(e) => changeScoringMode(e.target.value)}
+                >
+                  <option value="standard">Điểm theo từng phương án đã chọn</option>
+                  <option value="deduction">Trừ điểm từ điểm tối đa</option>
+                </Select>
+              </label>
+              {question.scoring_mode === "deduction" && (
+                <div
+                  className="grid grid-cols-2 gap-2"
+                  onBlur={(event) => {
+                    if (!event.currentTarget.contains(event.relatedTarget)) saveDeductionSettings();
+                  }}
+                >
+                  <label className="text-xs font-medium text-ink-2">
+                    Điểm tối đa
+                    <input
+                      type="number"
+                      step="any"
+                      className="input mt-1 py-1.5 text-sm"
+                      value={maxScore}
+                      disabled={!canManage}
+                      onChange={(e) => setMaxScore(e.target.value)}
+                    />
+                  </label>
+                  <label className="text-xs font-medium text-ink-2">
+                    Từ số lựa chọn thì về 0
+                    <input
+                      type="number"
+                      min="1"
+                      className="input mt-1 py-1.5 text-sm"
+                      placeholder="Không dùng ngưỡng"
+                      value={zeroScoreAt}
+                      disabled={!canManage}
+                      onChange={(e) => setZeroScoreAt(e.target.value)}
+                    />
+                  </label>
+                </div>
+              )}
+              {question.scoring_mode === "deduction" && (
+                <p className="text-[11px] text-muted">Không chọn phương án nào sẽ nhận trọn điểm tối đa.</p>
+              )}
+            </div>
+          )}
+
           {hasOptions && (
             <div className="mb-3 ml-1 grid gap-1.5">
               <div className="hidden grid-cols-[1rem_minmax(0,1fr)_5rem_1.5rem] gap-2 px-0.5 text-[11px] font-medium text-muted sm:grid">
                 <span />
                 <span>Nội dung phương án</span>
-                <span>Điểm</span>
+                <span>{question.scoring_mode === "deduction" ? "Điểm trừ" : "Điểm"}</span>
                 <span />
               </div>
               <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onOptionDragEnd}>
@@ -309,6 +483,7 @@ export function QuestionCard({ question, mutations, canManage, index, sections =
                       disabled={!canManage}
                       onSave={(body) => saveOption(o, body)}
                       onDelete={() => deleteOption(o)}
+                      scoreLabel={question.scoring_mode === "deduction" ? "Điểm trừ" : "Điểm"}
                     />
                   ))}
                 </SortableContext>
@@ -326,7 +501,7 @@ export function QuestionCard({ question, mutations, canManage, index, sections =
                     type="number"
                     step="any"
                     className="input w-20 shrink-0 py-1.5 text-sm"
-                    placeholder="Điểm"
+                    placeholder={question.scoring_mode === "deduction" ? "Điểm trừ" : "Điểm"}
                     aria-label="Điểm phương án mới"
                     value={newOptionScore}
                     onChange={(e) => setNewOptionScore(e.target.value)}

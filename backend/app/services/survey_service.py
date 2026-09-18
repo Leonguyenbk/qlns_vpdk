@@ -245,6 +245,8 @@ def duplicate_survey(survey_id: int, *, actor, meta: dict) -> dict:
         db.session.flush()
         section_ids[section.id] = copied_section.id
 
+    question_copies = {}
+    option_copies = {}
     for q in sorted(survey.questions, key=lambda x: x.sort_order):
         if not q.is_active:
             continue
@@ -259,14 +261,18 @@ def duplicate_survey(survey_id: int, *, actor, meta: dict) -> dict:
             section_id=section_ids.get(q.section_id),
             yes_score=q.yes_score,
             no_score=q.no_score,
+            scoring_mode=q.scoring_mode,
+            max_score=q.max_score,
+            zero_score_at=q.zero_score_at,
+            trigger_answer=q.trigger_answer,
         )
         db.session.add(new_q)
         db.session.flush()
+        question_copies[q.id] = new_q
         for o in sorted(q.options, key=lambda x: x.sort_order):
             if not o.is_active:
                 continue
-            db.session.add(
-                SurveyOption(
+            copied_option = SurveyOption(
                     question_id=new_q.id,
                     option_text=o.option_text,
                     option_value=o.option_value,
@@ -274,7 +280,18 @@ def duplicate_survey(survey_id: int, *, actor, meta: dict) -> dict:
                     sort_order=o.sort_order,
                     is_active=True,
                 )
-            )
+            db.session.add(copied_option)
+            db.session.flush()
+            option_copies[o.id] = copied_option.id
+    for q in survey.questions:
+        if q.id not in question_copies or not q.parent_question_id:
+            continue
+        copied = question_copies[q.id]
+        parent_copy = question_copies.get(q.parent_question_id)
+        if parent_copy is None:
+            raise ValidationError("Câu hỏi phụ đang liên kết câu cha đã tắt; hãy kiểm tra trước khi sao chép.")
+        copied.parent_question_id = parent_copy.id
+        copied.trigger_option_id = option_copies.get(q.trigger_option_id)
     db.session.flush()
     record_audit(
         user_id=actor.id,

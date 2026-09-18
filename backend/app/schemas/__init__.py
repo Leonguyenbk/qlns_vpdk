@@ -327,7 +327,10 @@ class SurveySectionUpdateSchema(ApiSchema):
 
 
 class SurveyQuestionCreateSchema(ApiSchema):
-    nullable_fields = {"section", "section_id", "yes_score", "no_score"}
+    nullable_fields = {
+        "section", "section_id", "yes_score", "no_score", "max_score", "zero_score_at",
+        "parent_question_id", "trigger_option_id", "trigger_answer",
+    }
     question_text = fields.String(required=True, error_messages=required)
     question_type = fields.String(
         required=True, validate=validate.OneOf(sorted(QUESTION_TYPES)), error_messages=required
@@ -338,11 +341,20 @@ class SurveyQuestionCreateSchema(ApiSchema):
     section_id = fields.Integer(allow_none=True, strict=True)
     yes_score = fields.Float(allow_none=True)
     no_score = fields.Float(allow_none=True)
+    scoring_mode = fields.String(load_default="standard", validate=validate.OneOf(["standard", "deduction"]))
+    max_score = fields.Float(allow_none=True)
+    zero_score_at = fields.Integer(allow_none=True, strict=True, validate=validate.Range(min=1))
+    parent_question_id = fields.Integer(allow_none=True, strict=True)
+    trigger_option_id = fields.Integer(allow_none=True, strict=True)
+    trigger_answer = fields.String(allow_none=True, validate=validate.OneOf(["yes", "no"]))
     options = fields.List(fields.Nested(SurveyOptionInputSchema), load_default=list)
 
 
 class SurveyQuestionUpdateSchema(ApiSchema):
-    nullable_fields = {"section", "section_id", "yes_score", "no_score"}
+    nullable_fields = {
+        "section", "section_id", "yes_score", "no_score", "max_score", "zero_score_at",
+        "parent_question_id", "trigger_option_id", "trigger_answer",
+    }
     question_text = fields.String()
     question_type = fields.String(validate=validate.OneOf(sorted(QUESTION_TYPES)))
     is_required = fields.Boolean()
@@ -351,6 +363,12 @@ class SurveyQuestionUpdateSchema(ApiSchema):
     section_id = fields.Integer(allow_none=True, strict=True)
     yes_score = fields.Float(allow_none=True)
     no_score = fields.Float(allow_none=True)
+    scoring_mode = fields.String(validate=validate.OneOf(["standard", "deduction"]))
+    max_score = fields.Float(allow_none=True)
+    zero_score_at = fields.Integer(allow_none=True, strict=True, validate=validate.Range(min=1))
+    parent_question_id = fields.Integer(allow_none=True, strict=True)
+    trigger_option_id = fields.Integer(allow_none=True, strict=True)
+    trigger_answer = fields.String(allow_none=True, validate=validate.OneOf(["yes", "no"]))
     options = fields.List(fields.Nested(SurveyOptionInputSchema))
 
 

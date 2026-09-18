@@ -17,6 +17,7 @@ from ..models import Employee, OrganizationUnit
 from ..models.survey import Survey, SurveyAnswer, SurveyBranchLimit, SurveyQuestion, SurveyResponse
 from .survey_filters import apply_branch_scope, apply_response_filters
 from .survey_service import get_survey_or_404
+from .survey_scoring import record_scores
 
 
 def _assert_submittable(survey: Survey) -> None:
@@ -91,7 +92,10 @@ def get_public_survey(slug: str) -> dict:
     return data
 
 
-def _is_answered(item: dict | None, qtype: str) -> bool:
+def _is_answered(item: dict | None, question: SurveyQuestion) -> bool:
+    qtype = question.question_type
+    if qtype == "multiple_choice" and question.scoring_mode == "deduction":
+        return True
     if item is None:
         return False
     if qtype == "single_choice":
@@ -101,6 +105,22 @@ def _is_answered(item: dict | None, qtype: str) -> bool:
     if qtype in ("rating", "number"):
         return item.get("answer_number") is not None
     return bool(clean_str(item.get("answer_text")))
+
+
+def _condition_satisfied(question: SurveyQuestion, answers_by_question: dict[int, dict]) -> bool:
+    if question.parent_question_id is None:
+        return True
+    parent_item = answers_by_question.get(question.parent_question_id)
+    if parent_item is None:
+        return False
+    if question.trigger_answer is not None:
+        return clean_str(parent_item.get("answer_text")) == question.trigger_answer
+    if question.trigger_option_id is not None:
+        selected = parent_item.get("option_ids") or (
+            [parent_item["option_id"]] if parent_item.get("option_id") is not None else []
+        )
+        return question.trigger_option_id in selected
+    return False
 
 
 def _validate_answer(question: SurveyQuestion, item: dict) -> list[dict]:
@@ -118,6 +138,9 @@ def _validate_answer(question: SurveyQuestion, item: dict) -> list[dict]:
         option_ids = item.get("option_ids") or (
             [item["option_id"]] if item.get("option_id") is not None else []
         )
+        option_ids = list(dict.fromkeys(option_ids))
+        if not option_ids and question.scoring_mode == "deduction":
+            return [{"answer_text": "__none__"}]
         if not option_ids:
             raise ValidationError(f"Câu hỏi '{label}' cần chọn ít nhất một phương án.")
         valid_ids = {o.id for o in question.options if o.is_active}
@@ -180,18 +203,27 @@ def submit_response(survey_id: int, data: dict, *, meta: dict) -> tuple[dict, bo
     questions = (
         db.session.query(SurveyQuestion)
         .filter(SurveyQuestion.survey_id == survey.id, SurveyQuestion.is_active.is_(True))
+        .order_by(SurveyQuestion.sort_order, SurveyQuestion.id)
         .all()
     )
     answers_by_question = {a["question_id"]: a for a in data.get("answers", [])}
+    active_ids = {q.id for q in questions}
+    visible_questions = [
+        q for q in questions
+        if (q.parent_question_id is None or q.parent_question_id in active_ids)
+        and _condition_satisfied(q, answers_by_question)
+    ]
 
     planned: list[tuple[SurveyQuestion, list[dict]]] = []
-    for q in questions:
+    for q in visible_questions:
         item = answers_by_question.get(q.id)
-        if not _is_answered(item, q.question_type):
+        if not _is_answered(item, q):
             if q.is_required:
                 raise ValidationError(f"Câu hỏi '{q.question_text}' là bắt buộc.")
             continue
-        planned.append((q, _validate_answer(q, item)))
+        planned.append((q, _validate_answer(q, item or {"question_id": q.id, "option_ids": []})))
+
+    record_scores(planned, visible_questions)
 
     branch_id = data.get("branch_id")
     if branch_id is not None and db.session.get(OrganizationUnit, branch_id) is None:

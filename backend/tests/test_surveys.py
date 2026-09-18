@@ -213,6 +213,131 @@ def test_multiple_choice_saved_and_counted_correctly(client, admin_user, auth_he
     assert counted[opt_ids[1]] == 1
 
 
+def test_conditional_question_is_required_only_when_triggered_and_scores_child(
+    client, admin_user, auth_header
+):
+    headers = auth_header("admin_test")
+    survey = _create_survey(client, headers, title="Khảo sát có câu hỏi phụ")
+    parent = client.post(
+        f"/api/surveys/{survey['id']}/questions",
+        headers=headers,
+        json={
+            "question_text": "Hồ sơ có xử lý đúng hạn không?",
+            "question_type": "yes_no",
+            "is_required": True,
+            "yes_score": 10,
+        },
+    ).get_json()["data"]
+    child_response = client.post(
+        f"/api/surveys/{survey['id']}/questions",
+        headers=headers,
+        json={
+            "question_text": "Nếu không, nguyên nhân là gì?",
+            "question_type": "single_choice",
+            "is_required": True,
+            "parent_question_id": parent["id"],
+            "trigger_answer": "no",
+            "options": [
+                {"option_text": "Thiếu giấy tờ", "score": 4},
+                {"option_text": "Lý do khác", "score": 1},
+            ],
+        },
+    )
+    assert child_response.status_code == 201, child_response.get_json()
+    child = child_response.get_json()["data"]
+    client.post(
+        f"/api/surveys/{survey['id']}/status", headers=headers, json={"status": "active"}
+    )
+
+    public = client.get(f"/api/public/surveys/{survey['slug']}").get_json()["data"]
+    public_child = next(q for q in public["questions"] if q["id"] == child["id"])
+    assert public_child["parent_question_id"] == parent["id"]
+    assert public_child["trigger_answer"] == "no"
+    assert "max_score" not in public_child
+
+    yes_response = client.post(
+        f"/api/public/surveys/{survey['id']}/submit",
+        json={"answers": [{"question_id": parent["id"], "answer_text": "yes"}]},
+    )
+    assert yes_response.status_code == 201, yes_response.get_json()
+    assert len(yes_response.get_json()["data"]["answers"]) == 1
+
+    missing_child = client.post(
+        f"/api/public/surveys/{survey['id']}/submit",
+        json={"answers": [{"question_id": parent["id"], "answer_text": "no"}]},
+    )
+    assert missing_child.status_code == 422
+
+    no_response = client.post(
+        f"/api/public/surveys/{survey['id']}/submit",
+        json={
+            "answers": [
+                {"question_id": parent["id"], "answer_text": "no"},
+                {"question_id": child["id"], "option_id": child["options"][0]["id"]},
+            ]
+        },
+    )
+    assert no_response.status_code == 201, no_response.get_json()
+
+    stats = client.get(
+        f"/api/surveys/{survey['id']}/statistics", headers=headers
+    ).get_json()["data"]
+    assert stats["overview"]["average_score"] == 7.0
+
+
+def test_multiple_choice_deduction_scores_none_one_two_and_threshold(
+    client, admin_user, auth_header
+):
+    headers = auth_header("admin_test")
+    survey = _create_survey(client, headers, title="Khảo sát trừ điểm")
+    response = client.post(
+        f"/api/surveys/{survey['id']}/questions",
+        headers=headers,
+        json={
+            "question_text": "Chọn các lỗi được ghi nhận",
+            "question_type": "multiple_choice",
+            "scoring_mode": "deduction",
+            "max_score": 10,
+            "zero_score_at": 3,
+            "options": [
+                {"option_text": "Lỗi 1", "score": 3},
+                {"option_text": "Lỗi 2", "score": 3},
+                {"option_text": "Lỗi 3", "score": 3},
+                {"option_text": "Lỗi 4", "score": 3},
+            ],
+        },
+    )
+    assert response.status_code == 201, response.get_json()
+    question = response.get_json()["data"]
+    option_ids = [option["id"] for option in question["options"]]
+    client.post(
+        f"/api/surveys/{survey['id']}/status", headers=headers, json={"status": "active"}
+    )
+
+    public = client.get(f"/api/public/surveys/{survey['slug']}").get_json()["data"]
+    public_question = public["questions"][0]
+    assert public_question["scoring_mode"] == "deduction"
+    assert "max_score" not in public_question
+    assert all("score" not in option for option in public_question["options"])
+
+    for selected in ([], option_ids[:1], option_ids[:2], option_ids[:3]):
+        result = client.post(
+            f"/api/public/surveys/{survey['id']}/submit",
+            json={"answers": [{"question_id": question["id"], "option_ids": selected}]},
+        )
+        assert result.status_code == 201, result.get_json()
+
+    stats = client.get(
+        f"/api/surveys/{survey['id']}/statistics", headers=headers
+    ).get_json()["data"]
+    assert stats["overview"]["average_score"] == 5.25
+    assert stats["overview"]["score_answer_count"] == 4
+    question_stats = stats["by_question"][0]["stats"]
+    assert question_stats["average_score"] == 5.25
+    assert question_stats["scored_answers"] == 4
+    assert question_stats["scoring_mode"] == "deduction"
+
+
 def test_scored_options_calculate_average_and_rank_branches(
     client, admin_user, auth_header, make_unit
 ):

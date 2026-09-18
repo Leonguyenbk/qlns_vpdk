@@ -3,7 +3,7 @@ import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { IconGrip, IconTrash } from "../ui/icons";
 
-export function OptionRow({ option, onSave, onDelete, disabled }) {
+export function OptionRow({ option, onSave, onDelete, disabled, scoreLabel = "Điểm" }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: `option-${option.id}`,
   });
@@ -61,8 +61,8 @@ export function OptionRow({ option, onSave, onDelete, disabled }) {
         className="input w-20 shrink-0 py-1.5 text-sm"
         value={score}
         disabled={disabled}
-        aria-label={`Điểm cho ${option.option_text}`}
-        placeholder="Điểm"
+        aria-label={`${scoreLabel} cho ${option.option_text}`}
+        placeholder={scoreLabel}
         onChange={(e) => setScore(e.target.value)}
         onKeyDown={(e) => e.key === "Enter" && e.currentTarget.blur()}
       />

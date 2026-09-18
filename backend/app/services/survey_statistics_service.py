@@ -33,7 +33,13 @@ def _normalize_label(text: str | None) -> str:
 
 def _score_sources(
     survey_id: int,
-) -> tuple[list[int], dict[int, float], dict[int, dict[str, float]], dict[int, float]]:
+) -> tuple[
+    list[int],
+    dict[int, float],
+    dict[int, dict[str, float]],
+    dict[int, float],
+    dict[int, dict],
+]:
     """Trả về nguồn điểm của khảo sát.
 
     Điểm cấu hình trên phương án được ưu tiên và áp dụng cả cho phiên bản phương
@@ -49,6 +55,7 @@ def _score_sources(
     option_score_map: dict[int, float] = {}
     yes_no_score_map: dict[int, dict[str, float]] = {}
     satisfaction_option_map: dict[int, float] = {}
+    deduction_question_map: dict[int, dict] = {}
     for q in questions:
         if q.question_type == "rating":
             rating_question_ids.append(q.id)
@@ -60,7 +67,15 @@ def _score_sources(
                 scores["no"] = float(q.no_score)
             if scores:
                 yes_no_score_map[q.id] = scores
-        if q.question_type in ("single_choice", "multiple_choice"):
+        if q.question_type == "multiple_choice" and q.scoring_mode == "deduction":
+            deduction_question_map[q.id] = {
+                "max_score": float(q.max_score or 0),
+                "zero_score_at": q.zero_score_at,
+                "option_scores": {
+                    option.id: float(option.score or 0) for option in q.options
+                },
+            }
+        elif q.question_type in ("single_choice", "multiple_choice"):
             for option in q.options:
                 if option.score is not None:
                     option_score_map[option.id] = float(option.score)
@@ -83,6 +98,7 @@ def _score_sources(
         option_score_map,
         yes_no_score_map,
         satisfaction_option_map,
+        deduction_question_map,
     )
 
 
@@ -91,17 +107,30 @@ def _score_values_by_response(
     rating_question_ids: list[int],
     option_score_map: dict[int, float],
     yes_no_score_map: dict[int, dict[str, float]] | None = None,
+    deduction_question_map: dict[int, dict] | None = None,
+    *, use_recorded_scores: bool = True,
 ) -> dict[int, list[float]]:
     """{response_id: [điểm, ...]} từ câu rating và phương án có cấu hình điểm."""
     values_by_response: dict[int, list[float]] = defaultdict(list)
     if not response_ids:
         return values_by_response
+    if use_recorded_scores:
+        snapshots = db.session.query(SurveyAnswer.response_id, SurveyAnswer.earned_score).filter(
+            SurveyAnswer.response_id.in_(response_ids),
+            SurveyAnswer.score_recorded.is_(True),
+            SurveyAnswer.score_in_total.is_(True),
+            SurveyAnswer.earned_score.isnot(None),
+        ).all()
+        for rid, score in snapshots:
+            values_by_response[rid].append(float(score))
+    legacy_filter = SurveyAnswer.score_recorded.is_(False) if use_recorded_scores else db.true()
     if rating_question_ids:
         rows = (
             db.session.query(SurveyAnswer.response_id, SurveyAnswer.answer_number)
             .filter(
                 SurveyAnswer.response_id.in_(response_ids),
                 SurveyAnswer.question_id.in_(rating_question_ids),
+                legacy_filter,
             )
             .all()
         )
@@ -114,6 +143,7 @@ def _score_values_by_response(
             .filter(
                 SurveyAnswer.response_id.in_(response_ids),
                 SurveyAnswer.option_id.in_(option_score_map.keys()),
+                legacy_filter,
             )
             .all()
         )
@@ -129,6 +159,7 @@ def _score_values_by_response(
             .filter(
                 SurveyAnswer.response_id.in_(response_ids),
                 SurveyAnswer.question_id.in_(yes_no_score_map.keys()),
+                legacy_filter,
             )
             .all()
         )
@@ -136,6 +167,37 @@ def _score_values_by_response(
             score = yes_no_score_map[question_id].get(answer_text)
             if score is not None:
                 values_by_response[response_id].append(score)
+    if deduction_question_map:
+        rows = (
+            db.session.query(
+                SurveyAnswer.response_id,
+                SurveyAnswer.question_id,
+                SurveyAnswer.option_id,
+            )
+            .filter(
+                SurveyAnswer.response_id.in_(response_ids),
+                SurveyAnswer.question_id.in_(deduction_question_map.keys()),
+                legacy_filter,
+            )
+            .all()
+        )
+        selected_by_response: dict[tuple[int, int], list[int]] = defaultdict(list)
+        answered_pairs: set[tuple[int, int]] = set()
+        for response_id, question_id, option_id in rows:
+            key = (response_id, question_id)
+            answered_pairs.add(key)
+            if option_id is not None:
+                selected_by_response[key].append(option_id)
+        for response_id, question_id in answered_pairs:
+            config = deduction_question_map[question_id]
+            selected = selected_by_response[(response_id, question_id)]
+            threshold = config["zero_score_at"]
+            if threshold is not None and len(selected) >= threshold:
+                score = 0.0
+            else:
+                deduction = sum(config["option_scores"].get(option_id, 0) for option_id in selected)
+                score = max(0.0, config["max_score"] - deduction)
+            values_by_response[response_id].append(score)
     return values_by_response
 
 
@@ -149,14 +211,24 @@ def _scoped_response_ids(survey_id: int, args, *, actor, scope) -> list[int]:
 def get_statistics(survey_id: int, args, *, actor, scope) -> dict:
     get_survey_or_404(survey_id)
     response_ids = _scoped_response_ids(survey_id, args, actor=actor, scope=scope)
-    rating_qids, option_score_map, yes_no_score_map, satisfaction_option_map = (
+    (
+        rating_qids,
+        option_score_map,
+        yes_no_score_map,
+        satisfaction_option_map,
+        deduction_question_map,
+    ) = (
         _score_sources(survey_id)
     )
     values_by_response = _score_values_by_response(
-        response_ids, rating_qids, option_score_map, yes_no_score_map
+        response_ids,
+        rating_qids,
+        option_score_map,
+        yes_no_score_map,
+        deduction_question_map,
     )
     satisfaction_by_response = _score_values_by_response(
-        response_ids, rating_qids, satisfaction_option_map
+        response_ids, rating_qids, satisfaction_option_map, use_recorded_scores=False
     )
     return {
         "overview": _overview(
@@ -297,24 +369,53 @@ def _question_stats(question: dict, response_ids: list[int]) -> dict:
             .group_by(SurveyAnswer.option_id)
             .all()
         )
-        scored_rows = (
-            db.session.query(SurveyOption.score)
-            .join(SurveyAnswer, SurveyAnswer.option_id == SurveyOption.id)
-            .filter(
-                SurveyAnswer.question_id == qid,
-                SurveyAnswer.response_id.in_(response_ids),
-                SurveyOption.score.isnot(None),
+        if question.get("scoring_mode") == "deduction":
+            answer_rows = (
+                db.session.query(SurveyAnswer.response_id, SurveyAnswer.option_id)
+                .filter(
+                    SurveyAnswer.question_id == qid,
+                    SurveyAnswer.response_id.in_(response_ids),
+                )
+                .all()
             )
-            .all()
-        )
-        scored_values = [float(row[0]) for row in scored_rows]
+            selected_by_response: dict[int, list[int]] = defaultdict(list)
+            answered_response_ids: set[int] = set()
+            for response_id, option_id in answer_rows:
+                answered_response_ids.add(response_id)
+                if option_id is not None:
+                    selected_by_response[response_id].append(option_id)
+            option_scores = {
+                option["id"]: float(option.get("score") or 0)
+                for option in question["options"]
+            }
+            scored_values = []
+            for response_id in answered_response_ids:
+                selected = selected_by_response[response_id]
+                threshold = question.get("zero_score_at")
+                if threshold is not None and len(selected) >= threshold:
+                    scored_values.append(0.0)
+                else:
+                    deduction = sum(option_scores.get(option_id, 0) for option_id in selected)
+                    scored_values.append(max(0.0, float(question.get("max_score") or 0) - deduction))
+        else:
+            scored_rows = (
+                db.session.query(SurveyOption.score)
+                .join(SurveyAnswer, SurveyAnswer.option_id == SurveyOption.id)
+                .filter(
+                    SurveyAnswer.question_id == qid,
+                    SurveyAnswer.response_id.in_(response_ids),
+                    SurveyOption.score.isnot(None),
+                )
+                .all()
+            )
+            scored_values = [float(row[0]) for row in scored_rows]
         option_rows = list(question["options"])
         visible_option_ids = {option["id"] for option in option_rows}
         historical_options = (
             db.session.query(SurveyOption)
             .filter(
                 SurveyOption.question_id == qid,
-                SurveyOption.id.in_(set(counts) - visible_option_ids),
+                SurveyOption.id.in_({option_id for option_id in counts if option_id is not None} - visible_option_ids),
             )
             .order_by(SurveyOption.sort_order, SurveyOption.id)
             .all()
@@ -345,6 +446,9 @@ def _question_stats(question: dict, response_ids: list[int]) -> dict:
             if scored_values
             else None,
             "scored_answers": len(scored_values),
+            "scoring_mode": question.get("scoring_mode", "standard"),
+            "max_score": question.get("max_score"),
+            "zero_score_at": question.get("zero_score_at"),
             "options": options,
         }
 
@@ -432,7 +536,26 @@ def _by_question(survey_id: int, response_ids: list[int]) -> list[dict]:
     questions = list_questions(survey_id, include_inactive=False)
     if not response_ids:
         return [{**q, "stats": _empty_question_stats(q["question_type"])} for q in questions]
-    return [{**q, "stats": _question_stats(q, response_ids)} for q in questions]
+    result = []
+    # Include historical option versions when combining old answers and frozen scores.
+    from sqlalchemy.orm import joinedload
+    from .survey_scoring import legacy_answer_score
+    answers = db.session.query(SurveyAnswer).options(
+        joinedload(SurveyAnswer.option), joinedload(SurveyAnswer.question)
+    ).filter(SurveyAnswer.response_id.in_(response_ids)).all()
+    scores_by_question = defaultdict(list)
+    for answer in answers:
+        score = answer.earned_score if answer.score_recorded else legacy_answer_score(answer)
+        if score is not None:
+            scores_by_question[answer.question_id].append(float(score))
+    for q in questions:
+        stats = _question_stats(q, response_ids)
+        if stats["type"] in ("choice", "yes_no"):
+            scores = scores_by_question[q["id"]]
+            stats["average_score"] = round(sum(scores) / len(scores), 2) if scores else None
+            stats["scored_answers"] = len(scores)
+        result.append({**q, "stats": stats})
+    return result
 
 
 def _time_series(response_ids: list[int]) -> list[dict]:

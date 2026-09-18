@@ -13,6 +13,12 @@ const EMPTY = {
   section_id: "",
   yes_score: "",
   no_score: "",
+  scoring_mode: "standard",
+  max_score: "",
+  zero_score_at: "",
+  parent_question_id: "",
+  trigger_option_id: "",
+  trigger_answer: "",
 };
 
 export function AddQuestionModal({ open, onClose, onCreate, existingQuestions = [], sections = [] }) {
@@ -27,6 +33,15 @@ export function AddQuestionModal({ open, onClose, onCreate, existingQuestions = 
   const hasOptions = QUESTION_TYPES_WITH_OPTIONS.has(form.question_type);
 
   const sourceQuestions = existingQuestions.filter((q) => q.is_active);
+  const parentQuestions = sourceQuestions.filter(
+    (q) =>
+      !q.parent_question_id &&
+      q.scoring_mode !== "deduction" &&
+      ["yes_no", "single_choice", "multiple_choice"].includes(q.question_type)
+  );
+  const selectedParent = parentQuestions.find(
+    (q) => String(q.id) === String(form.parent_question_id)
+  );
 
   const reset = () => {
     setForm({ ...EMPTY, section_id: lastSectionId });
@@ -48,6 +63,12 @@ export function AddQuestionModal({ open, onClose, onCreate, existingQuestions = 
       section_id: source.section_id || "",
       yes_score: source.yes_score ?? "",
       no_score: source.no_score ?? "",
+      scoring_mode: source.scoring_mode || "standard",
+      max_score: source.max_score ?? "",
+      zero_score_at: source.zero_score_at ?? "",
+      parent_question_id: source.parent_question_id || "",
+      trigger_option_id: source.trigger_option_id || "",
+      trigger_answer: source.trigger_answer || "",
     });
     const copied = source.options
       .filter((o) => o.is_active)
@@ -70,6 +91,14 @@ export function AddQuestionModal({ open, onClose, onCreate, existingQuestions = 
       toast.error("Cần ít nhất 2 phương án trả lời");
       return;
     }
+    if (
+      form.question_type === "multiple_choice" &&
+      form.scoring_mode === "deduction" &&
+      form.max_score === ""
+    ) {
+      toast.error("Nhập điểm tối đa cho câu trừ điểm");
+      return;
+    }
     setSaving(true);
     try {
       await onCreate({
@@ -81,6 +110,21 @@ export function AddQuestionModal({ open, onClose, onCreate, existingQuestions = 
           form.question_type === "yes_no" && form.yes_score !== "" ? Number(form.yes_score) : null,
         no_score:
           form.question_type === "yes_no" && form.no_score !== "" ? Number(form.no_score) : null,
+        scoring_mode:
+          form.question_type === "multiple_choice" ? form.scoring_mode : "standard",
+        max_score:
+          form.question_type === "multiple_choice" && form.scoring_mode === "deduction"
+            ? Number(form.max_score)
+            : null,
+        zero_score_at:
+          form.question_type === "multiple_choice" &&
+          form.scoring_mode === "deduction" &&
+          form.zero_score_at !== ""
+            ? Number(form.zero_score_at)
+            : null,
+        parent_question_id: form.parent_question_id ? Number(form.parent_question_id) : null,
+        trigger_option_id: form.trigger_option_id ? Number(form.trigger_option_id) : null,
+        trigger_answer: form.trigger_answer || null,
         options: hasOptions ? opts : [],
       });
       reset();
@@ -151,6 +195,55 @@ export function AddQuestionModal({ open, onClose, onCreate, existingQuestions = 
             ))}
           </Select>
         </FormField>
+        {parentQuestions.length > 0 && (
+          <div className="grid gap-3 rounded-lg border border-rule bg-paper-2 p-3 sm:grid-cols-2">
+            <p className="text-xs text-muted sm:col-span-2">Khi được kích hoạt, điểm câu phụ thay điểm đáp án cha. Nếu có nhiều câu phụ cho cùng đáp án, cộng điểm các câu phụ. Hỗ trợ một cấp.</p>
+            <FormField label="Câu hỏi phụ của">
+              <Select
+                value={form.parent_question_id}
+                onChange={(e) => {
+                  const parent = parentQuestions.find((q) => String(q.id) === e.target.value);
+                  setForm((f) => ({
+                    ...f,
+                    parent_question_id: e.target.value,
+                    trigger_answer: parent?.question_type === "yes_no" ? "yes" : "",
+                    trigger_option_id:
+                      parent && parent.question_type !== "yes_no"
+                        ? String(parent.options.find((o) => o.is_active)?.id || "")
+                        : "",
+                  }));
+                }}
+              >
+                <option value="">Không phải câu hỏi phụ</option>
+                {parentQuestions.map((q) => (
+                  <option key={q.id} value={q.id}>{q.question_text}</option>
+                ))}
+              </Select>
+            </FormField>
+            {selectedParent && (
+              <FormField label="Hiển thị khi trả lời">
+                {selectedParent.question_type === "yes_no" ? (
+                  <Select
+                    value={form.trigger_answer}
+                    onChange={(e) => setForm((f) => ({ ...f, trigger_answer: e.target.value }))}
+                  >
+                    <option value="yes">Có</option>
+                    <option value="no">Không</option>
+                  </Select>
+                ) : (
+                  <Select
+                    value={form.trigger_option_id}
+                    onChange={(e) => setForm((f) => ({ ...f, trigger_option_id: e.target.value }))}
+                  >
+                    {selectedParent.options.filter((o) => o.is_active).map((o) => (
+                      <option key={o.id} value={o.id}>{o.option_text}</option>
+                    ))}
+                  </Select>
+                )}
+              </FormField>
+            )}
+          </div>
+        )}
         <label className="flex items-center gap-2 text-sm">
           <input
             type="checkbox"
@@ -181,12 +274,46 @@ export function AddQuestionModal({ open, onClose, onCreate, existingQuestions = 
           </FormField>
         )}
 
+        {form.question_type === "multiple_choice" && (
+          <div className="grid gap-3 rounded-lg bg-paper-2 p-3">
+            <FormField label="Cách tính điểm">
+              <Select
+                value={form.scoring_mode}
+                onChange={(e) => setForm((f) => ({ ...f, scoring_mode: e.target.value }))}
+              >
+                <option value="standard">Điểm theo từng phương án đã chọn</option>
+                <option value="deduction">Trừ điểm từ điểm tối đa</option>
+              </Select>
+            </FormField>
+            {form.scoring_mode === "deduction" && (
+              <div className="grid grid-cols-2 gap-3">
+                <FormField label="Điểm tối đa" required>
+                  <TextInput
+                    type="number"
+                    step="any"
+                    value={form.max_score}
+                    onChange={(e) => setForm((f) => ({ ...f, max_score: e.target.value }))}
+                  />
+                </FormField>
+                <FormField label="Từ bao nhiêu lựa chọn thì về 0" hint="Để trống nếu không dùng ngưỡng">
+                  <TextInput
+                    type="number"
+                    min="1"
+                    value={form.zero_score_at}
+                    onChange={(e) => setForm((f) => ({ ...f, zero_score_at: e.target.value }))}
+                  />
+                </FormField>
+              </div>
+            )}
+          </div>
+        )}
+
         {hasOptions && (
           <FormField label="Phương án trả lời" required>
             <div className="grid gap-2">
               <div className="hidden grid-cols-[minmax(0,1fr)_6rem_1.5rem] gap-2 px-0.5 text-[11px] font-medium text-muted sm:grid">
                 <span>Nội dung phương án</span>
-                <span>Điểm</span>
+                <span>{form.scoring_mode === "deduction" ? "Điểm trừ" : "Điểm"}</span>
                 <span />
               </div>
               {options.map((o, i) => (
@@ -207,7 +334,7 @@ export function AddQuestionModal({ open, onClose, onCreate, existingQuestions = 
                     step="any"
                     value={o.score}
                     aria-label={`Điểm phương án ${i + 1}`}
-                    placeholder="Điểm"
+                    placeholder={form.scoring_mode === "deduction" ? "Điểm trừ" : "Điểm"}
                     className="w-24 shrink-0"
                     onChange={(e) =>
                       setOptions((arr) =>

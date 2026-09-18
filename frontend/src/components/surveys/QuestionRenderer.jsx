@@ -179,6 +179,9 @@ export function QuestionRenderer({ question, value, onChange, error, disabled })
         )}
       </p>
       {control}
+      {type === "multiple_choice" && question.scoring_mode === "deduction" && (
+        <p className="mt-2 text-xs text-muted">Nếu không có nội dung nào phù hợp, có thể bỏ chọn tất cả.</p>
+      )}
       {error && <p className="mt-1.5 text-xs text-danger">{error}</p>}
     </div>
   );

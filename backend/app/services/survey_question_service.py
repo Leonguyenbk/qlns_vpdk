@@ -78,6 +78,74 @@ def _next_question_order(survey_id: int) -> int:
     return (m or 0) + 1
 
 
+def _condition_values(
+    data: dict,
+    *,
+    survey_id: int,
+    current: SurveyQuestion | None = None,
+) -> tuple[int | None, int | None, str | None]:
+    parent_id = data.get(
+        "parent_question_id", current.parent_question_id if current is not None else None
+    )
+    trigger_option_id = data.get(
+        "trigger_option_id", current.trigger_option_id if current is not None else None
+    )
+    trigger_answer = data.get(
+        "trigger_answer", current.trigger_answer if current is not None else None
+    )
+    if parent_id is None:
+        return None, None, None
+    if current is not None and parent_id == current.id:
+        raise ValidationError("Câu hỏi không thể là câu hỏi phụ của chính nó.")
+    parent = db.session.get(SurveyQuestion, parent_id)
+    if parent is None or parent.survey_id != survey_id or not parent.is_active:
+        raise ValidationError("Câu hỏi cha không hợp lệ hoặc không thuộc khảo sát này.")
+    if parent.parent_question_id is not None:
+        raise ValidationError("Hiện tại hệ thống chỉ hỗ trợ câu hỏi phụ một cấp.")
+    if current is not None and db.session.query(SurveyQuestion.id).filter(
+        SurveyQuestion.parent_question_id == current.id
+    ).first():
+        raise ValidationError("Câu hỏi đã có câu hỏi phụ không thể chuyển thành câu hỏi phụ.")
+    if parent.scoring_mode == "deduction":
+        raise ValidationError("Hãy dùng câu trừ điểm làm câu hỏi phụ, không làm câu hỏi cha.")
+    if parent.question_type == "yes_no":
+        if trigger_answer not in ("yes", "no"):
+            raise ValidationError("Câu hỏi phụ cần chọn điều kiện Có hoặc Không.")
+        return parent.id, None, trigger_answer
+    if parent.question_type in QUESTION_TYPES_WITH_OPTIONS:
+        option = db.session.get(SurveyOption, trigger_option_id) if trigger_option_id else None
+        if option is None or option.question_id != parent.id or not option.is_active:
+            raise ValidationError("Phương án kích hoạt câu hỏi phụ không hợp lệ.")
+        return parent.id, option.id, None
+    raise ValidationError("Câu hỏi cha phải là loại Có/Không hoặc lựa chọn.")
+
+
+def _scoring_values(data: dict, *, qtype: str, current: SurveyQuestion | None = None):
+    mode = data.get("scoring_mode", current.scoring_mode if current is not None else "standard")
+    if qtype != "multiple_choice" and "scoring_mode" not in data:
+        mode = "standard"
+    max_score = data.get("max_score", current.max_score if current is not None else None)
+    zero_score_at = data.get(
+        "zero_score_at", current.zero_score_at if current is not None else None
+    )
+    if mode == "deduction":
+        if qtype != "multiple_choice":
+            raise ValidationError("Chế độ trừ điểm chỉ áp dụng cho câu chọn nhiều đáp án.")
+        if max_score is None or max_score < 0:
+            raise ValidationError("Câu trừ điểm cần nhập điểm tối đa.")
+        if current is not None and db.session.query(SurveyQuestion.id).filter(
+            SurveyQuestion.parent_question_id == current.id
+        ).first():
+            raise ValidationError("Bỏ liên kết câu hỏi phụ trước khi đổi câu cha sang trừ điểm.")
+        return mode, max_score, zero_score_at
+    return "standard", None, None
+
+
+def _validate_deduction_options(mode, options):
+    if mode == "deduction" and any((o.get("score") or 0) < 0 for o in options):
+        raise ValidationError("Nhập số điểm trừ không âm (ví dụ nhập 3 để trừ 3 điểm).")
+
+
 def _clone_question(q: SurveyQuestion) -> SurveyQuestion:
     """Tạo câu hỏi mới sao chép nội dung + phương án đang hoạt động, ẩn câu hỏi cũ."""
     new_q = SurveyQuestion(
@@ -91,22 +159,38 @@ def _clone_question(q: SurveyQuestion) -> SurveyQuestion:
         section_id=q.section_id,
         yes_score=q.yes_score,
         no_score=q.no_score,
+        scoring_mode=q.scoring_mode,
+        max_score=q.max_score,
+        zero_score_at=q.zero_score_at,
+        parent_question_id=q.parent_question_id,
+        trigger_option_id=q.trigger_option_id,
+        trigger_answer=q.trigger_answer,
     )
     db.session.add(new_q)
     db.session.flush()
+    option_id_map: dict[int, int] = {}
     for o in q.options:
         if not o.is_active:
             continue
-        db.session.add(
-            SurveyOption(
-                question_id=new_q.id,
-                option_text=o.option_text,
-                option_value=o.option_value,
-                score=o.score,
-                sort_order=o.sort_order,
-                is_active=True,
-            )
+        new_option = SurveyOption(
+            question_id=new_q.id,
+            option_text=o.option_text,
+            option_value=o.option_value,
+            score=o.score,
+            sort_order=o.sort_order,
+            is_active=True,
         )
+        db.session.add(new_option)
+        db.session.flush()
+        option_id_map[o.id] = new_option.id
+    children = db.session.query(SurveyQuestion).filter(
+        SurveyQuestion.parent_question_id == q.id,
+        SurveyQuestion.is_active.is_(True),
+    ).all()
+    for child in children:
+        child.parent_question_id = new_q.id
+        if child.trigger_option_id in option_id_map:
+            child.trigger_option_id = option_id_map[child.trigger_option_id]
     q.is_active = False
     db.session.flush()
     return new_q
@@ -135,15 +219,22 @@ def _apply_options(question: SurveyQuestion, items: list[dict]) -> None:
                 text != opt.option_text or value != opt.option_value or score != opt.score
             )
             if content_changed and _option_has_answers(opt.id):
-                db.session.add(
-                    SurveyOption(
-                        question_id=question.id,
-                        option_text=text,
-                        option_value=value,
-                        score=score,
-                        sort_order=order,
-                        is_active=True,
-                    )
+                new_option = SurveyOption(
+                    question_id=question.id,
+                    option_text=text,
+                    option_value=value,
+                    score=score,
+                    sort_order=order,
+                    is_active=True,
+                )
+                db.session.add(new_option)
+                db.session.flush()
+                db.session.query(SurveyQuestion).filter(
+                    SurveyQuestion.trigger_option_id == opt.id,
+                    SurveyQuestion.is_active.is_(True),
+                ).update(
+                    {SurveyQuestion.trigger_option_id: new_option.id},
+                    synchronize_session=False,
                 )
                 opt.is_active = False
             else:
@@ -165,6 +256,13 @@ def _apply_options(question: SurveyQuestion, items: list[dict]) -> None:
     for oid, opt in existing.items():
         if oid in kept_ids:
             continue
+        if db.session.query(SurveyQuestion.id).filter(
+            SurveyQuestion.trigger_option_id == oid,
+            SurveyQuestion.is_active.is_(True),
+        ).first():
+            raise ConflictError(
+                "Phương án đang kích hoạt câu hỏi phụ; hãy đổi điều kiện câu hỏi phụ trước."
+            )
         if _option_has_answers(oid):
             opt.is_active = False
         else:
@@ -329,6 +427,11 @@ def create_question(survey_id: int, data: dict, *, actor, meta: dict) -> dict:
         raise ValidationError(f"Câu hỏi loại '{qtype}' phải có ít nhất 2 phương án trả lời.")
 
     section_record = _section_for_survey(data.get("section_id"), survey_id)
+    scoring_mode, max_score, zero_score_at = _scoring_values(data, qtype=qtype)
+    _validate_deduction_options(scoring_mode, options_payload)
+    parent_id, trigger_option_id, trigger_answer = _condition_values(
+        data, survey_id=survey_id
+    )
     question = SurveyQuestion(
         survey_id=survey_id,
         question_text=text,
@@ -339,6 +442,12 @@ def create_question(survey_id: int, data: dict, *, actor, meta: dict) -> dict:
         section_id=section_record.id if section_record else None,
         yes_score=data.get("yes_score") if qtype == "yes_no" else None,
         no_score=data.get("no_score") if qtype == "yes_no" else None,
+        scoring_mode=scoring_mode,
+        max_score=max_score,
+        zero_score_at=zero_score_at,
+        parent_question_id=parent_id,
+        trigger_option_id=trigger_option_id,
+        trigger_answer=trigger_answer,
         sort_order=_next_question_order(survey_id),
     )
     db.session.add(question)
@@ -381,17 +490,43 @@ def update_question(question_id: int, data: dict, *, actor, meta: dict) -> dict:
     new_type = data.get("question_type", q.question_type)
     if new_type not in QUESTION_TYPES:
         raise ValidationError("Loại câu hỏi không hợp lệ.")
+    if new_type != q.question_type and db.session.query(SurveyQuestion.id).filter(
+        SurveyQuestion.parent_question_id == q.id,
+        SurveyQuestion.is_active.is_(True),
+    ).first():
+        raise ConflictError(
+            "Câu hỏi đang có câu hỏi phụ; hãy bỏ liên kết câu hỏi phụ trước khi đổi loại."
+        )
+    if data.get("is_active") is False and db.session.query(SurveyQuestion.id).filter(
+        SurveyQuestion.parent_question_id == q.id,
+        SurveyQuestion.is_active.is_(True),
+    ).first():
+        raise ConflictError(
+            "Câu hỏi đang có câu hỏi phụ; hãy bỏ liên kết câu hỏi phụ trước khi tắt."
+        )
 
     new_yes_score = data.get("yes_score", q.yes_score)
     new_no_score = data.get("no_score", q.no_score)
     if new_type != "yes_no":
         new_yes_score = None
         new_no_score = None
+    new_scoring_mode, new_max_score, new_zero_score_at = _scoring_values(
+        data, qtype=new_type, current=q
+    )
+    new_parent_id, new_trigger_option_id, new_trigger_answer = _condition_values(
+        data, survey_id=q.survey_id, current=q
+    )
     content_changed = (
         new_text != q.question_text
         or new_type != q.question_type
         or new_yes_score != q.yes_score
         or new_no_score != q.no_score
+        or new_scoring_mode != q.scoring_mode
+        or new_max_score != q.max_score
+        or new_zero_score_at != q.zero_score_at
+        or new_parent_id != q.parent_question_id
+        or new_trigger_option_id != q.trigger_option_id
+        or new_trigger_answer != q.trigger_answer
     )
     target = q
     revised_from = None
@@ -403,6 +538,12 @@ def update_question(question_id: int, data: dict, *, actor, meta: dict) -> dict:
     target.question_type = new_type
     target.yes_score = new_yes_score
     target.no_score = new_no_score
+    target.scoring_mode = new_scoring_mode
+    target.max_score = new_max_score
+    target.zero_score_at = new_zero_score_at
+    target.parent_question_id = new_parent_id
+    target.trigger_option_id = new_trigger_option_id
+    target.trigger_answer = new_trigger_answer
     if "is_required" in data:
         target.is_required = bool(data["is_required"])
     if "is_active" in data:
@@ -416,6 +557,10 @@ def update_question(question_id: int, data: dict, *, actor, meta: dict) -> dict:
         target.section_id = None
 
     options_payload = data.get("options")
+    _validate_deduction_options(
+        new_scoring_mode,
+        options_payload if options_payload is not None else [o.to_dict() for o in target.options if o.is_active],
+    )
     if new_type in QUESTION_TYPES_WITH_OPTIONS:
         if options_payload is not None:
             _apply_options(target, options_payload)
@@ -443,6 +588,13 @@ def update_question(question_id: int, data: dict, *, actor, meta: dict) -> dict:
 
 def delete_question(question_id: int, *, actor, meta: dict) -> dict:
     q = _get_question_or_404(question_id)
+    if db.session.query(SurveyQuestion.id).filter(
+        SurveyQuestion.parent_question_id == q.id,
+        SurveyQuestion.is_active.is_(True),
+    ).first():
+        raise ConflictError(
+            "Câu hỏi đang có câu hỏi phụ; hãy bỏ liên kết câu hỏi phụ trước khi xóa."
+        )
     old = q.to_dict()
     if _question_has_responses(q.id):
         q.is_active = False
@@ -477,6 +629,12 @@ def duplicate_question(question_id: int, *, actor, meta: dict) -> dict:
         section_id=q.section_id,
         yes_score=q.yes_score,
         no_score=q.no_score,
+        scoring_mode=q.scoring_mode,
+        max_score=q.max_score,
+        zero_score_at=q.zero_score_at,
+        parent_question_id=q.parent_question_id,
+        trigger_option_id=q.trigger_option_id,
+        trigger_answer=q.trigger_answer,
     )
     db.session.add(new_q)
     db.session.flush()
@@ -536,6 +694,7 @@ def reorder_questions(survey_id: int, items: list[dict], *, actor, meta: dict) -
 # ----------------------------- Phương án -----------------------------
 def create_option(question_id: int, data: dict, *, actor, meta: dict) -> dict:
     q = _get_question_or_404(question_id)
+    _validate_deduction_options(q.scoring_mode, [data])
     if q.question_type not in QUESTION_TYPES_WITH_OPTIONS:
         raise ValidationError("Loại câu hỏi này không sử dụng phương án trả lời.")
     text = clean_str(data.get("option_text"))
@@ -573,6 +732,11 @@ def update_option(option_id: int, data: dict, *, actor, meta: dict) -> dict:
         raise ValidationError("Nội dung phương án không được để trống.")
     new_value = clean_str(data["option_value"]) if "option_value" in data else opt.option_value
     new_score = data.get("score", opt.score)
+    _validate_deduction_options(opt.question.scoring_mode, [{"score": new_score}])
+    if data.get("is_active") is False and db.session.query(SurveyQuestion.id).filter(
+        SurveyQuestion.trigger_option_id == opt.id,
+    ).first():
+        raise ConflictError("Bỏ liên kết câu hỏi phụ trước khi tắt phương án kích hoạt.")
 
     content_changed = (
         new_text != opt.option_text or new_value != opt.option_value or new_score != opt.score
@@ -595,6 +759,13 @@ def update_option(option_id: int, data: dict, *, actor, meta: dict) -> dict:
         target.option_text = new_text
         target.option_value = new_value
         target.score = new_score
+
+    if target is not opt:
+        db.session.flush()
+        db.session.query(SurveyQuestion).filter(
+            SurveyQuestion.trigger_option_id == opt.id,
+            SurveyQuestion.is_active.is_(True),
+        ).update({SurveyQuestion.trigger_option_id: target.id}, synchronize_session=False)
 
     if "is_active" in data:
         target.is_active = bool(data["is_active"])
@@ -619,6 +790,13 @@ def update_option(option_id: int, data: dict, *, actor, meta: dict) -> dict:
 
 def delete_option(option_id: int, *, actor, meta: dict) -> dict:
     opt = _get_option_or_404(option_id)
+    if db.session.query(SurveyQuestion.id).filter(
+        SurveyQuestion.trigger_option_id == opt.id,
+        SurveyQuestion.is_active.is_(True),
+    ).first():
+        raise ConflictError(
+            "Phương án đang kích hoạt câu hỏi phụ; hãy đổi điều kiện câu hỏi phụ trước khi xóa."
+        )
     q = db.session.get(SurveyQuestion, opt.question_id)
     remaining_active = [o for o in q.options if o.is_active and o.id != opt.id]
     if q.question_type in QUESTION_TYPES_WITH_OPTIONS and len(remaining_active) < 2:
