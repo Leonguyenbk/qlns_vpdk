@@ -6,11 +6,18 @@ import { QUESTION_TYPE_LABELS, QUESTION_TYPES_WITH_OPTIONS } from "../../lib/con
 import { apiErrorMessage } from "../../lib/api";
 import { IconTrash } from "../ui/icons";
 
-const EMPTY = { question_text: "", question_type: "single_choice", is_required: false, section: "" };
+const EMPTY = {
+  question_text: "",
+  question_type: "single_choice",
+  is_required: false,
+  section_id: "",
+  yes_score: "",
+  no_score: "",
+};
 
-export function AddQuestionModal({ open, onClose, onCreate, existingQuestions = [] }) {
-  const lastSection = existingQuestions[existingQuestions.length - 1]?.section || "";
-  const [form, setForm] = useState({ ...EMPTY, section: lastSection });
+export function AddQuestionModal({ open, onClose, onCreate, existingQuestions = [], sections = [] }) {
+  const lastSectionId = existingQuestions[existingQuestions.length - 1]?.section_id || "";
+  const [form, setForm] = useState({ ...EMPTY, section_id: lastSectionId });
   const [options, setOptions] = useState([
     { option_text: "", score: "" },
     { option_text: "", score: "" },
@@ -19,16 +26,10 @@ export function AddQuestionModal({ open, onClose, onCreate, existingQuestions = 
   const [saving, setSaving] = useState(false);
   const hasOptions = QUESTION_TYPES_WITH_OPTIONS.has(form.question_type);
 
-  // Câu hỏi khác trong khảo sát đã có sẵn phương án trả lời — dùng để sao chép,
-  // tránh gõ lại cùng 1 thang đo (vd. "Rất hài lòng".."Rất không hài lòng") nhiều lần.
-  const sourceQuestions = existingQuestions.filter(
-    (q) => QUESTION_TYPES_WITH_OPTIONS.has(q.question_type) && (q.options || []).some((o) => o.is_active)
-  );
-  // Danh sách "Phần" đã dùng trong khảo sát, gợi ý để không gõ lại/gõ sai tên phần.
-  const sectionOptions = [...new Set(existingQuestions.map((q) => q.section).filter(Boolean))];
+  const sourceQuestions = existingQuestions.filter((q) => q.is_active);
 
   const reset = () => {
-    setForm({ ...EMPTY, section: lastSection });
+    setForm({ ...EMPTY, section_id: lastSectionId });
     setOptions([
       { option_text: "", score: "" },
       { option_text: "", score: "" },
@@ -36,14 +37,22 @@ export function AddQuestionModal({ open, onClose, onCreate, existingQuestions = 
     setCopyFromId("");
   };
 
-  const copyOptionsFrom = (questionId) => {
+  const copyQuestionFrom = (questionId) => {
     setCopyFromId(questionId);
     const source = sourceQuestions.find((q) => String(q.id) === String(questionId));
     if (!source) return;
+    setForm({
+      question_text: source.question_text,
+      question_type: source.question_type,
+      is_required: source.is_required,
+      section_id: source.section_id || "",
+      yes_score: source.yes_score ?? "",
+      no_score: source.no_score ?? "",
+    });
     const copied = source.options
       .filter((o) => o.is_active)
       .map((o) => ({ option_text: o.option_text, score: o.score ?? "" }));
-    if (copied.length) setOptions(copied);
+    setOptions(copied.length ? copied : [{ option_text: "", score: "" }, { option_text: "", score: "" }]);
   };
 
   const submit = async () => {
@@ -61,17 +70,17 @@ export function AddQuestionModal({ open, onClose, onCreate, existingQuestions = 
       toast.error("Cần ít nhất 2 phương án trả lời");
       return;
     }
-    if (opts.some((o) => o.score != null && (o.score < 0 || o.score > 5))) {
-      toast.error("Điểm phương án phải nằm trong khoảng 0–5");
-      return;
-    }
     setSaving(true);
     try {
       await onCreate({
         question_text: form.question_text.trim(),
         question_type: form.question_type,
         is_required: form.is_required,
-        section: form.section.trim() || null,
+        section_id: form.section_id ? Number(form.section_id) : null,
+        yes_score:
+          form.question_type === "yes_no" && form.yes_score !== "" ? Number(form.yes_score) : null,
+        no_score:
+          form.question_type === "yes_no" && form.no_score !== "" ? Number(form.no_score) : null,
         options: hasOptions ? opts : [],
       });
       reset();
@@ -100,20 +109,28 @@ export function AddQuestionModal({ open, onClose, onCreate, existingQuestions = 
       }
     >
       <div className="grid gap-4">
-        <FormField label="Phần" hint="Để nhóm nhiều câu hỏi lại, vd. &quot;Phần 1. Tiếp cận dịch vụ&quot; — bỏ trống nếu không cần chia phần">
-          <TextInput
-            list="survey-section-options"
-            value={form.section}
-            onChange={(e) => setForm((f) => ({ ...f, section: e.target.value }))}
-            placeholder="Vd: Phần 1. Tiếp cận dịch vụ"
-          />
-          {sectionOptions.length > 0 && (
-            <datalist id="survey-section-options">
-              {sectionOptions.map((s) => (
-                <option key={s} value={s} />
+        {sourceQuestions.length > 0 && (
+          <FormField label="Sao chép câu hỏi để sửa tiếp" hint="Sao chép cả nội dung, loại câu hỏi, đáp án và điểm">
+            <Select value={copyFromId} onChange={(e) => copyQuestionFrom(e.target.value)}>
+              <option value="">-- Chọn câu hỏi có sẵn --</option>
+              {sourceQuestions.map((q) => (
+                <option key={q.id} value={q.id}>
+                  {q.question_text.length > 70 ? `${q.question_text.slice(0, 70)}…` : q.question_text}
+                </option>
               ))}
-            </datalist>
-          )}
+            </Select>
+          </FormField>
+        )}
+        <FormField label="Phần">
+          <Select
+            value={form.section_id}
+            onChange={(e) => setForm((f) => ({ ...f, section_id: e.target.value }))}
+          >
+            <option value="">Không thuộc phần nào</option>
+            {sections.map((section) => (
+              <option key={section.id} value={section.id}>{section.title}</option>
+            ))}
+          </Select>
         </FormField>
         <FormField label="Nội dung câu hỏi" required>
           <Textarea
@@ -143,26 +160,33 @@ export function AddQuestionModal({ open, onClose, onCreate, existingQuestions = 
           Bắt buộc trả lời
         </label>
 
+        {form.question_type === "yes_no" && (
+          <FormField label="Điểm cho đáp án Có / Không" hint="Có thể để trống nếu câu hỏi này không tính điểm">
+            <div className="grid grid-cols-2 gap-3">
+              <TextInput
+                type="number"
+                step="any"
+                value={form.yes_score}
+                placeholder="Điểm Có"
+                onChange={(e) => setForm((f) => ({ ...f, yes_score: e.target.value }))}
+              />
+              <TextInput
+                type="number"
+                step="any"
+                value={form.no_score}
+                placeholder="Điểm Không"
+                onChange={(e) => setForm((f) => ({ ...f, no_score: e.target.value }))}
+              />
+            </div>
+          </FormField>
+        )}
+
         {hasOptions && (
           <FormField label="Phương án trả lời" required>
             <div className="grid gap-2">
-              {sourceQuestions.length > 0 && (
-                <Select
-                  value={copyFromId}
-                  onChange={(e) => copyOptionsFrom(e.target.value)}
-                  className="mb-1 text-xs"
-                >
-                  <option value="">-- Sao chép phương án từ câu hỏi khác (tuỳ chọn) --</option>
-                  {sourceQuestions.map((q) => (
-                    <option key={q.id} value={q.id}>
-                      {q.question_text.length > 60 ? `${q.question_text.slice(0, 60)}…` : q.question_text}
-                    </option>
-                  ))}
-                </Select>
-              )}
               <div className="hidden grid-cols-[minmax(0,1fr)_6rem_1.5rem] gap-2 px-0.5 text-[11px] font-medium text-muted sm:grid">
                 <span>Nội dung phương án</span>
-                <span>Điểm (0–5)</span>
+                <span>Điểm</span>
                 <span />
               </div>
               {options.map((o, i) => (
@@ -180,9 +204,7 @@ export function AddQuestionModal({ open, onClose, onCreate, existingQuestions = 
                   />
                   <TextInput
                     type="number"
-                    min="0"
-                    max="5"
-                    step="0.01"
+                    step="any"
                     value={o.score}
                     aria-label={`Điểm phương án ${i + 1}`}
                     placeholder="Điểm"

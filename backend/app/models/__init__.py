@@ -32,6 +32,7 @@ from .survey import (
     SurveyOption,
     SurveyQuestion,
     SurveyResponse,
+    SurveySection,
 )
 from .task import (
     Task,
@@ -69,6 +70,7 @@ __all__ = [
     # Khảo sát
     "Survey",
     "SurveyQuestion",
+    "SurveySection",
     "SurveyOption",
     "SurveyResponse",
     "SurveyAnswer",

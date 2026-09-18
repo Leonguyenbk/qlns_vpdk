@@ -57,9 +57,7 @@ export function OptionRow({ option, onSave, onDelete, disabled }) {
       />
       <input
         type="number"
-        min="0"
-        max="5"
-        step="0.01"
+        step="any"
         className="input w-20 shrink-0 py-1.5 text-sm"
         value={score}
         disabled={disabled}

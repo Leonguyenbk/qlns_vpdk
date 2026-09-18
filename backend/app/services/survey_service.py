@@ -14,6 +14,7 @@ from ..models.survey import (
     SurveyOption,
     SurveyQuestion,
     SurveyResponse,
+    SurveySection,
 )
 from .audit_service import record_audit
 
@@ -233,6 +234,17 @@ def duplicate_survey(survey_id: int, *, actor, meta: dict) -> dict:
     db.session.add(new_survey)
     db.session.flush()
 
+    section_ids = {}
+    for section in sorted(survey.sections, key=lambda row: row.sort_order):
+        copied_section = SurveySection(
+            survey_id=new_survey.id,
+            title=section.title,
+            sort_order=section.sort_order,
+        )
+        db.session.add(copied_section)
+        db.session.flush()
+        section_ids[section.id] = copied_section.id
+
     for q in sorted(survey.questions, key=lambda x: x.sort_order):
         if not q.is_active:
             continue
@@ -243,6 +255,10 @@ def duplicate_survey(survey_id: int, *, actor, meta: dict) -> dict:
             is_required=q.is_required,
             is_active=True,
             sort_order=q.sort_order,
+            section=q.section,
+            section_id=section_ids.get(q.section_id),
+            yes_score=q.yes_score,
+            no_score=q.no_score,
         )
         db.session.add(new_q)
         db.session.flush()

@@ -36,6 +36,11 @@ def _answer_score(answer):
         return answer.option.score
     if answer.question and answer.question.question_type == "rating":
         return answer.answer_number
+    if answer.question and answer.question.question_type == "yes_no":
+        if answer.answer_text == "yes":
+            return answer.question.yes_score if answer.question.yes_score is not None else ""
+        if answer.answer_text == "no":
+            return answer.question.no_score if answer.question.no_score is not None else ""
     return ""
 
 
@@ -118,7 +123,7 @@ def build_summary_workbook(survey, stats: dict, *, scope_label: str | None = Non
     avg = overview.get("average_score")
     ws1.append(
         [
-            f"Điểm trung bình: {avg if avg is not None else '—'}/5"
+            f"Điểm trung bình: {avg if avg is not None else '—'}"
             f" · Tỷ lệ hài lòng: {overview['satisfaction_rate']}%"
             f" · Tỷ lệ không hài lòng: {overview['dissatisfaction_rate']}%"
         ]
@@ -165,8 +170,20 @@ def build_summary_workbook(survey, stats: dict, *, scope_label: str | None = Non
             else:
                 _row("(chưa có phản hồi)", "", 0, 0)
         elif st["type"] == "yes_no":
-            _row("Có", "", st["yes_count"], st["yes_percentage"])
-            _row("Không", "", st["no_count"], st["no_percentage"])
+            _row(
+                "Có",
+                st.get("yes_score") if st.get("yes_score") is not None else "",
+                st["yes_count"],
+                st["yes_percentage"],
+            )
+            _row(
+                "Không",
+                st.get("no_score") if st.get("no_score") is not None else "",
+                st["no_count"],
+                st["no_percentage"],
+            )
+            if st.get("average_score") is not None:
+                _row("Điểm trung bình", st["average_score"], "", "")
         elif st["type"] == "rating":
             for b in st["breakdown"]:
                 _row(b["label"], b["level"], b["count"], b["percentage"])

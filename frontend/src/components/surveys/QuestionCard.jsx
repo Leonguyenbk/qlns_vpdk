@@ -10,19 +10,21 @@ import { IconGrip, IconTrash, IconCopy } from "../ui/icons";
 import { OptionRow } from "./OptionRow";
 import { ConfirmDialog } from "../ui/Modal";
 
-export function QuestionCard({ question, mutations, canManage, index, sectionOptions = [] }) {
+export function QuestionCard({ question, mutations, canManage, index, sections = [] }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: `question-${question.id}`,
   });
   const [text, setText] = useState(question.question_text);
-  const [sectionText, setSectionText] = useState(question.section || "");
+  const [yesScore, setYesScore] = useState(question.yes_score ?? "");
+  const [noScore, setNoScore] = useState(question.no_score ?? "");
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [newOption, setNewOption] = useState("");
   const [newOptionScore, setNewOptionScore] = useState("");
   const hasOptions = QUESTION_TYPES_WITH_OPTIONS.has(question.question_type);
 
   useEffect(() => setText(question.question_text), [question.question_text]);
-  useEffect(() => setSectionText(question.section || ""), [question.section]);
+  useEffect(() => setYesScore(question.yes_score ?? ""), [question.yes_score]);
+  useEffect(() => setNoScore(question.no_score ?? ""), [question.no_score]);
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 4 } }));
 
@@ -53,14 +55,31 @@ export function QuestionCard({ question, mutations, canManage, index, sectionOpt
     }
   };
 
-  const saveSection = async () => {
-    const trimmed = sectionText.trim();
-    if (trimmed === (question.section || "")) return;
+  const saveSection = async (sectionId) => {
     try {
-      await mutations.update.mutateAsync({ id: question.id, body: { section: trimmed || null } });
+      await mutations.update.mutateAsync({
+        id: question.id,
+        body: { section_id: sectionId ? Number(sectionId) : null },
+      });
     } catch (err) {
       toast.error(apiErrorMessage(err));
-      setSectionText(question.section || "");
+    }
+  };
+
+  const saveYesNoScores = async () => {
+    const nextYes = yesScore === "" ? null : Number(yesScore);
+    const nextNo = noScore === "" ? null : Number(noScore);
+    if (nextYes === (question.yes_score ?? null) && nextNo === (question.no_score ?? null)) return;
+    try {
+      const resp = await mutations.update.mutateAsync({
+        id: question.id,
+        body: { yes_score: nextYes, no_score: nextNo },
+      });
+      notifyRevision(resp.data.data);
+    } catch (err) {
+      toast.error(apiErrorMessage(err));
+      setYesScore(question.yes_score ?? "");
+      setNoScore(question.no_score ?? "");
     }
   };
 
@@ -114,10 +133,6 @@ export function QuestionCard({ question, mutations, canManage, index, sectionOpt
     const t = newOption.trim();
     if (!t) return;
     const score = newOptionScore === "" ? null : Number(newOptionScore);
-    if (score != null && (score < 0 || score > 5)) {
-      toast.error("Điểm phương án phải nằm trong khoảng 0–5");
-      return;
-    }
     try {
       await mutations.createOption.mutateAsync({
         questionId: question.id,
@@ -184,26 +199,22 @@ export function QuestionCard({ question, mutations, canManage, index, sectionOpt
             {canManage ? (
               <>
                 <span className="text-[#cbd5e1]">·</span>
-                <input
-                  list={`section-options-${question.id}`}
-                  className="input h-6 w-56 py-0 text-xs"
-                  placeholder="Thuộc phần (tuỳ chọn)"
-                  value={sectionText}
-                  onChange={(e) => setSectionText(e.target.value)}
-                  onBlur={saveSection}
-                />
-                {sectionOptions.length > 0 && (
-                  <datalist id={`section-options-${question.id}`}>
-                    {sectionOptions.map((s) => (
-                      <option key={s} value={s} />
-                    ))}
-                  </datalist>
-                )}
+                <Select
+                  className="h-7 w-56 py-0 text-xs"
+                  value={question.section_id || ""}
+                  onChange={(e) => saveSection(e.target.value)}
+                >
+                  <option value="">Không thuộc phần</option>
+                  {sections.map((section) => (
+                    <option key={section.id} value={section.id}>{section.title}</option>
+                  ))}
+                </Select>
               </>
             ) : (
               question.section && <span>· {question.section}</span>
             )}
           </div>
+
           <textarea
             className="input mb-3 text-[0.95rem] font-medium"
             rows={2}
@@ -246,6 +257,38 @@ export function QuestionCard({ question, mutations, canManage, index, sectionOpt
             </label>
           </div>
 
+          {question.question_type === "yes_no" && (
+            <div
+              className="mb-3 grid grid-cols-2 gap-2 rounded-lg bg-paper-2 p-3"
+              onBlur={(event) => {
+                if (!event.currentTarget.contains(event.relatedTarget)) saveYesNoScores();
+              }}
+            >
+              <label className="text-xs font-medium text-ink-2">
+                Điểm Có
+                <input
+                  type="number"
+                  step="any"
+                  className="input mt-1 py-1.5 text-sm"
+                  value={yesScore}
+                  disabled={!canManage}
+                  onChange={(e) => setYesScore(e.target.value)}
+                />
+              </label>
+              <label className="text-xs font-medium text-ink-2">
+                Điểm Không
+                <input
+                  type="number"
+                  step="any"
+                  className="input mt-1 py-1.5 text-sm"
+                  value={noScore}
+                  disabled={!canManage}
+                  onChange={(e) => setNoScore(e.target.value)}
+                />
+              </label>
+            </div>
+          )}
+
           {hasOptions && (
             <div className="mb-3 ml-1 grid gap-1.5">
               <div className="hidden grid-cols-[1rem_minmax(0,1fr)_5rem_1.5rem] gap-2 px-0.5 text-[11px] font-medium text-muted sm:grid">
@@ -281,9 +324,7 @@ export function QuestionCard({ question, mutations, canManage, index, sectionOpt
                   />
                   <input
                     type="number"
-                    min="0"
-                    max="5"
-                    step="0.01"
+                    step="any"
                     className="input w-20 shrink-0 py-1.5 text-sm"
                     placeholder="Điểm"
                     aria-label="Điểm phương án mới"
@@ -304,12 +345,13 @@ export function QuestionCard({ question, mutations, canManage, index, sectionOpt
           <div className="flex shrink-0 gap-1">
             <button
               type="button"
-              className="rounded-md p-1.5 text-muted hover:bg-paper-2 hover:text-ink-2"
+              className="inline-flex items-center gap-1 rounded-md px-2 py-1.5 text-xs text-muted hover:bg-paper-2 hover:text-ink-2"
               onClick={onDuplicate}
               aria-label="Sao chép câu hỏi"
               title="Sao chép câu hỏi"
             >
               <IconCopy size={16} />
+              <span>Sao chép</span>
             </button>
             <button
               type="button"

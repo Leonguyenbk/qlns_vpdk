@@ -4,7 +4,12 @@ import toast from "react-hot-toast";
 import { DndContext, closestCenter, PointerSensor, useSensor, useSensors } from "@dnd-kit/core";
 import { SortableContext, verticalListSortingStrategy, arrayMove } from "@dnd-kit/sortable";
 import { useSurvey } from "../../hooks/useSurveys";
-import { useSurveyQuestions, useSurveyQuestionMutations } from "../../hooks/useSurveyQuestions";
+import {
+  useSurveyQuestions,
+  useSurveyQuestionMutations,
+  useSurveySections,
+  useSurveySectionMutations,
+} from "../../hooks/useSurveyQuestions";
 import { useCan } from "../../components/Can";
 import { PERMISSIONS, SURVEY_STATUS_LABELS, SURVEY_STATUS_BADGE } from "../../lib/constants";
 import { PageHeader, Button, Badge } from "../../components/ui/primitives";
@@ -12,6 +17,7 @@ import { LoadingState, ErrorState, EmptyState } from "../../components/ui/DataSt
 import { QuestionCard } from "../../components/surveys/QuestionCard";
 import { AddQuestionModal } from "../../components/surveys/AddQuestionModal";
 import { PreviewModal } from "../../components/surveys/PreviewModal";
+import { SectionManager } from "../../components/surveys/SectionManager";
 
 export default function SurveyQuestionsPage() {
   const { id } = useParams();
@@ -23,6 +29,8 @@ export default function SurveyQuestionsPage() {
     includeInactive: true,
   });
   const mutations = useSurveyQuestionMutations(id);
+  const { data: sections = [] } = useSurveySections(id);
+  const sectionMutations = useSurveySectionMutations(id);
   const [showAdd, setShowAdd] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
 
@@ -43,7 +51,6 @@ export default function SurveyQuestionsPage() {
     toast.success("Đã thêm câu hỏi");
   };
 
-  const sectionOptions = [...new Set((questions || []).map((q) => q.section).filter(Boolean))];
   let sectionCounter = 0;
 
   return (
@@ -67,6 +74,8 @@ export default function SurveyQuestionsPage() {
           </div>
         }
       />
+
+      {canManage && <SectionManager sections={sections} mutations={sectionMutations} />}
 
       {isLoading ? (
         <LoadingState />
@@ -98,7 +107,7 @@ export default function SurveyQuestionsPage() {
                       mutations={mutations}
                       canManage={canManage}
                       index={sectionCounter - 1}
-                      sectionOptions={sectionOptions}
+                      sections={sections}
                     />
                   </div>
                 );
@@ -121,6 +130,7 @@ export default function SurveyQuestionsPage() {
         onClose={() => setShowAdd(false)}
         onCreate={onCreate}
         existingQuestions={questions || []}
+        sections={sections}
       />
       <PreviewModal survey={showPreview ? survey : null} onClose={() => setShowPreview(false)} />
     </div>

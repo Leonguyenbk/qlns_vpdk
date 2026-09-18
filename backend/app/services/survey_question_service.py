@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from sqlalchemy import func
 
-from ..common.exceptions import NotFoundError, ValidationError
+from ..common.exceptions import ConflictError, NotFoundError, ValidationError
 from ..common.utils import clean_str
 from ..extensions import db
 from ..models.survey import (
@@ -19,6 +19,7 @@ from ..models.survey import (
     SurveyAnswer,
     SurveyOption,
     SurveyQuestion,
+    SurveySection,
 )
 from .audit_service import record_audit
 from .survey_service import get_survey_or_404
@@ -52,6 +53,22 @@ def _get_option_or_404(option_id: int) -> SurveyOption:
     return o
 
 
+def _get_section_or_404(section_id: int) -> SurveySection:
+    section = db.session.get(SurveySection, section_id)
+    if section is None:
+        raise NotFoundError("Không tìm thấy phần khảo sát.")
+    return section
+
+
+def _section_for_survey(section_id: int | None, survey_id: int) -> SurveySection | None:
+    if section_id is None:
+        return None
+    section = _get_section_or_404(section_id)
+    if section.survey_id != survey_id:
+        raise ValidationError("Phần không thuộc khảo sát này.")
+    return section
+
+
 def _next_question_order(survey_id: int) -> int:
     m = (
         db.session.query(func.max(SurveyQuestion.sort_order))
@@ -71,6 +88,9 @@ def _clone_question(q: SurveyQuestion) -> SurveyQuestion:
         is_active=True,
         sort_order=q.sort_order,
         section=q.section,
+        section_id=q.section_id,
+        yes_score=q.yes_score,
+        no_score=q.no_score,
     )
     db.session.add(new_q)
     db.session.flush()
@@ -155,6 +175,137 @@ def _apply_options(question: SurveyQuestion, items: list[dict]) -> None:
         raise ValidationError("Câu hỏi cần ít nhất 2 phương án trả lời đang hoạt động.")
 
 
+# ----------------------------- Phần khảo sát -----------------------------
+def list_sections(survey_id: int) -> list[dict]:
+    get_survey_or_404(survey_id)
+    rows = (
+        db.session.query(SurveySection)
+        .filter(SurveySection.survey_id == survey_id)
+        .order_by(SurveySection.sort_order, SurveySection.id)
+        .all()
+    )
+    counts = dict(
+        db.session.query(SurveyQuestion.section_id, func.count(SurveyQuestion.id))
+        .filter(
+            SurveyQuestion.survey_id == survey_id,
+            SurveyQuestion.section_id.isnot(None),
+        )
+        .group_by(SurveyQuestion.section_id)
+        .all()
+    )
+    return [{**row.to_dict(), "question_count": counts.get(row.id, 0)} for row in rows]
+
+
+def create_section(survey_id: int, data: dict, *, actor, meta: dict) -> dict:
+    get_survey_or_404(survey_id)
+    title = clean_str(data.get("title"))
+    if not title:
+        raise ValidationError("Tên phần là bắt buộc.")
+    duplicate = (
+        db.session.query(SurveySection.id)
+        .filter(SurveySection.survey_id == survey_id, SurveySection.title == title)
+        .first()
+    )
+    if duplicate:
+        raise ValidationError("Tên phần đã tồn tại trong khảo sát.")
+    max_order = (
+        db.session.query(func.max(SurveySection.sort_order))
+        .filter(SurveySection.survey_id == survey_id)
+        .scalar()
+        or 0
+    )
+    section = SurveySection(survey_id=survey_id, title=title, sort_order=max_order + 1)
+    db.session.add(section)
+    db.session.flush()
+    record_audit(
+        user_id=actor.id,
+        action="survey_section.create",
+        entity_type="survey_section",
+        entity_id=section.id,
+        new_values=section.to_dict(),
+        **meta,
+    )
+    db.session.commit()
+    return {**section.to_dict(), "question_count": 0}
+
+
+def update_section(section_id: int, data: dict, *, actor, meta: dict) -> dict:
+    section = _get_section_or_404(section_id)
+    old = section.to_dict()
+    title = clean_str(data.get("title", section.title))
+    if not title:
+        raise ValidationError("Tên phần là bắt buộc.")
+    duplicate = (
+        db.session.query(SurveySection.id)
+        .filter(
+            SurveySection.survey_id == section.survey_id,
+            SurveySection.title == title,
+            SurveySection.id != section.id,
+        )
+        .first()
+    )
+    if duplicate:
+        raise ValidationError("Tên phần đã tồn tại trong khảo sát.")
+    section.title = title
+    db.session.query(SurveyQuestion).filter(
+        SurveyQuestion.section_id == section.id
+    ).update({SurveyQuestion.section: title}, synchronize_session=False)
+    db.session.flush()
+    record_audit(
+        user_id=actor.id,
+        action="survey_section.update",
+        entity_type="survey_section",
+        entity_id=section.id,
+        old_values=old,
+        new_values=section.to_dict(),
+        **meta,
+    )
+    db.session.commit()
+    return section.to_dict()
+
+
+def delete_section(section_id: int, *, actor, meta: dict) -> None:
+    section = _get_section_or_404(section_id)
+    if db.session.query(SurveyQuestion.id).filter(SurveyQuestion.section_id == section.id).first():
+        raise ConflictError("Phần đang có câu hỏi; hãy chuyển câu hỏi sang phần khác trước.")
+    old = section.to_dict()
+    db.session.delete(section)
+    db.session.flush()
+    record_audit(
+        user_id=actor.id,
+        action="survey_section.delete",
+        entity_type="survey_section",
+        entity_id=section_id,
+        old_values=old,
+        **meta,
+    )
+    db.session.commit()
+
+
+def reorder_sections(survey_id: int, items: list[dict], *, actor, meta: dict) -> list[dict]:
+    get_survey_or_404(survey_id)
+    valid_ids = {
+        row[0]
+        for row in db.session.query(SurveySection.id)
+        .filter(SurveySection.survey_id == survey_id)
+        .all()
+    }
+    if any(item["id"] not in valid_ids for item in items):
+        raise ValidationError("Phần không thuộc khảo sát này.")
+    for item in items:
+        db.session.get(SurveySection, item["id"]).sort_order = item["sort_order"]
+    record_audit(
+        user_id=actor.id,
+        action="survey_section.reorder",
+        entity_type="survey",
+        entity_id=survey_id,
+        new_values={"order": items},
+        **meta,
+    )
+    db.session.commit()
+    return list_sections(survey_id)
+
+
 # ----------------------------- Câu hỏi -----------------------------
 def list_questions(survey_id: int, *, include_inactive: bool = False) -> list[dict]:
     get_survey_or_404(survey_id)
@@ -177,13 +328,17 @@ def create_question(survey_id: int, data: dict, *, actor, meta: dict) -> dict:
     if qtype in QUESTION_TYPES_WITH_OPTIONS and len(options_payload) < 2:
         raise ValidationError(f"Câu hỏi loại '{qtype}' phải có ít nhất 2 phương án trả lời.")
 
+    section_record = _section_for_survey(data.get("section_id"), survey_id)
     question = SurveyQuestion(
         survey_id=survey_id,
         question_text=text,
         question_type=qtype,
         is_required=bool(data.get("is_required", False)),
         is_active=bool(data.get("is_active", True)),
-        section=clean_str(data.get("section")),
+        section=section_record.title if section_record else clean_str(data.get("section")),
+        section_id=section_record.id if section_record else None,
+        yes_score=data.get("yes_score") if qtype == "yes_no" else None,
+        no_score=data.get("no_score") if qtype == "yes_no" else None,
         sort_order=_next_question_order(survey_id),
     )
     db.session.add(question)
@@ -227,7 +382,17 @@ def update_question(question_id: int, data: dict, *, actor, meta: dict) -> dict:
     if new_type not in QUESTION_TYPES:
         raise ValidationError("Loại câu hỏi không hợp lệ.")
 
-    content_changed = new_text != q.question_text or new_type != q.question_type
+    new_yes_score = data.get("yes_score", q.yes_score)
+    new_no_score = data.get("no_score", q.no_score)
+    if new_type != "yes_no":
+        new_yes_score = None
+        new_no_score = None
+    content_changed = (
+        new_text != q.question_text
+        or new_type != q.question_type
+        or new_yes_score != q.yes_score
+        or new_no_score != q.no_score
+    )
     target = q
     revised_from = None
     if content_changed and _question_has_responses(q.id):
@@ -236,12 +401,19 @@ def update_question(question_id: int, data: dict, *, actor, meta: dict) -> dict:
 
     target.question_text = new_text
     target.question_type = new_type
+    target.yes_score = new_yes_score
+    target.no_score = new_no_score
     if "is_required" in data:
         target.is_required = bool(data["is_required"])
     if "is_active" in data:
         target.is_active = bool(data["is_active"])
-    if "section" in data:
+    if "section_id" in data:
+        section_record = _section_for_survey(data["section_id"], target.survey_id)
+        target.section_id = section_record.id if section_record else None
+        target.section = section_record.title if section_record else None
+    elif "section" in data:
         target.section = clean_str(data["section"])
+        target.section_id = None
 
     options_payload = data.get("options")
     if new_type in QUESTION_TYPES_WITH_OPTIONS:
@@ -302,6 +474,9 @@ def duplicate_question(question_id: int, *, actor, meta: dict) -> dict:
         is_active=True,
         section=q.section,
         sort_order=_next_question_order(q.survey_id),
+        section_id=q.section_id,
+        yes_score=q.yes_score,
+        no_score=q.no_score,
     )
     db.session.add(new_q)
     db.session.flush()

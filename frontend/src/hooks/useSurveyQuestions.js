@@ -12,6 +12,40 @@ export function useSurveyQuestions(surveyId, { includeInactive = false } = {}) {
   });
 }
 
+export function useSurveySections(surveyId) {
+  return useQuery({
+    queryKey: ["surveys", surveyId, "sections"],
+    queryFn: () => api.get(`/surveys/${surveyId}/sections`).then((r) => r.data.data),
+    enabled: !!surveyId,
+  });
+}
+
+export function useSurveySectionMutations(surveyId) {
+  const qc = useQueryClient();
+  const invalidate = () => {
+    qc.invalidateQueries({ queryKey: ["surveys", surveyId, "sections"] });
+    qc.invalidateQueries({ queryKey: ["surveys", surveyId, "questions"] });
+  };
+  return {
+    create: useMutation({
+      mutationFn: (body) => api.post(`/surveys/${surveyId}/sections`, body),
+      onSuccess: invalidate,
+    }),
+    update: useMutation({
+      mutationFn: ({ id, body }) => api.put(`/survey-sections/${id}`, body),
+      onSuccess: invalidate,
+    }),
+    remove: useMutation({
+      mutationFn: (id) => api.delete(`/survey-sections/${id}`),
+      onSuccess: invalidate,
+    }),
+    reorder: useMutation({
+      mutationFn: (items) => api.post(`/surveys/${surveyId}/sections/reorder`, { items }),
+      onSuccess: invalidate,
+    }),
+  };
+}
+
 export function useSurveyQuestionMutations(surveyId) {
   const qc = useQueryClient();
   const invalidate = () => qc.invalidateQueries({ queryKey: ["surveys", surveyId, "questions"] });

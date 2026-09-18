@@ -22,7 +22,7 @@ function QuestionStatCard({ question }) {
         <>
           {stats.average_score != null && (
             <p className="mb-3 text-sm text-ink-2">
-              Điểm trung bình: <span className="font-semibold text-ink">{stats.average_score}/5</span>
+              Điểm trung bình: <span className="font-semibold text-ink">{stats.average_score}</span>
               <span className="ml-1 text-xs text-muted">({stats.scored_answers} đáp án có điểm)</span>
             </p>
           )}
@@ -43,10 +43,17 @@ function QuestionStatCard({ question }) {
         </>
       )}
       {stats.type === "yes_no" && (
-        <div className="grid gap-2.5">
-          <BarRow label="Có" percentage={stats.yes_percentage} valueLabel={`${stats.yes_count} · ${stats.yes_percentage}%`} color="var(--color-ok)" />
-          <BarRow label="Không" percentage={stats.no_percentage} valueLabel={`${stats.no_count} · ${stats.no_percentage}%`} color="var(--color-danger)" />
-        </div>
+        <>
+          {stats.average_score != null && (
+            <p className="mb-3 text-sm text-ink-2">
+              Điểm trung bình: <span className="font-semibold text-ink">{stats.average_score}</span>
+            </p>
+          )}
+          <div className="grid gap-2.5">
+            <BarRow label={`Có${stats.yes_score != null ? ` · ${stats.yes_score} điểm` : ""}`} percentage={stats.yes_percentage} valueLabel={`${stats.yes_count} · ${stats.yes_percentage}%`} color="var(--color-ok)" />
+            <BarRow label={`Không${stats.no_score != null ? ` · ${stats.no_score} điểm` : ""}`} percentage={stats.no_percentage} valueLabel={`${stats.no_count} · ${stats.no_percentage}%`} color="var(--color-danger)" />
+          </div>
+        </>
       )}
       {stats.type === "rating" && (
         <>
@@ -117,6 +124,14 @@ export function SurveyStatisticsView({ surveyId }) {
   const { overview, by_question, time_series, by_branch } = data;
   const maxSeries = Math.max(1, ...time_series.map((t) => t.count));
   const topBranches = by_branch.filter((b) => b.rank === 1);
+  const branchScores = by_branch.map((b) => b.average_score).filter((score) => score != null);
+  const minBranchScore = branchScores.length ? Math.min(...branchScores) : 0;
+  const maxBranchScore = branchScores.length ? Math.max(...branchScores) : 0;
+  const branchScoreWidth = (score) => {
+    if (score == null) return 0;
+    if (maxBranchScore === minBranchScore) return 100;
+    return ((score - minBranchScore) / (maxBranchScore - minBranchScore)) * 100;
+  };
 
   return (
     <div>
@@ -134,14 +149,14 @@ export function SurveyStatisticsView({ surveyId }) {
         <KpiTile label="Tỷ lệ hoàn thành" value={`${overview.completion_rate}%`} />
         <KpiTile
           label="Điểm trung bình"
-          value={overview.average_score != null ? `${overview.average_score}/5` : "—"}
+          value={overview.average_score != null ? overview.average_score : "—"}
           hint={`${overview.score_answer_count || 0} đáp án có gán điểm`}
         />
-        <KpiTile label="Tỷ lệ hài lòng" value={`${overview.satisfaction_rate}%`} hint="Đánh giá 4–5 sao" />
-        <KpiTile label="Tỷ lệ không hài lòng" value={`${overview.dissatisfaction_rate}%`} hint="Đánh giá 1–2 sao" />
+        <KpiTile label="Tỷ lệ hài lòng" value={overview.satisfaction_answer_count ? `${overview.satisfaction_rate}%` : "—"} hint="Chỉ tính câu đánh giá 1–5" />
+        <KpiTile label="Tỷ lệ không hài lòng" value={overview.satisfaction_answer_count ? `${overview.dissatisfaction_rate}%` : "—"} hint="Chỉ tính câu đánh giá 1–5" />
       </div>
 
-      {overview.total_responses > 0 && (
+      {overview.satisfaction_answer_count > 0 && (
         <Card className="mb-6">
           <h3 className="mb-3 font-semibold text-slate-800">Phân bố mức độ hài lòng</h3>
           <RatingBreakdown breakdown={overview.rating_breakdown} />
@@ -180,7 +195,7 @@ export function SurveyStatisticsView({ surveyId }) {
                     {topBranches.map((b) => b.branch_name).join(", ")}
                   </p>
                   <p className="text-sm text-emerald-800">
-                    {topBranches[0].average_score}/5 điểm
+                    {topBranches[0].average_score} điểm
                   </p>
                 </div>
               )}
@@ -188,8 +203,8 @@ export function SurveyStatisticsView({ surveyId }) {
                 <div key={b.branch_id ?? "none"}>
                   <BarRow
                     label={`${b.rank ? `#${b.rank} · ` : ""}${b.branch_name}`}
-                    percentage={b.average_score != null ? (b.average_score / 5) * 100 : 0}
-                    valueLabel={b.average_score != null ? `${b.average_score}/5` : "Chưa có điểm"}
+                    percentage={branchScoreWidth(b.average_score)}
+                    valueLabel={b.average_score != null ? `${b.average_score} điểm` : "Chưa có điểm"}
                   />
                   <p className="mt-1 text-xs text-muted">
                     {b.total_responses} lượt · {b.scored_answers || 0} đáp án có điểm · Hài lòng{" "}

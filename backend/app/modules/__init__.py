@@ -48,8 +48,15 @@ def register_blueprints(app: Flask) -> None:
     from .surveys.routes import options_bp as survey_options_bp
     from .surveys.routes import public_bp as public_surveys_bp
     from .surveys.routes import questions_bp as survey_questions_bp
+    from .surveys.routes import sections_bp as survey_sections_bp
 
-    for bp in (surveys_bp, survey_questions_bp, survey_options_bp, public_surveys_bp):
+    for bp in (
+        surveys_bp,
+        survey_questions_bp,
+        survey_options_bp,
+        survey_sections_bp,
+        public_surveys_bp,
+    ):
         app.register_blueprint(bp)
 
     # --- Bảng tin / thông báo nội bộ ---

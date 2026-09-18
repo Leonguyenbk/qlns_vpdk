@@ -72,6 +72,12 @@ class Survey(TimestampMixin, db.Model):
         cascade="all, delete-orphan",
         order_by="SurveyQuestion.sort_order",
     )
+    sections: Mapped[list["SurveySection"]] = relationship(
+        "SurveySection",
+        back_populates="survey",
+        cascade="all, delete-orphan",
+        order_by="SurveySection.sort_order",
+    )
     creator = relationship("User")
 
     def to_dict(self, *, counts: dict | None = None) -> dict:
@@ -96,6 +102,34 @@ class Survey(TimestampMixin, db.Model):
         return data
 
 
+class SurveySection(TimestampMixin, db.Model):
+    __tablename__ = "survey_sections"
+    __table_args__ = (
+        UniqueConstraint("survey_id", "title", name="uq_survey_sections_title"),
+        Index("ix_survey_sections_order", "survey_id", "sort_order"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    survey_id: Mapped[int] = mapped_column(
+        ForeignKey("surveys.id", ondelete="CASCADE"), nullable=False
+    )
+    title: Mapped[str] = mapped_column(String(255), nullable=False)
+    sort_order: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+
+    survey: Mapped["Survey"] = relationship("Survey", back_populates="sections")
+    questions: Mapped[list["SurveyQuestion"]] = relationship(
+        "SurveyQuestion", back_populates="section_record"
+    )
+
+    def to_dict(self) -> dict:
+        return {
+            "id": self.id,
+            "survey_id": self.survey_id,
+            "title": self.title,
+            "sort_order": self.sort_order,
+        }
+
+
 class SurveyQuestion(TimestampMixin, db.Model):
     __tablename__ = "survey_questions"
     __table_args__ = (
@@ -116,8 +150,16 @@ class SurveyQuestion(TimestampMixin, db.Model):
     # dịch vụ"). Chỉ là nhãn tổ chức — không ảnh hưởng ý nghĩa dữ liệu lịch sử
     # nên luôn sửa tại chỗ, không kích hoạt cơ chế "revision" như question_text.
     section: Mapped[str | None] = mapped_column(String(255))
+    section_id: Mapped[int | None] = mapped_column(
+        ForeignKey("survey_sections.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    yes_score: Mapped[float | None] = mapped_column(Float)
+    no_score: Mapped[float | None] = mapped_column(Float)
 
     survey: Mapped["Survey"] = relationship("Survey", back_populates="questions")
+    section_record: Mapped["SurveySection | None"] = relationship(
+        "SurveySection", back_populates="questions"
+    )
     options: Mapped[list["SurveyOption"]] = relationship(
         "SurveyOption",
         back_populates="question",
@@ -131,6 +173,7 @@ class SurveyQuestion(TimestampMixin, db.Model):
         include_options: bool = True,
         only_active_options: bool = False,
         include_option_scores: bool = True,
+        include_scores: bool = True,
     ) -> dict:
         data = {
             "id": self.id,
@@ -140,10 +183,14 @@ class SurveyQuestion(TimestampMixin, db.Model):
             "is_required": self.is_required,
             "is_active": self.is_active,
             "sort_order": self.sort_order,
-            "section": self.section,
+            "section": self.section_record.title if self.section_record else self.section,
+            "section_id": self.section_id,
             "created_at": _iso(self.created_at),
             "updated_at": _iso(self.updated_at),
         }
+        if include_scores:
+            data["yes_score"] = self.yes_score
+            data["no_score"] = self.no_score
         if include_options:
             opts = self.options
             if only_active_options:

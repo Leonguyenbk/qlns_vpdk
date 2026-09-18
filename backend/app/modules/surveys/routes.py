@@ -14,6 +14,8 @@ from ...schemas import (
     survey_option_update_schema,
     survey_question_create_schema,
     survey_question_update_schema,
+    survey_section_create_schema,
+    survey_section_update_schema,
     survey_status_schema,
     survey_submit_schema,
     survey_update_schema,
@@ -29,6 +31,7 @@ from .._helpers import actor_and_scope, audit_meta, validated_json
 bp = Blueprint("surveys", __name__, url_prefix="/api/surveys")
 questions_bp = Blueprint("survey_questions", __name__, url_prefix="/api/survey-questions")
 options_bp = Blueprint("survey_options", __name__, url_prefix="/api/survey-options")
+sections_bp = Blueprint("survey_sections", __name__, url_prefix="/api/survey-sections")
 public_bp = Blueprint("public_surveys", __name__, url_prefix="/api/public/surveys")
 
 
@@ -108,6 +111,60 @@ def set_branch_limits(survey_id: int):
         survey_id, payload["items"], actor=actor, meta=audit_meta()
     )
     return success(data, "Đã cập nhật chỉ tiêu theo chi nhánh")
+
+
+# ----------------------------- Phần khảo sát -----------------------------
+@bp.get("/<int:survey_id>/sections")
+@require_permission(perms.SURVEY_VIEW)
+def list_sections(survey_id: int):
+    return success(survey_question_service.list_sections(survey_id))
+
+
+@bp.post("/<int:survey_id>/sections")
+@require_permission(perms.SURVEY_MANAGE_QUESTIONS)
+def create_section(survey_id: int):
+    actor, _ = actor_and_scope()
+    data = survey_question_service.create_section(
+        survey_id,
+        validated_json(survey_section_create_schema),
+        actor=actor,
+        meta=audit_meta(),
+    )
+    return success(data, "Đã tạo phần khảo sát", status_code=201)
+
+
+@bp.post("/<int:survey_id>/sections/reorder")
+@require_permission(perms.SURVEY_MANAGE_QUESTIONS)
+def reorder_sections(survey_id: int):
+    actor, _ = actor_and_scope()
+    payload = validated_json(reorder_schema)
+    return success(
+        survey_question_service.reorder_sections(
+            survey_id, payload["items"], actor=actor, meta=audit_meta()
+        ),
+        "Đã sắp xếp các phần",
+    )
+
+
+@sections_bp.put("/<int:section_id>")
+@require_permission(perms.SURVEY_MANAGE_QUESTIONS)
+def update_section(section_id: int):
+    actor, _ = actor_and_scope()
+    data = survey_question_service.update_section(
+        section_id,
+        validated_json(survey_section_update_schema),
+        actor=actor,
+        meta=audit_meta(),
+    )
+    return success(data, "Đã cập nhật phần khảo sát")
+
+
+@sections_bp.delete("/<int:section_id>")
+@require_permission(perms.SURVEY_MANAGE_QUESTIONS)
+def delete_section(section_id: int):
+    actor, _ = actor_and_scope()
+    survey_question_service.delete_section(section_id, actor=actor, meta=audit_meta())
+    return success(None, "Đã xóa phần khảo sát")
 
 
 # ----------------------------- Câu hỏi -----------------------------

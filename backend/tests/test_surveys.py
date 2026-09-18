@@ -228,12 +228,12 @@ def test_scored_options_calculate_average_and_rank_branches(
             "question_type": "single_choice",
             "is_required": True,
             "options": [
-                {"option_text": "Chưa tốt", "score": 1},
-                {"option_text": "Rất tốt", "score": 5},
+                {"option_text": "Chưa tốt", "score": -10},
+                {"option_text": "Rất tốt", "score": 100},
             ],
         },
     ).get_json()["data"]
-    assert [option["score"] for option in question["options"]] == [1.0, 5.0]
+    assert [option["score"] for option in question["options"]] == [-10.0, 100.0]
 
     client.post(
         f"/api/surveys/{survey['id']}/status", headers=headers, json={"status": "active"}
@@ -255,28 +255,110 @@ def test_scored_options_calculate_average_and_rank_branches(
     stats = client.get(
         f"/api/surveys/{survey['id']}/statistics", headers=headers
     ).get_json()["data"]
-    assert stats["overview"]["average_score"] == 3.0
+    assert stats["overview"]["average_score"] == 45.0
     assert stats["overview"]["score_answer_count"] == 2
     assert stats["by_branch"][0]["branch_id"] == branch_high.id
     assert stats["by_branch"][0]["rank"] == 1
-    assert stats["by_branch"][0]["average_score"] == 5.0
+    assert stats["by_branch"][0]["average_score"] == 100.0
     assert stats["by_branch"][1]["rank"] == 2
     question_stats = stats["by_question"][0]["stats"]
-    assert question_stats["average_score"] == 3.0
+    assert question_stats["average_score"] == 45.0
 
     # Đổi điểm sau khi đã có phản hồi phải tạo phiên bản phương án mới; điểm
     # của phản hồi lịch sử vẫn giữ nguyên là 5.
     revised = client.put(
         f"/api/survey-options/{high_option['id']}",
         headers=headers,
-        json={"score": 4},
+        json={"score": 500},
     ).get_json()["data"]
     assert revised["revised_from_id"] == high_option["id"]
-    assert revised["score"] == 4.0
+    assert revised["score"] == 500.0
     stats_after = client.get(
         f"/api/surveys/{survey['id']}/statistics", headers=headers
     ).get_json()["data"]
-    assert stats_after["overview"]["average_score"] == 3.0
+    assert stats_after["overview"]["average_score"] == 45.0
+
+
+def test_sections_yes_no_scores_and_question_copy(client, admin_user, auth_header):
+    headers = auth_header("admin_test")
+    survey = _create_survey(client, headers, title="Khảo sát theo phần")
+    section = client.post(
+        f"/api/surveys/{survey['id']}/sections",
+        headers=headers,
+        json={"title": "Phần 1. Tiếp nhận"},
+    )
+    assert section.status_code == 201, section.get_json()
+    section = section.get_json()["data"]
+
+    question = client.post(
+        f"/api/surveys/{survey['id']}/questions",
+        headers=headers,
+        json={
+            "question_text": "Hồ sơ có được hướng dẫn đầy đủ không?",
+            "question_type": "yes_no",
+            "section_id": section["id"],
+            "yes_score": 25.5,
+            "no_score": -7,
+        },
+    )
+    assert question.status_code == 201, question.get_json()
+    question = question.get_json()["data"]
+    assert question["section_id"] == section["id"]
+    assert question["yes_score"] == 25.5
+    assert question["no_score"] == -7.0
+
+    copied = client.post(
+        f"/api/survey-questions/{question['id']}/duplicate", headers=headers
+    ).get_json()["data"]
+    assert copied["section_id"] == section["id"]
+    assert copied["yes_score"] == 25.5
+    assert copied["no_score"] == -7.0
+
+    renamed = client.put(
+        f"/api/survey-sections/{section['id']}",
+        headers=headers,
+        json={"title": "Phần 1. Hướng dẫn"},
+    )
+    assert renamed.status_code == 200
+    questions = client.get(
+        f"/api/surveys/{survey['id']}/questions", headers=headers
+    ).get_json()["data"]
+    assert all(item["section"] == "Phần 1. Hướng dẫn" for item in questions)
+    assert client.delete(
+        f"/api/survey-sections/{section['id']}", headers=headers
+    ).status_code == 409
+
+    client.post(
+        f"/api/surveys/{survey['id']}/status", headers=headers, json={"status": "active"}
+    )
+    public = client.get(f"/api/public/surveys/{survey['slug']}").get_json()["data"]
+    public_question = next(item for item in public["questions"] if item["id"] == question["id"])
+    assert "yes_score" not in public_question
+    response = client.post(
+        f"/api/public/surveys/{survey['id']}/submit",
+        json={"answers": [{"question_id": question["id"], "answer_text": "yes"}]},
+    )
+    assert response.status_code == 201, response.get_json()
+    stats = client.get(
+        f"/api/surveys/{survey['id']}/statistics", headers=headers
+    ).get_json()["data"]
+    assert stats["overview"]["average_score"] == 25.5
+    question_stats = next(
+        item["stats"] for item in stats["by_question"] if item["id"] == question["id"]
+    )
+    assert question_stats["average_score"] == 25.5
+    assert question_stats["yes_score"] == 25.5
+
+    revised = client.put(
+        f"/api/survey-questions/{question['id']}",
+        headers=headers,
+        json={"yes_score": 999, "no_score": -999},
+    ).get_json()["data"]
+    assert revised["revised_from_id"] == question["id"]
+    stats_after = client.get(
+        f"/api/surveys/{survey['id']}/statistics", headers=headers
+    ).get_json()["data"]
+    assert stats_after["overview"]["average_score"] == 25.5
 
 
 def test_filter_dashboard_by_date_range(client, admin_user, auth_header):

@@ -87,6 +87,7 @@ def _clean_db(app):
         "survey_responses",
         "survey_options",
         "survey_questions",
+        "survey_sections",
         "surveys",
         "refresh_tokens",
         "employee_assignments",
