@@ -151,11 +151,6 @@ export function SurveyStatisticsView({ surveyId }) {
       <div className="mb-6 grid grid-cols-2 gap-3 md:grid-cols-3">
         <KpiTile label="Tổng lượt khảo sát" value={overview.total_responses} />
         <KpiTile label="Tỷ lệ hoàn thành" value={`${overview.completion_rate}%`} />
-        <KpiTile
-          label="Điểm trung bình"
-          value={overview.average_score != null ? overview.average_score : "—"}
-          hint={`${overview.score_answer_count || 0} đáp án có gán điểm`}
-        />
         {overview.max_possible_score != null && (
           <KpiTile
             label="Tổng điểm TB / Tối đa"
