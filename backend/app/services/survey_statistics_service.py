@@ -675,10 +675,13 @@ def _by_branch(
                 else 0,
             }
         )
+    # Xếp theo tổng điểm trung bình thực nhận (không phải điểm trung bình gộp
+    # từng câu hỏi) — cùng thứ tự với tỷ lệ % vì điểm tối đa là hằng số của
+    # khảo sát, giống nhau cho mọi chi nhánh.
     result.sort(
         key=lambda r: (
-            r["branch_id"] is None or r["average_score"] is None,
-            -(r["average_score"] or 0),
+            r["branch_id"] is None or r["average_total_score"] is None,
+            -(r["average_total_score"] or 0),
             -r["total_responses"],
             r["branch_name"],
         )
@@ -686,12 +689,12 @@ def _by_branch(
     previous_score = None
     current_rank = 0
     for index, row in enumerate(result, start=1):
-        if row["branch_id"] is None or row["average_score"] is None:
+        if row["branch_id"] is None or row["average_total_score"] is None:
             row["rank"] = None
             continue
-        if previous_score != row["average_score"]:
+        if previous_score != row["average_total_score"]:
             current_rank = index
-            previous_score = row["average_score"]
+            previous_score = row["average_total_score"]
         row["rank"] = current_rank
     return result
 

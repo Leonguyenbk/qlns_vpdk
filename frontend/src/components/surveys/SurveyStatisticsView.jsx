@@ -128,14 +128,10 @@ export function SurveyStatisticsView({ surveyId }) {
 
   const { overview, by_question, by_branch } = data;
   const topBranches = by_branch.filter((b) => b.rank === 1);
-  const branchScores = by_branch.map((b) => b.average_score).filter((score) => score != null);
-  const minBranchScore = branchScores.length ? Math.min(...branchScores) : 0;
-  const maxBranchScore = branchScores.length ? Math.max(...branchScores) : 0;
-  const branchScoreWidth = (score) => {
-    if (score == null) return 0;
-    if (maxBranchScore === minBranchScore) return 100;
-    return ((score - minBranchScore) / (maxBranchScore - minBranchScore)) * 100;
-  };
+  const branchTotalLabel = (b) =>
+    b.max_possible_score != null
+      ? `${b.average_total_score}/${b.max_possible_score} điểm (${b.average_percentage}%)`
+      : "Chưa có điểm";
 
   return (
     <div>
@@ -177,24 +173,18 @@ export function SurveyStatisticsView({ surveyId }) {
                   <p className="mt-1 font-semibold text-emerald-950">
                     {topBranches.map((b) => b.branch_name).join(", ")}
                   </p>
-                  <p className="text-sm text-emerald-800">
-                    {topBranches[0].average_score} điểm
-                    {topBranches[0].max_possible_score != null &&
-                      ` · Tổng điểm TB ${topBranches[0].average_total_score}/${topBranches[0].max_possible_score} (${topBranches[0].average_percentage}%)`}
-                  </p>
+                  <p className="text-sm text-emerald-800">{branchTotalLabel(topBranches[0])}</p>
                 </div>
               )}
               {by_branch.map((b) => (
                 <div key={b.branch_id ?? "none"}>
                   <BarRow
                     label={`${b.rank ? `#${b.rank} · ` : ""}${b.branch_name}`}
-                    percentage={branchScoreWidth(b.average_score)}
-                    valueLabel={b.average_score != null ? `${b.average_score} điểm` : "Chưa có điểm"}
+                    percentage={b.average_percentage ?? 0}
+                    valueLabel={branchTotalLabel(b)}
                   />
                   <p className="mt-1 text-xs text-muted">
                     {b.total_responses} lượt · {b.scored_answers || 0} đáp án có điểm
-                    {b.max_possible_score != null &&
-                      ` · Tổng điểm TB ${b.average_total_score}/${b.max_possible_score} (${b.average_percentage}%)`}
                   </p>
                 </div>
               ))}

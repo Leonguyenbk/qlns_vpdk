@@ -495,6 +495,64 @@ def test_scored_options_calculate_average_and_rank_branches(
     assert stats_after["overview"]["average_score"] == 45.0
 
 
+def test_branch_rank_uses_total_score_not_pooled_average(client, admin_user, auth_header, make_unit):
+    """Chi nhánh trả lời đủ câu hỏi (tổng điểm cao hơn) phải xếp trên chi nhánh chỉ
+    trả lời một câu, dù "điểm trung bình" gộp từng câu hỏi của hai bên bằng nhau."""
+    headers = auth_header("admin_test")
+    branch_partial = make_unit("RANK-PARTIAL", name="CN Trả lời một câu", unit_type="BRANCH")
+    branch_full = make_unit("RANK-FULL", name="CN Trả lời đủ câu", unit_type="BRANCH")
+    survey = _create_survey(client, headers, title="Khảo sát 2 câu tính điểm")
+    q1 = client.post(
+        f"/api/surveys/{survey['id']}/questions",
+        headers=headers,
+        json={
+            "question_text": "Câu 1",
+            "question_type": "single_choice",
+            "is_required": False,
+            "options": [{"option_text": "Tốt", "score": 10}, {"option_text": "Tệ", "score": 1}],
+        },
+    ).get_json()["data"]
+    q2 = client.post(
+        f"/api/surveys/{survey['id']}/questions",
+        headers=headers,
+        json={
+            "question_text": "Câu 2",
+            "question_type": "single_choice",
+            "is_required": False,
+            "options": [{"option_text": "Tốt", "score": 10}, {"option_text": "Tệ", "score": 1}],
+        },
+    ).get_json()["data"]
+    client.post(f"/api/surveys/{survey['id']}/status", headers=headers, json={"status": "active"})
+
+    good1 = q1["options"][0]["id"]
+    good2 = q2["options"][0]["id"]
+    client.post(
+        f"/api/public/surveys/{survey['id']}/submit",
+        json={"branch_id": branch_partial.id, "answers": [{"question_id": q1["id"], "option_id": good1}]},
+    )
+    client.post(
+        f"/api/public/surveys/{survey['id']}/submit",
+        json={
+            "branch_id": branch_full.id,
+            "answers": [
+                {"question_id": q1["id"], "option_id": good1},
+                {"question_id": q2["id"], "option_id": good2},
+            ],
+        },
+    )
+
+    stats = client.get(f"/api/surveys/{survey['id']}/statistics", headers=headers).get_json()["data"]
+    partial_row = next(r for r in stats["by_branch"] if r["branch_id"] == branch_partial.id)
+    full_row = next(r for r in stats["by_branch"] if r["branch_id"] == branch_full.id)
+    # "Điểm trung bình" gộp từng câu hỏi bằng nhau ở cả hai chi nhánh...
+    assert partial_row["average_score"] == full_row["average_score"] == 10.0
+    # ...nhưng tổng điểm thực nhận và thứ hạng phải phản ánh đúng chi nhánh trả lời đủ hơn.
+    assert partial_row["average_total_score"] == 10.0
+    assert full_row["average_total_score"] == 20.0
+    assert full_row["rank"] == 1
+    assert partial_row["rank"] == 2
+
+
 def test_sections_yes_no_scores_and_question_copy(client, admin_user, auth_header):
     headers = auth_header("admin_test")
     survey = _create_survey(client, headers, title="Khảo sát theo phần")
