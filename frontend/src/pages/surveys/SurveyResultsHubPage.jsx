@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useSurveys } from "../../hooks/useSurveys";
-import { PageHeader, Select } from "../../components/ui/primitives";
+import { Select } from "../../components/ui/primitives";
 import { EmptyState, LoadingState } from "../../components/ui/DataStates";
 import { SurveyResponsesView } from "../../components/surveys/SurveyResponsesView";
 
@@ -20,10 +20,6 @@ export default function SurveyResultsHubPage() {
       >
         ← Quay lại Danh sách khảo sát
       </button>
-      <PageHeader
-        title="Kết quả khảo sát"
-        subtitle="Chọn một cuộc khảo sát để xem danh sách phản hồi"
-      />
       {isLoading ? (
         <LoadingState />
       ) : !surveys.length ? (

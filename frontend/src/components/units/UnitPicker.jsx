@@ -11,13 +11,23 @@ import { Select } from "../ui/primitives";
  *  - onChange: (unitId: string) => void
  *  - error:    thông báo lỗi (hiển thị ở ô Phòng / Chi nhánh)
  */
-export function UnitPicker({ units = [], value, onChange, error }) {
+export function UnitPicker({
+  units = [],
+  value,
+  onChange,
+  error,
+  includeHeadOffice = true,
+  showLabels = false,
+}) {
   const groups = useMemo(
     () =>
       units
-        .filter((u) => ["HEAD_OFFICE", "DEPARTMENT", "BRANCH"].includes(u.unit_type))
+        .filter((u) =>
+          (includeHeadOffice ? ["HEAD_OFFICE", "DEPARTMENT", "BRANCH"] : ["DEPARTMENT", "BRANCH"])
+            .includes(u.unit_type)
+        )
         .sort((a, b) => a.name.localeCompare(b.name, "vi")),
-    [units]
+    [units, includeHeadOffice]
   );
   const byId = useMemo(() => new Map(units.map((u) => [String(u.id), u])), [units]);
 
@@ -49,46 +59,52 @@ export function UnitPicker({ units = [], value, onChange, error }) {
 
   return (
     <div className="grid gap-3 sm:grid-cols-2">
-      <Select
-        value={groupId}
-        error={error}
-        onChange={(e) => {
-          const g = e.target.value;
-          setGroupId(g);
-          setSectionId("");
-          onChange?.(g || "");
-        }}
-      >
-        <option value="">-- Phòng / Chi nhánh --</option>
-        {groups.map((u) => (
-          <option key={u.id} value={u.id}>
-            {u.name}
-          </option>
-        ))}
-      </Select>
+      <div>
+        {showLabels && <label className="label">Chi nhánh / Phòng ban</label>}
+        <Select
+          value={groupId}
+          error={error}
+          onChange={(e) => {
+            const g = e.target.value;
+            setGroupId(g);
+            setSectionId("");
+            onChange?.(g || "");
+          }}
+        >
+          <option value="">-- Tất cả đơn vị --</option>
+          {groups.map((u) => (
+            <option key={u.id} value={u.id}>
+              {u.name}
+            </option>
+          ))}
+        </Select>
+      </div>
 
-      <Select
-        value={sectionId}
-        disabled={!groupId || sections.length === 0}
-        onChange={(e) => {
-          const s = e.target.value;
-          setSectionId(s);
-          onChange?.(s || groupId || "");
-        }}
-      >
-        <option value="">
-          {!groupId
-            ? "-- Chọn Phòng / Chi nhánh trước --"
-            : sections.length === 0
-              ? "(không có bộ phận)"
-              : "-- Toàn Phòng / Chi nhánh --"}
-        </option>
-        {sections.map((u) => (
-          <option key={u.id} value={u.id}>
-            {u.name}
+      <div>
+        {showLabels && <label className="label">Tổ / Bộ phận trực thuộc</label>}
+        <Select
+          value={sectionId}
+          disabled={!groupId || sections.length === 0}
+          onChange={(e) => {
+            const s = e.target.value;
+            setSectionId(s);
+            onChange?.(s || groupId || "");
+          }}
+        >
+          <option value="">
+            {!groupId
+              ? "-- Chọn đơn vị cấp trên trước --"
+              : sections.length === 0
+                ? "(không có tổ/bộ phận trực thuộc)"
+                : "-- Toàn đơn vị cấp trên --"}
           </option>
-        ))}
-      </Select>
+          {sections.map((u) => (
+            <option key={u.id} value={u.id}>
+              {u.name}
+            </option>
+          ))}
+        </Select>
+      </div>
     </div>
   );
 }
