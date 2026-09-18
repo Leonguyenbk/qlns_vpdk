@@ -3,7 +3,15 @@ import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { IconGrip, IconTrash } from "../ui/icons";
 
-export function OptionRow({ option, onSave, onDelete, disabled, scoreLabel = "Điểm" }) {
+export function OptionRow({
+  option,
+  onSave,
+  onDelete,
+  disabled,
+  scoreLabel = "Điểm",
+  scoreLocked = false,
+  scoreLockedHint = "Câu hỏi phụ",
+}) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: `option-${option.id}`,
   });
@@ -21,7 +29,7 @@ export function OptionRow({ option, onSave, onDelete, disabled, scoreLabel = "Đ
 
   const commit = () => {
     const nextText = text.trim();
-    const nextScore = score === "" ? null : Number(score);
+    const nextScore = scoreLocked ? null : score === "" ? null : Number(score);
     if (!nextText) {
       setText(option.option_text);
       return;
@@ -59,10 +67,15 @@ export function OptionRow({ option, onSave, onDelete, disabled, scoreLabel = "Đ
         type="number"
         step="any"
         className="input w-20 shrink-0 py-1.5 text-sm"
-        value={score}
-        disabled={disabled}
-        aria-label={`${scoreLabel} cho ${option.option_text}`}
-        placeholder={scoreLabel}
+        value={scoreLocked ? "" : score}
+        disabled={disabled || scoreLocked}
+        aria-label={
+          scoreLocked
+            ? `${scoreLockedHint}, không nhập điểm cho ${option.option_text}`
+            : `${scoreLabel} cho ${option.option_text}`
+        }
+        title={scoreLocked ? `Điểm lấy từ ${scoreLockedHint.toLowerCase()}` : undefined}
+        placeholder={scoreLocked ? scoreLockedHint : scoreLabel}
         onChange={(e) => setScore(e.target.value)}
         onKeyDown={(e) => e.key === "Enter" && e.currentTarget.blur()}
       />

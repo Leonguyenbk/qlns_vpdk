@@ -285,6 +285,85 @@ def test_conditional_question_is_required_only_when_triggered_and_scores_child(
     assert stats["overview"]["average_score"] == 7.0
 
 
+def test_trigger_branch_or_option_score_always_locked_to_null(client, admin_user, auth_header):
+    """Điểm của nhánh/phương án đang kích hoạt câu hỏi phụ luôn lấy từ câu hỏi phụ —
+    mọi cách gửi điểm lên (tạo câu hỏi phụ, sửa câu cha, sửa phương án trực tiếp) đều
+    phải bị hệ thống ép về null, không phụ thuộc client gửi gì."""
+    headers = auth_header("admin_test")
+    survey = _create_survey(client, headers, title="Khảo sát khóa điểm nhánh có câu hỏi phụ")
+
+    parent = client.post(
+        f"/api/surveys/{survey['id']}/questions",
+        headers=headers,
+        json={
+            "question_text": "Hồ sơ có xử lý đúng hạn không?",
+            "question_type": "yes_no",
+            "is_required": True,
+            "yes_score": 10,
+            "no_score": 5,
+        },
+    ).get_json()["data"]
+    assert parent["no_score"] == 5
+
+    single_parent = client.post(
+        f"/api/surveys/{survey['id']}/questions",
+        headers=headers,
+        json={
+            "question_text": "Anh/chị đánh giá thế nào?",
+            "question_type": "single_choice",
+            "is_required": True,
+            "options": [
+                {"option_text": "Tốt", "score": 10},
+                {"option_text": "Không tốt", "score": 3},
+            ],
+        },
+    ).get_json()["data"]
+    bad_option_id = single_parent["options"][1]["id"]
+
+    # Liên kết câu hỏi phụ vào nhánh "no" của parent và vào phương án "Không tốt".
+    child_yes_no = client.post(
+        f"/api/surveys/{survey['id']}/questions",
+        headers=headers,
+        json={
+            "question_text": "Nếu không, nguyên nhân là gì?",
+            "question_type": "single_choice",
+            "is_required": True,
+            "parent_question_id": parent["id"],
+            "trigger_answer": "no",
+            "options": [{"option_text": "Lý do A", "score": 2}, {"option_text": "Lý do B", "score": 1}],
+        },
+    ).get_json()["data"]
+    client.post(
+        f"/api/surveys/{survey['id']}/questions",
+        headers=headers,
+        json={
+            "question_text": "Vì sao không tốt?",
+            "question_type": "single_choice",
+            "is_required": True,
+            "parent_question_id": single_parent["id"],
+            "trigger_option_id": bad_option_id,
+            "options": [{"option_text": "Lý do C", "score": 2}, {"option_text": "Lý do D", "score": 1}],
+        },
+    ).get_json()["data"]
+
+    # Sửa câu cha yes/no và cố gửi lại no_score=99 — vẫn phải bị ép về null vì nhánh "no" đã có câu hỏi phụ.
+    updated_parent = client.put(
+        f"/api/survey-questions/{parent['id']}",
+        headers=headers,
+        json={"no_score": 99},
+    ).get_json()["data"]
+    assert updated_parent["no_score"] is None
+    assert updated_parent["yes_score"] == 10  # nhánh "yes" không có câu hỏi phụ, giữ nguyên được
+
+    # Cố sửa trực tiếp phương án "Không tốt" — vẫn bị ép về null vì đang kích hoạt câu hỏi phụ.
+    updated_option = client.put(
+        f"/api/survey-options/{bad_option_id}",
+        headers=headers,
+        json={"score": 77},
+    ).get_json()["data"]
+    assert updated_option["score"] is None
+
+
 def test_multiple_choice_deduction_scores_none_one_two_and_threshold(
     client, admin_user, auth_header
 ):

@@ -39,6 +39,24 @@ def _option_has_answers(option_id: int) -> bool:
     )
 
 
+def _locked_trigger_branches(question_id: int) -> set[str]:
+    """Nhánh Có/Không đang kích hoạt câu hỏi phụ — điểm luôn lấy từ câu hỏi phụ, không cho nhập."""
+    rows = db.session.query(SurveyQuestion.trigger_answer).filter(
+        SurveyQuestion.parent_question_id == question_id,
+        SurveyQuestion.is_active.is_(True),
+        SurveyQuestion.trigger_answer.isnot(None),
+    ).all()
+    return {r[0] for r in rows}
+
+
+def _is_trigger_option(option_id: int) -> bool:
+    """Phương án đang kích hoạt câu hỏi phụ — điểm luôn lấy từ câu hỏi phụ, không cho nhập."""
+    return db.session.query(SurveyQuestion.id).filter(
+        SurveyQuestion.trigger_option_id == option_id,
+        SurveyQuestion.is_active.is_(True),
+    ).first() is not None
+
+
 def _get_question_or_404(question_id: int) -> SurveyQuestion:
     q = db.session.get(SurveyQuestion, question_id)
     if q is None:
@@ -209,9 +227,9 @@ def _apply_options(question: SurveyQuestion, items: list[dict]) -> None:
         if not text:
             raise ValidationError("Nội dung phương án không được để trống.")
         value = clean_str(item.get("option_value"))
-        score = item.get("score")
         order = item.get("sort_order", i)
         oid = item.get("id")
+        score = None if oid and _is_trigger_option(oid) else item.get("score")
         opt = existing.get(oid) if oid else None
         if opt is not None:
             kept_ids.add(opt.id)
@@ -510,6 +528,12 @@ def update_question(question_id: int, data: dict, *, actor, meta: dict) -> dict:
     if new_type != "yes_no":
         new_yes_score = None
         new_no_score = None
+    else:
+        locked_branches = _locked_trigger_branches(q.id)
+        if "yes" in locked_branches:
+            new_yes_score = None
+        if "no" in locked_branches:
+            new_no_score = None
     new_scoring_mode, new_max_score, new_zero_score_at = _scoring_values(
         data, qtype=new_type, current=q
     )
@@ -731,7 +755,7 @@ def update_option(option_id: int, data: dict, *, actor, meta: dict) -> dict:
     if "option_text" in data and not new_text:
         raise ValidationError("Nội dung phương án không được để trống.")
     new_value = clean_str(data["option_value"]) if "option_value" in data else opt.option_value
-    new_score = data.get("score", opt.score)
+    new_score = None if _is_trigger_option(opt.id) else data.get("score", opt.score)
     _validate_deduction_options(opt.question.scoring_mode, [{"score": new_score}])
     if data.get("is_active") is False and db.session.query(SurveyQuestion.id).filter(
         SurveyQuestion.trigger_option_id == opt.id,

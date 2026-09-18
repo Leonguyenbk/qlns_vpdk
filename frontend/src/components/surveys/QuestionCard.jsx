@@ -40,6 +40,15 @@ export function QuestionCard({ question, mutations, canManage, index, sections =
   );
   const selectedParent = parentQuestions.find((q) => q.id === question.parent_question_id);
 
+  // Nhánh/phương án đang kích hoạt một câu hỏi phụ đang bật: điểm luôn lấy từ câu hỏi phụ
+  // khi tính tổng, nên không cho nhập điểm ở đây nữa (tránh nhầm là điểm còn được dùng).
+  const activeChildren = questions.filter((q) => q.is_active && q.parent_question_id === question.id);
+  const yesLocked = activeChildren.some((c) => c.trigger_answer === "yes");
+  const noLocked = activeChildren.some((c) => c.trigger_answer === "no");
+  const lockedOptionIds = new Set(
+    activeChildren.filter((c) => c.trigger_option_id).map((c) => c.trigger_option_id)
+  );
+
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 4 } }));
 
   const style = {
@@ -81,8 +90,8 @@ export function QuestionCard({ question, mutations, canManage, index, sections =
   };
 
   const saveYesNoScores = async () => {
-    const nextYes = yesScore === "" ? null : Number(yesScore);
-    const nextNo = noScore === "" ? null : Number(noScore);
+    const nextYes = yesLocked ? null : yesScore === "" ? null : Number(yesScore);
+    const nextNo = noLocked ? null : noScore === "" ? null : Number(noScore);
     if (nextYes === (question.yes_score ?? null) && nextNo === (question.no_score ?? null)) return;
     try {
       const resp = await mutations.update.mutateAsync({
@@ -392,8 +401,10 @@ export function QuestionCard({ question, mutations, canManage, index, sections =
                   type="number"
                   step="any"
                   className="input mt-1 py-1.5 text-sm"
-                  value={yesScore}
-                  disabled={!canManage}
+                  value={yesLocked ? "" : yesScore}
+                  disabled={!canManage || yesLocked}
+                  placeholder={yesLocked ? "Câu hỏi phụ" : undefined}
+                  title={yesLocked ? "Điểm lấy từ câu hỏi phụ" : undefined}
                   onChange={(e) => setYesScore(e.target.value)}
                 />
               </label>
@@ -403,11 +414,18 @@ export function QuestionCard({ question, mutations, canManage, index, sections =
                   type="number"
                   step="any"
                   className="input mt-1 py-1.5 text-sm"
-                  value={noScore}
-                  disabled={!canManage}
+                  value={noLocked ? "" : noScore}
+                  disabled={!canManage || noLocked}
+                  placeholder={noLocked ? "Câu hỏi phụ" : undefined}
+                  title={noLocked ? "Điểm lấy từ câu hỏi phụ" : undefined}
                   onChange={(e) => setNoScore(e.target.value)}
                 />
               </label>
+              {(yesLocked || noLocked) && (
+                <p className="col-span-2 text-[11px] text-muted">
+                  Nhánh đang có câu hỏi phụ lấy điểm từ câu hỏi phụ đó, không nhập điểm ở đây.
+                </p>
+              )}
             </div>
           )}
 
@@ -471,6 +489,11 @@ export function QuestionCard({ question, mutations, canManage, index, sections =
                 <span>{question.scoring_mode === "deduction" ? "Điểm trừ" : "Điểm"}</span>
                 <span />
               </div>
+              {lockedOptionIds.size > 0 && (
+                <p className="px-0.5 text-[11px] text-muted">
+                  Phương án đang có câu hỏi phụ lấy điểm từ câu hỏi phụ đó, không nhập điểm ở đây.
+                </p>
+              )}
               <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onOptionDragEnd}>
                 <SortableContext
                   items={question.options.map((o) => `option-${o.id}`)}
@@ -484,6 +507,7 @@ export function QuestionCard({ question, mutations, canManage, index, sections =
                       onSave={(body) => saveOption(o, body)}
                       onDelete={() => deleteOption(o)}
                       scoreLabel={question.scoring_mode === "deduction" ? "Điểm trừ" : "Điểm"}
+                      scoreLocked={lockedOptionIds.has(o.id)}
                     />
                   ))}
                 </SortableContext>
