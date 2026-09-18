@@ -50,7 +50,10 @@ def get_public_survey(slug: str) -> dict:
             .order_by(SurveyQuestion.sort_order)
             .all()
         )
-        data["questions"] = [q.to_dict(only_active_options=True) for q in questions]
+        # Điểm là cấu hình quản trị, không công khai cho người trả lời khảo sát.
+        data["questions"] = [
+            q.to_dict(only_active_options=True, include_option_scores=False) for q in questions
+        ]
     # Câu hỏi mặc định "Chi nhánh được khảo sát": danh sách chi nhánh đang hoạt
     # động để trang công khai tự chọn theo mã QR hoặc hiển thị cho người dân chọn.
     # Chi nhánh đã đủ chỉ tiêu (survey_branch_limits) được đánh dấu `full` để

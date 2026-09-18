@@ -8,8 +8,10 @@ export function OptionRow({ option, onSave, onDelete, disabled }) {
     id: `option-${option.id}`,
   });
   const [text, setText] = useState(option.option_text);
+  const [score, setScore] = useState(option.score ?? "");
 
   useEffect(() => setText(option.option_text), [option.option_text]);
+  useEffect(() => setScore(option.score ?? ""), [option.score]);
 
   const style = {
     transform: CSS.Transform.toString(transform),
@@ -17,12 +19,30 @@ export function OptionRow({ option, onSave, onDelete, disabled }) {
     opacity: isDragging ? 0.5 : 1,
   };
 
+  const commit = () => {
+    const nextText = text.trim();
+    const nextScore = score === "" ? null : Number(score);
+    if (!nextText) {
+      setText(option.option_text);
+      return;
+    }
+    if (nextText !== option.option_text || nextScore !== (option.score ?? null)) {
+      onSave({ option_text: nextText, score: nextScore });
+    }
+  };
+
+  const onRowBlur = (event) => {
+    if (event.currentTarget.contains(event.relatedTarget)) return;
+    commit();
+  };
+
   return (
-    <div ref={setNodeRef} style={style} className="flex items-center gap-2">
+    <div ref={setNodeRef} style={style} className="flex items-center gap-2" onBlur={onRowBlur}>
       <button
         type="button"
         className="cursor-grab touch-none text-muted hover:text-ink-2 active:cursor-grabbing"
         aria-label="Kéo để đổi thứ tự"
+        disabled={disabled}
         {...attributes}
         {...listeners}
       >
@@ -33,7 +53,20 @@ export function OptionRow({ option, onSave, onDelete, disabled }) {
         value={text}
         disabled={disabled}
         onChange={(e) => setText(e.target.value)}
-        onBlur={() => text.trim() && text !== option.option_text && onSave(text.trim())}
+        onKeyDown={(e) => e.key === "Enter" && e.currentTarget.blur()}
+      />
+      <input
+        type="number"
+        min="0"
+        max="5"
+        step="0.01"
+        className="input w-20 shrink-0 py-1.5 text-sm"
+        value={score}
+        disabled={disabled}
+        aria-label={`Điểm cho ${option.option_text}`}
+        placeholder="Điểm"
+        onChange={(e) => setScore(e.target.value)}
+        onKeyDown={(e) => e.key === "Enter" && e.currentTarget.blur()}
       />
       <button
         type="button"

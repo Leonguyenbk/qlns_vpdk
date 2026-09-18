@@ -20,12 +20,18 @@ function QuestionStatCard({ question }) {
       <p className="mb-3 text-sm font-medium text-ink">{question.question_text}</p>
       {stats.type === "choice" && (
         <>
+          {stats.average_score != null && (
+            <p className="mb-3 text-sm text-ink-2">
+              Điểm trung bình: <span className="font-semibold text-ink">{stats.average_score}/5</span>
+              <span className="ml-1 text-xs text-muted">({stats.scored_answers} đáp án có điểm)</span>
+            </p>
+          )}
           {stats.options.length ? (
             <div className="grid gap-2.5">
               {stats.options.map((o) => (
                 <BarRow
                   key={o.option_id}
-                  label={o.option_text}
+                  label={`${o.option_text}${o.score != null ? ` · ${o.score} điểm` : ""}`}
                   percentage={o.percentage}
                   valueLabel={`${o.count} · ${o.percentage}%`}
                 />
@@ -110,7 +116,7 @@ export function SurveyStatisticsView({ surveyId }) {
 
   const { overview, by_question, time_series, by_branch } = data;
   const maxSeries = Math.max(1, ...time_series.map((t) => t.count));
-  const maxBranch = Math.max(1, ...by_branch.map((b) => b.total_responses));
+  const topBranches = by_branch.filter((b) => b.rank === 1);
 
   return (
     <div>
@@ -126,7 +132,11 @@ export function SurveyStatisticsView({ surveyId }) {
       <div className="mb-6 grid grid-cols-2 gap-3 md:grid-cols-5">
         <KpiTile label="Tổng lượt khảo sát" value={overview.total_responses} />
         <KpiTile label="Tỷ lệ hoàn thành" value={`${overview.completion_rate}%`} />
-        <KpiTile label="Điểm trung bình" value={overview.average_score != null ? `${overview.average_score}/5` : "—"} />
+        <KpiTile
+          label="Điểm trung bình"
+          value={overview.average_score != null ? `${overview.average_score}/5` : "—"}
+          hint={`${overview.score_answer_count || 0} đáp án có gán điểm`}
+        />
         <KpiTile label="Tỷ lệ hài lòng" value={`${overview.satisfaction_rate}%`} hint="Đánh giá 4–5 sao" />
         <KpiTile label="Tỷ lệ không hài lòng" value={`${overview.dissatisfaction_rate}%`} hint="Đánh giá 1–2 sao" />
       </div>
@@ -158,19 +168,32 @@ export function SurveyStatisticsView({ surveyId }) {
         </Card>
 
         <Card>
-          <h3 className="mb-3 font-semibold text-slate-800">Theo chi nhánh</h3>
+          <h3 className="mb-3 font-semibold text-slate-800">Xếp hạng điểm theo chi nhánh</h3>
           {by_branch.length ? (
             <div className="grid gap-3">
+              {topBranches.length > 0 && (
+                <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-emerald-700">
+                    {topBranches.length > 1 ? "Các chi nhánh đồng dẫn đầu" : "Chi nhánh dẫn đầu"}
+                  </p>
+                  <p className="mt-1 font-semibold text-emerald-950">
+                    {topBranches.map((b) => b.branch_name).join(", ")}
+                  </p>
+                  <p className="text-sm text-emerald-800">
+                    {topBranches[0].average_score}/5 điểm
+                  </p>
+                </div>
+              )}
               {by_branch.map((b) => (
                 <div key={b.branch_id ?? "none"}>
                   <BarRow
-                    label={b.branch_name}
-                    percentage={(b.total_responses / maxBranch) * 100}
-                    valueLabel={`${b.total_responses} lượt`}
+                    label={`${b.rank ? `#${b.rank} · ` : ""}${b.branch_name}`}
+                    percentage={b.average_score != null ? (b.average_score / 5) * 100 : 0}
+                    valueLabel={b.average_score != null ? `${b.average_score}/5` : "Chưa có điểm"}
                   />
                   <p className="mt-1 text-xs text-muted">
-                    Điểm TB {b.average_score ?? "—"}/5 · Hài lòng {b.satisfaction_rate}% · Không hài lòng{" "}
-                    {b.dissatisfaction_rate}%
+                    {b.total_responses} lượt · {b.scored_answers || 0} đáp án có điểm · Hài lòng{" "}
+                    {b.satisfaction_rate}% · Không hài lòng {b.dissatisfaction_rate}%
                   </p>
                 </div>
               ))}

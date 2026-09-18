@@ -213,6 +213,72 @@ def test_multiple_choice_saved_and_counted_correctly(client, admin_user, auth_he
     assert counted[opt_ids[1]] == 1
 
 
+def test_scored_options_calculate_average_and_rank_branches(
+    client, admin_user, auth_header, make_unit
+):
+    headers = auth_header("admin_test")
+    branch_low = make_unit("SCORE-LOW", name="Chi nhánh điểm thấp", unit_type="BRANCH")
+    branch_high = make_unit("SCORE-HIGH", name="Chi nhánh điểm cao", unit_type="BRANCH")
+    survey = _create_survey(client, headers, title="Khảo sát có chấm điểm")
+    question = client.post(
+        f"/api/surveys/{survey['id']}/questions",
+        headers=headers,
+        json={
+            "question_text": "Mức độ hài lòng?",
+            "question_type": "single_choice",
+            "is_required": True,
+            "options": [
+                {"option_text": "Chưa tốt", "score": 1},
+                {"option_text": "Rất tốt", "score": 5},
+            ],
+        },
+    ).get_json()["data"]
+    assert [option["score"] for option in question["options"]] == [1.0, 5.0]
+
+    client.post(
+        f"/api/surveys/{survey['id']}/status", headers=headers, json={"status": "active"}
+    )
+    public = client.get(f"/api/public/surveys/{survey['slug']}").get_json()["data"]
+    assert all("score" not in option for option in public["questions"][0]["options"])
+
+    low_option, high_option = question["options"]
+    for branch, option in ((branch_low, low_option), (branch_high, high_option)):
+        response = client.post(
+            f"/api/public/surveys/{survey['id']}/submit",
+            json={
+                "branch_id": branch.id,
+                "answers": [{"question_id": question["id"], "option_id": option["id"]}],
+            },
+        )
+        assert response.status_code == 201, response.get_json()
+
+    stats = client.get(
+        f"/api/surveys/{survey['id']}/statistics", headers=headers
+    ).get_json()["data"]
+    assert stats["overview"]["average_score"] == 3.0
+    assert stats["overview"]["score_answer_count"] == 2
+    assert stats["by_branch"][0]["branch_id"] == branch_high.id
+    assert stats["by_branch"][0]["rank"] == 1
+    assert stats["by_branch"][0]["average_score"] == 5.0
+    assert stats["by_branch"][1]["rank"] == 2
+    question_stats = stats["by_question"][0]["stats"]
+    assert question_stats["average_score"] == 3.0
+
+    # Đổi điểm sau khi đã có phản hồi phải tạo phiên bản phương án mới; điểm
+    # của phản hồi lịch sử vẫn giữ nguyên là 5.
+    revised = client.put(
+        f"/api/survey-options/{high_option['id']}",
+        headers=headers,
+        json={"score": 4},
+    ).get_json()["data"]
+    assert revised["revised_from_id"] == high_option["id"]
+    assert revised["score"] == 4.0
+    stats_after = client.get(
+        f"/api/surveys/{survey['id']}/statistics", headers=headers
+    ).get_json()["data"]
+    assert stats_after["overview"]["average_score"] == 3.0
+
+
 def test_filter_dashboard_by_date_range(client, admin_user, auth_header):
     headers = auth_header("admin_test")
     survey = _create_survey(client, headers)

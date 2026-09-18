@@ -11,7 +11,10 @@ const EMPTY = { question_text: "", question_type: "single_choice", is_required: 
 export function AddQuestionModal({ open, onClose, onCreate, existingQuestions = [] }) {
   const lastSection = existingQuestions[existingQuestions.length - 1]?.section || "";
   const [form, setForm] = useState({ ...EMPTY, section: lastSection });
-  const [options, setOptions] = useState(["", ""]);
+  const [options, setOptions] = useState([
+    { option_text: "", score: "" },
+    { option_text: "", score: "" },
+  ]);
   const [copyFromId, setCopyFromId] = useState("");
   const [saving, setSaving] = useState(false);
   const hasOptions = QUESTION_TYPES_WITH_OPTIONS.has(form.question_type);
@@ -26,7 +29,10 @@ export function AddQuestionModal({ open, onClose, onCreate, existingQuestions = 
 
   const reset = () => {
     setForm({ ...EMPTY, section: lastSection });
-    setOptions(["", ""]);
+    setOptions([
+      { option_text: "", score: "" },
+      { option_text: "", score: "" },
+    ]);
     setCopyFromId("");
   };
 
@@ -34,8 +40,10 @@ export function AddQuestionModal({ open, onClose, onCreate, existingQuestions = 
     setCopyFromId(questionId);
     const source = sourceQuestions.find((q) => String(q.id) === String(questionId));
     if (!source) return;
-    const texts = source.options.filter((o) => o.is_active).map((o) => o.option_text);
-    if (texts.length) setOptions(texts);
+    const copied = source.options
+      .filter((o) => o.is_active)
+      .map((o) => ({ option_text: o.option_text, score: o.score ?? "" }));
+    if (copied.length) setOptions(copied);
   };
 
   const submit = async () => {
@@ -43,9 +51,18 @@ export function AddQuestionModal({ open, onClose, onCreate, existingQuestions = 
       toast.error("Nhập nội dung câu hỏi");
       return;
     }
-    const opts = options.map((o) => o.trim()).filter(Boolean);
+    const opts = options
+      .map((o) => ({
+        option_text: o.option_text.trim(),
+        score: o.score === "" ? null : Number(o.score),
+      }))
+      .filter((o) => o.option_text);
     if (hasOptions && opts.length < 2) {
       toast.error("Cần ít nhất 2 phương án trả lời");
+      return;
+    }
+    if (opts.some((o) => o.score != null && (o.score < 0 || o.score > 5))) {
+      toast.error("Điểm phương án phải nằm trong khoảng 0–5");
       return;
     }
     setSaving(true);
@@ -55,7 +72,7 @@ export function AddQuestionModal({ open, onClose, onCreate, existingQuestions = 
         question_type: form.question_type,
         is_required: form.is_required,
         section: form.section.trim() || null,
-        options: hasOptions ? opts.map((option_text) => ({ option_text })) : [],
+        options: hasOptions ? opts : [],
       });
       reset();
       onClose();
@@ -143,13 +160,37 @@ export function AddQuestionModal({ open, onClose, onCreate, existingQuestions = 
                   ))}
                 </Select>
               )}
+              <div className="hidden grid-cols-[minmax(0,1fr)_6rem_1.5rem] gap-2 px-0.5 text-[11px] font-medium text-muted sm:grid">
+                <span>Nội dung phương án</span>
+                <span>Điểm (0–5)</span>
+                <span />
+              </div>
               {options.map((o, i) => (
                 <div key={i} className="flex items-center gap-2">
                   <TextInput
-                    value={o}
+                    value={o.option_text}
                     placeholder={`Phương án ${i + 1}`}
                     onChange={(e) =>
-                      setOptions((arr) => arr.map((v, idx) => (idx === i ? e.target.value : v)))
+                      setOptions((arr) =>
+                        arr.map((v, idx) =>
+                          idx === i ? { ...v, option_text: e.target.value } : v
+                        )
+                      )
+                    }
+                  />
+                  <TextInput
+                    type="number"
+                    min="0"
+                    max="5"
+                    step="0.01"
+                    value={o.score}
+                    aria-label={`Điểm phương án ${i + 1}`}
+                    placeholder="Điểm"
+                    className="w-24 shrink-0"
+                    onChange={(e) =>
+                      setOptions((arr) =>
+                        arr.map((v, idx) => (idx === i ? { ...v, score: e.target.value } : v))
+                      )
                     }
                   />
                   {options.length > 2 && (
@@ -166,7 +207,7 @@ export function AddQuestionModal({ open, onClose, onCreate, existingQuestions = 
               <Button
                 variant="secondary"
                 className="w-fit px-3 py-1 text-xs"
-                onClick={() => setOptions((arr) => [...arr, ""])}
+                onClick={() => setOptions((arr) => [...arr, { option_text: "", score: "" }])}
               >
                 + Thêm phương án
               </Button>

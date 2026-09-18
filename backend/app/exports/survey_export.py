@@ -31,6 +31,14 @@ def _format_answer(answer) -> str:
     return ""
 
 
+def _answer_score(answer):
+    if answer.option_id and answer.option and answer.option.score is not None:
+        return answer.option.score
+    if answer.question and answer.question.question_type == "rating":
+        return answer.answer_number
+    return ""
+
+
 def build_workbook(survey, responses: list) -> io.BytesIO:
     wb = Workbook()
 
@@ -61,7 +69,9 @@ def build_workbook(survey, responses: list) -> io.BytesIO:
         ws1.column_dimensions[get_column_letter(col)].width = 20
 
     ws2 = wb.create_sheet("Chi tiết câu trả lời")
-    headers2 = ["STT", "Ngày khảo sát", "Chi nhánh", "Cán bộ", "Khảo sát", "Câu hỏi", "Trả lời"]
+    headers2 = [
+        "STT", "Ngày khảo sát", "Chi nhánh", "Cán bộ", "Khảo sát", "Câu hỏi", "Trả lời", "Điểm",
+    ]
     ws2.append(headers2)
     stt = 0
     for r in responses:
@@ -76,6 +86,7 @@ def build_workbook(survey, responses: list) -> io.BytesIO:
                     survey.title,
                     a.question.question_text if a.question else "",
                     _format_answer(a),
+                    _answer_score(a),
                 ]
             )
     _style_header(ws2)
@@ -114,7 +125,7 @@ def build_summary_workbook(survey, stats: dict, *, scope_label: str | None = Non
     )
     ws1.append([])
     header_row = ws1.max_row + 1
-    headers = ["Phần", "Câu hỏi", "Phương án / Chỉ số", "Số lượng", "Tỷ lệ (%)"]
+    headers = ["Phần", "Câu hỏi", "Phương án / Chỉ số", "Điểm", "Số lượng", "Tỷ lệ (%)"]
     ws1.append(headers)
     for cell in ws1[header_row]:
         cell.font = _HEADER_FONT
@@ -126,13 +137,14 @@ def build_summary_workbook(survey, stats: dict, *, scope_label: str | None = Non
         st = q["stats"]
         first = True
 
-        def _row(option_label, count, percentage):
+        def _row(option_label, score, count, percentage):
             nonlocal first
             ws1.append(
                 [
                     section if first else "",
                     qtext if first else "",
                     option_label,
+                    score if score != "" else "",
                     count if count != "" else "",
                     percentage if percentage != "" else "",
                 ]
@@ -142,34 +154,46 @@ def build_summary_workbook(survey, stats: dict, *, scope_label: str | None = Non
         if st["type"] == "choice":
             if st["options"]:
                 for opt in st["options"]:
-                    _row(opt["option_text"], opt["count"], opt["percentage"])
+                    _row(
+                        opt["option_text"],
+                        opt.get("score") if opt.get("score") is not None else "",
+                        opt["count"],
+                        opt["percentage"],
+                    )
+                if st.get("average_score") is not None:
+                    _row("Điểm trung bình", st["average_score"], "", "")
             else:
-                _row("(chưa có phản hồi)", 0, 0)
+                _row("(chưa có phản hồi)", "", 0, 0)
         elif st["type"] == "yes_no":
-            _row("Có", st["yes_count"], st["yes_percentage"])
-            _row("Không", st["no_count"], st["no_percentage"])
+            _row("Có", "", st["yes_count"], st["yes_percentage"])
+            _row("Không", "", st["no_count"], st["no_percentage"])
         elif st["type"] == "rating":
             for b in st["breakdown"]:
-                _row(b["label"], b["count"], b["percentage"])
-            _row("Điểm trung bình", "", st["average"] if st["average"] is not None else "")
+                _row(b["label"], b["level"], b["count"], b["percentage"])
+            _row("Điểm trung bình", st["average"] if st["average"] is not None else "", "", "")
         elif st["type"] == "number":
-            _row("Trung bình", "", st["average"] if st["average"] is not None else "")
-            _row("Nhỏ nhất", "", st["min"] if st["min"] is not None else "")
-            _row("Lớn nhất", "", st["max"] if st["max"] is not None else "")
+            _row("Trung bình", st["average"] if st["average"] is not None else "", "", "")
+            _row("Nhỏ nhất", st["min"] if st["min"] is not None else "", "", "")
+            _row("Lớn nhất", st["max"] if st["max"] is not None else "", "", "")
         else:  # open_text
-            _row(f"{st['total_respondents']} ý kiến (xem chi tiết trong hệ thống)", "", "")
+            _row(f"{st['total_respondents']} ý kiến (xem chi tiết trong hệ thống)", "", "", "")
 
-    for col, width in zip(range(1, 6), (22, 46, 40, 12, 12)):
+    for col, width in zip(range(1, 7), (22, 46, 40, 12, 12, 12)):
         ws1.column_dimensions[get_column_letter(col)].width = width
 
     ws2 = wb.create_sheet("Theo chi nhánh")
-    headers2 = ["Chi nhánh", "Tổng lượt", "Điểm trung bình", "Tỷ lệ hài lòng (%)", "Tỷ lệ không hài lòng (%)"]
+    headers2 = [
+        "Xếp hạng", "Chi nhánh", "Tổng lượt", "Số đáp án có điểm", "Điểm trung bình",
+        "Tỷ lệ hài lòng (%)", "Tỷ lệ không hài lòng (%)",
+    ]
     ws2.append(headers2)
     for b in stats["by_branch"]:
         ws2.append(
             [
+                b.get("rank") or "",
                 b["branch_name"],
                 b["total_responses"],
+                b.get("scored_answers", 0),
                 b["average_score"] if b["average_score"] is not None else "",
                 b["satisfaction_rate"],
                 b["dissatisfaction_rate"],

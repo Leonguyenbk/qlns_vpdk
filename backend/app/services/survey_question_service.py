@@ -1,7 +1,7 @@
 """Nghiệp vụ quản lý câu hỏi và phương án trả lời của khảo sát.
 
 Quy tắc bất biến dữ liệu lịch sử (xem thêm `app/models/survey.py`): khi một câu hỏi
-hoặc phương án ĐÃ có câu trả lời, sửa nội dung sẽ tạo bản ghi mới (is_active=True)
+hoặc phương án ĐÃ có câu trả lời, sửa nội dung/điểm sẽ tạo bản ghi mới (is_active=True)
 và ẩn bản ghi cũ (is_active=False) thay vì ghi đè — nhờ đó `survey_answers` cũ vẫn
 trỏ đúng nội dung tại thời điểm người dân trả lời. Đổi thứ tự, bật/tắt hoạt động,
 bắt buộc trả lời... không làm thay đổi ý nghĩa dữ liệu nên luôn được sửa tại chỗ.
@@ -82,6 +82,7 @@ def _clone_question(q: SurveyQuestion) -> SurveyQuestion:
                 question_id=new_q.id,
                 option_text=o.option_text,
                 option_value=o.option_value,
+                score=o.score,
                 sort_order=o.sort_order,
                 is_active=True,
             )
@@ -104,18 +105,22 @@ def _apply_options(question: SurveyQuestion, items: list[dict]) -> None:
         if not text:
             raise ValidationError("Nội dung phương án không được để trống.")
         value = clean_str(item.get("option_value"))
+        score = item.get("score")
         order = item.get("sort_order", i)
         oid = item.get("id")
         opt = existing.get(oid) if oid else None
         if opt is not None:
             kept_ids.add(opt.id)
-            content_changed = text != opt.option_text or value != opt.option_value
+            content_changed = (
+                text != opt.option_text or value != opt.option_value or score != opt.score
+            )
             if content_changed and _option_has_answers(opt.id):
                 db.session.add(
                     SurveyOption(
                         question_id=question.id,
                         option_text=text,
                         option_value=value,
+                        score=score,
                         sort_order=order,
                         is_active=True,
                     )
@@ -124,6 +129,7 @@ def _apply_options(question: SurveyQuestion, items: list[dict]) -> None:
             else:
                 opt.option_text = text
                 opt.option_value = value
+                opt.score = score
                 opt.sort_order = order
         else:
             db.session.add(
@@ -131,6 +137,7 @@ def _apply_options(question: SurveyQuestion, items: list[dict]) -> None:
                     question_id=question.id,
                     option_text=text,
                     option_value=value,
+                    score=score,
                     sort_order=order,
                     is_active=True,
                 )
@@ -191,6 +198,7 @@ def create_question(survey_id: int, data: dict, *, actor, meta: dict) -> dict:
                     question_id=question.id,
                     option_text=otext,
                     option_value=clean_str(item.get("option_value")),
+                    score=item.get("score"),
                     sort_order=i,
                     is_active=True,
                 )
@@ -305,6 +313,7 @@ def duplicate_question(question_id: int, *, actor, meta: dict) -> dict:
                 question_id=new_q.id,
                 option_text=o.option_text,
                 option_value=o.option_value,
+                score=o.score,
                 sort_order=o.sort_order,
                 is_active=True,
             )
@@ -362,6 +371,7 @@ def create_option(question_id: int, data: dict, *, actor, meta: dict) -> dict:
         question_id=q.id,
         option_text=text,
         option_value=clean_str(data.get("option_value")),
+        score=data.get("score"),
         sort_order=max_order + 1,
         is_active=True,
     )
@@ -387,8 +397,11 @@ def update_option(option_id: int, data: dict, *, actor, meta: dict) -> dict:
     if "option_text" in data and not new_text:
         raise ValidationError("Nội dung phương án không được để trống.")
     new_value = clean_str(data["option_value"]) if "option_value" in data else opt.option_value
+    new_score = data.get("score", opt.score)
 
-    content_changed = new_text != opt.option_text or new_value != opt.option_value
+    content_changed = (
+        new_text != opt.option_text or new_value != opt.option_value or new_score != opt.score
+    )
     target = opt
     revised_from = None
     if content_changed and _option_has_answers(opt.id):
@@ -396,6 +409,7 @@ def update_option(option_id: int, data: dict, *, actor, meta: dict) -> dict:
             question_id=opt.question_id,
             option_text=new_text,
             option_value=new_value,
+            score=new_score,
             sort_order=opt.sort_order,
             is_active=True,
         )
@@ -405,6 +419,7 @@ def update_option(option_id: int, data: dict, *, actor, meta: dict) -> dict:
     else:
         target.option_text = new_text
         target.option_value = new_value
+        target.score = new_score
 
     if "is_active" in data:
         target.is_active = bool(data["is_active"])

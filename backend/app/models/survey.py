@@ -1,7 +1,7 @@
 """Model module Khảo sát – Đánh giá mức độ hài lòng.
 
 Nguyên tắc bất biến dữ liệu lịch sử: khi một câu hỏi/phương án ĐÃ có câu trả lời,
-sửa nội dung (question_text/question_type hoặc option_text/option_value) không
+sửa nội dung (question_text/question_type hoặc option_text/option_value/score) không
 ghi đè bản ghi cũ — service tạo bản ghi mới và chuyển bản cũ sang `is_active=False`
 (xem `app/services/survey_question_service.py`). Nhờ vậy `survey_answers` luôn trỏ
 tới đúng nội dung câu hỏi/phương án tại thời điểm người dân trả lời.
@@ -125,7 +125,13 @@ class SurveyQuestion(TimestampMixin, db.Model):
         order_by="SurveyOption.sort_order",
     )
 
-    def to_dict(self, *, include_options: bool = True, only_active_options: bool = False) -> dict:
+    def to_dict(
+        self,
+        *,
+        include_options: bool = True,
+        only_active_options: bool = False,
+        include_option_scores: bool = True,
+    ) -> dict:
         data = {
             "id": self.id,
             "survey_id": self.survey_id,
@@ -142,7 +148,7 @@ class SurveyQuestion(TimestampMixin, db.Model):
             opts = self.options
             if only_active_options:
                 opts = [o for o in opts if o.is_active]
-            data["options"] = [o.to_dict() for o in opts]
+            data["options"] = [o.to_dict(include_score=include_option_scores) for o in opts]
         return data
 
 
@@ -159,13 +165,16 @@ class SurveyOption(TimestampMixin, db.Model):
     )
     option_text: Mapped[str] = mapped_column(String(500), nullable=False)
     option_value: Mapped[str | None] = mapped_column(String(100))
+    # Điểm dùng để tổng hợp/xếp hạng. Nullable để các phương án mô tả có thể
+    # không tham gia chấm điểm.
+    score: Mapped[float | None] = mapped_column(Float)
     sort_order: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
 
     question: Mapped["SurveyQuestion"] = relationship("SurveyQuestion", back_populates="options")
 
-    def to_dict(self) -> dict:
-        return {
+    def to_dict(self, *, include_score: bool = True) -> dict:
+        data = {
             "id": self.id,
             "question_id": self.question_id,
             "option_text": self.option_text,
@@ -173,6 +182,9 @@ class SurveyOption(TimestampMixin, db.Model):
             "sort_order": self.sort_order,
             "is_active": self.is_active,
         }
+        if include_score:
+            data["score"] = self.score
+        return data
 
 
 class SurveyResponse(TimestampMixin, db.Model):

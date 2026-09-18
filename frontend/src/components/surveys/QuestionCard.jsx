@@ -18,6 +18,7 @@ export function QuestionCard({ question, mutations, canManage, index, sectionOpt
   const [sectionText, setSectionText] = useState(question.section || "");
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [newOption, setNewOption] = useState("");
+  const [newOptionScore, setNewOptionScore] = useState("");
   const hasOptions = QUESTION_TYPES_WITH_OPTIONS.has(question.question_type);
 
   useEffect(() => setText(question.question_text), [question.question_text]);
@@ -70,9 +71,9 @@ export function QuestionCard({ question, mutations, canManage, index, sectionOpt
         body: {
           question_type: type,
           options: QUESTION_TYPES_WITH_OPTIONS.has(type)
-            ? (hasOptions ? question.options.map((o) => o.option_text) : ["Phương án 1", "Phương án 2"]).map(
-                (t) => ({ option_text: t })
-              )
+            ? hasOptions
+              ? question.options.map((o) => ({ option_text: o.option_text, score: o.score }))
+              : ["Phương án 1", "Phương án 2"].map((option_text) => ({ option_text, score: null }))
             : undefined,
         },
       });
@@ -112,17 +113,26 @@ export function QuestionCard({ question, mutations, canManage, index, sectionOpt
   const addOption = async () => {
     const t = newOption.trim();
     if (!t) return;
+    const score = newOptionScore === "" ? null : Number(newOptionScore);
+    if (score != null && (score < 0 || score > 5)) {
+      toast.error("Điểm phương án phải nằm trong khoảng 0–5");
+      return;
+    }
     try {
-      await mutations.createOption.mutateAsync({ questionId: question.id, body: { option_text: t } });
+      await mutations.createOption.mutateAsync({
+        questionId: question.id,
+        body: { option_text: t, score },
+      });
       setNewOption("");
+      setNewOptionScore("");
     } catch (err) {
       toast.error(apiErrorMessage(err));
     }
   };
 
-  const saveOption = async (option, text2) => {
+  const saveOption = async (option, body) => {
     try {
-      const resp = await mutations.updateOption.mutateAsync({ id: option.id, body: { option_text: text2 } });
+      const resp = await mutations.updateOption.mutateAsync({ id: option.id, body });
       if (resp.data.data.revised_from_id) {
         toast("Phương án đã có phản hồi — đã tạo phương án mới, dữ liệu cũ vẫn được giữ nguyên.", { icon: "ℹ️" });
       }
@@ -238,6 +248,12 @@ export function QuestionCard({ question, mutations, canManage, index, sectionOpt
 
           {hasOptions && (
             <div className="mb-3 ml-1 grid gap-1.5">
+              <div className="hidden grid-cols-[1rem_minmax(0,1fr)_5rem_1.5rem] gap-2 px-0.5 text-[11px] font-medium text-muted sm:grid">
+                <span />
+                <span>Nội dung phương án</span>
+                <span>Điểm</span>
+                <span />
+              </div>
               <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onOptionDragEnd}>
                 <SortableContext
                   items={question.options.map((o) => `option-${o.id}`)}
@@ -248,7 +264,7 @@ export function QuestionCard({ question, mutations, canManage, index, sectionOpt
                       key={o.id}
                       option={o}
                       disabled={!canManage}
-                      onSave={(t) => saveOption(o, t)}
+                      onSave={(body) => saveOption(o, body)}
                       onDelete={() => deleteOption(o)}
                     />
                   ))}
@@ -261,6 +277,18 @@ export function QuestionCard({ question, mutations, canManage, index, sectionOpt
                     placeholder="+ Thêm phương án"
                     value={newOption}
                     onChange={(e) => setNewOption(e.target.value)}
+                    onKeyDown={(e) => e.key === "Enter" && addOption()}
+                  />
+                  <input
+                    type="number"
+                    min="0"
+                    max="5"
+                    step="0.01"
+                    className="input w-20 shrink-0 py-1.5 text-sm"
+                    placeholder="Điểm"
+                    aria-label="Điểm phương án mới"
+                    value={newOptionScore}
+                    onChange={(e) => setNewOptionScore(e.target.value)}
                     onKeyDown={(e) => e.key === "Enter" && addOption()}
                   />
                   <Button variant="secondary" className="px-2.5 py-1 text-xs" onClick={addOption}>

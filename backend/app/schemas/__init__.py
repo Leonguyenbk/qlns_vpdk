@@ -312,9 +312,10 @@ class SurveyStatusSchema(ApiSchema):
 
 
 class SurveyOptionInputSchema(ApiSchema):
-    nullable_fields = {"option_value"}
+    nullable_fields = {"option_value", "score"}
     option_text = fields.String(required=True, error_messages=required)
     option_value = fields.String(allow_none=True)
+    score = fields.Float(allow_none=True, validate=validate.Range(min=0, max=5))
 
 
 class SurveyQuestionCreateSchema(ApiSchema):
@@ -336,18 +337,21 @@ class SurveyQuestionUpdateSchema(ApiSchema):
     is_required = fields.Boolean()
     is_active = fields.Boolean()
     section = fields.String(allow_none=True)
+    options = fields.List(fields.Nested(SurveyOptionInputSchema))
 
 
 class SurveyOptionCreateSchema(ApiSchema):
-    nullable_fields = {"option_value"}
+    nullable_fields = {"option_value", "score"}
     option_text = fields.String(required=True, error_messages=required)
     option_value = fields.String(allow_none=True)
+    score = fields.Float(allow_none=True, validate=validate.Range(min=0, max=5))
 
 
 class SurveyOptionUpdateSchema(ApiSchema):
-    nullable_fields = {"option_value"}
+    nullable_fields = {"option_value", "score"}
     option_text = fields.String()
     option_value = fields.String(allow_none=True)
+    score = fields.Float(allow_none=True, validate=validate.Range(min=0, max=5))
 
 
 class ReorderItemSchema(ApiSchema):
