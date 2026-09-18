@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useSurveys } from "../../hooks/useSurveys";
 import { Select } from "../../components/ui/primitives";
@@ -10,6 +10,16 @@ export default function SurveyStatisticsHubPage() {
   const { data, isLoading } = useSurveys({ page_size: 100 });
   const [surveyId, setSurveyId] = useState("");
   const surveys = data?.items || [];
+
+  // Mặc định chọn cuộc khảo sát đang diễn ra mới nhất (danh sách đã sắp mới nhất
+  // trước); chỉ tự chọn một lần lúc vào trang, không ghi đè lựa chọn của người dùng.
+  const autoSelected = useRef(false);
+  useEffect(() => {
+    if (autoSelected.current || !data?.items?.length) return;
+    autoSelected.current = true;
+    const latestActive = data.items.find((s) => s.status === "active");
+    if (latestActive) setSurveyId(String(latestActive.id));
+  }, [data]);
 
   return (
     <div>
