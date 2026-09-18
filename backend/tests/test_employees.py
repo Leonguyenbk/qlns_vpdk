@@ -98,3 +98,29 @@ def test_list_pagination_and_search(client, admin_user, auth_header, make_unit, 
     resp2 = client.get("/api/employees?keyword=SEARCH3", headers=headers)
     items = resp2.get_json()["data"]["items"]
     assert len(items) == 1 and items[0]["employee_code"] == "SEARCH3"
+
+
+def test_filter_unit_can_include_descendants(
+    client, admin_user, auth_header, make_unit, make_position, make_employee
+):
+    branch = make_unit("BRANCH-FILTER", unit_type="BRANCH")
+    section = make_unit("SECTION-FILTER", unit_type="SECTION", parent=branch)
+    other = make_unit("OTHER-FILTER", unit_type="BRANCH")
+    position = make_position("POS-FILTER")
+    make_employee("IN-BRANCH", branch, position)
+    make_employee("IN-SECTION", section, position)
+    make_employee("OUTSIDE-BRANCH", other, position)
+    headers = auth_header("admin_test")
+
+    exact = client.get(f"/api/employees?unit_id={branch.id}", headers=headers)
+    exact_codes = {item["employee_code"] for item in exact.get_json()["data"]["items"]}
+    assert "IN-BRANCH" in exact_codes
+    assert "IN-SECTION" not in exact_codes
+
+    subtree = client.get(
+        f"/api/employees?unit_id={branch.id}&include_descendants=true",
+        headers=headers,
+    )
+    subtree_codes = {item["employee_code"] for item in subtree.get_json()["data"]["items"]}
+    assert {"IN-BRANCH", "IN-SECTION"} <= subtree_codes
+    assert "OUTSIDE-BRANCH" not in subtree_codes

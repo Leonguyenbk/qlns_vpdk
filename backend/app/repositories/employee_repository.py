@@ -45,6 +45,7 @@ def list_for_export(
     scope,
     keyword: str | None = None,
     unit_id: int | None = None,
+    unit_ids: set[int] | None = None,
     position_id: int | None = None,
     status: str | None = None,
     employment_type: str | None = None,
@@ -66,7 +67,9 @@ def list_for_export(
                 Employee.phone.ilike(like),
             )
         )
-    if unit_id:
+    if unit_ids:
+        query = query.filter(cur.c.unit_id.in_(unit_ids))
+    elif unit_id:
         query = query.filter(cur.c.unit_id == unit_id)
     if position_id:
         query = query.filter(cur.c.position_id == position_id)
@@ -94,6 +97,7 @@ def search(
     scope,
     keyword: str | None = None,
     unit_id: int | None = None,
+    unit_ids: set[int] | None = None,
     position_id: int | None = None,
     status: str | None = None,
     employment_type: str | None = None,
@@ -129,7 +133,9 @@ def search(
                 Employee.phone.ilike(like),
             )
         )
-    if unit_id:
+    if unit_ids:
+        query = query.filter(cur.c.unit_id.in_(unit_ids))
+    elif unit_id:
         query = query.filter(cur.c.unit_id == unit_id)
     if position_id:
         query = query.filter(cur.c.position_id == position_id)

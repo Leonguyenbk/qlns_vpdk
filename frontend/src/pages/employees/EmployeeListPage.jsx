@@ -13,6 +13,7 @@ import { PageHeader, Button, Badge, Avatar, TextInput, Select } from "../../comp
 import { Table, Pagination } from "../../components/ui/Table";
 import { LoadingState, EmptyState, ErrorState } from "../../components/ui/DataStates";
 import { ConfirmDialog } from "../../components/ui/Modal";
+import { UnitPicker } from "../../components/units/UnitPicker";
 
 const DEFAULT_FILTERS = {
   keyword: "",
@@ -36,6 +37,7 @@ export default function EmployeeListPage() {
   const params = useMemo(() => {
     const p = { ...filters };
     Object.keys(p).forEach((k) => p[k] === "" && delete p[k]);
+    if (p.unit_id) p.include_descendants = true;
     return p;
   }, [filters]);
 
@@ -185,20 +187,20 @@ export default function EmployeeListPage() {
         }
       />
 
-      <div className="card mb-4 grid gap-3 p-4 md:grid-cols-3 xl:grid-cols-6">
+      <div className="card mb-4 grid gap-3 p-4 md:grid-cols-3 xl:grid-cols-7">
         <TextInput
           placeholder="Tìm theo mã, họ tên, SĐT..."
           value={filters.keyword}
           onChange={(e) => setFilter({ keyword: e.target.value })}
         />
-        <Select value={filters.unit_id} onChange={(e) => setFilter({ unit_id: e.target.value })}>
-          <option value="">Tất cả đơn vị</option>
-          {units?.map((u) => (
-            <option key={u.id} value={u.id}>
-              {u.path || u.name}
-            </option>
-          ))}
-        </Select>
+        <div className="md:col-span-2">
+          <UnitPicker
+            units={units || []}
+            value={filters.unit_id}
+            onChange={(unitId) => setFilter({ unit_id: unitId })}
+            includeHeadOffice={false}
+          />
+        </div>
         <Select value={filters.position_id} onChange={(e) => setFilter({ position_id: e.target.value })}>
           <option value="">Tất cả chức vụ</option>
           {positions?.map((p) => (

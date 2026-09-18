@@ -21,6 +21,7 @@ from ..models.enums import (
 )
 from ..permissions import constants as perms
 from ..repositories import employee_repository as repo
+from ..repositories import unit_repository
 from .assignment_service import (
     assert_no_primary_overlap,
     assign_primary,
@@ -148,10 +149,14 @@ def list_employees(args, *, actor, scope) -> dict:
     from ..common.utils import parse_pagination
 
     page, page_size = parse_pagination(args)
+    unit_id = _to_int(args.get("unit_id"))
+    include_descendants = str(args.get("include_descendants", "")).lower() in ("1", "true", "yes")
+    unit_ids = unit_repository.descendant_ids(unit_id) if unit_id and include_descendants else None
     rows, total = repo.search(
         scope=scope,
         keyword=args.get("keyword") or args.get("q"),
-        unit_id=_to_int(args.get("unit_id")),
+        unit_id=unit_id,
+        unit_ids=unit_ids,
         position_id=_to_int(args.get("position_id")),
         status=clean_str(args.get("status")),
         employment_type=clean_str(args.get("employment_type")),
@@ -515,9 +520,11 @@ def export_employees(args, *, actor, scope):
     employment_type = clean_str(args.get("employment_type"))
     keyword = clean_str(args.get("keyword") or args.get("q"))
     include_deleted = str(args.get("include_deleted", "")).lower() in ("1", "true", "yes")
+    include_descendants = str(args.get("include_descendants", "")).lower() in ("1", "true", "yes")
+    unit_ids = unit_repository.descendant_ids(unit_id) if unit_id and include_descendants else None
 
     rows = repo.list_for_export(
-        scope=scope, keyword=keyword, unit_id=unit_id, position_id=position_id,
+        scope=scope, keyword=keyword, unit_id=unit_id, unit_ids=unit_ids, position_id=position_id,
         status=status, employment_type=employment_type, include_deleted=include_deleted,
     )
 

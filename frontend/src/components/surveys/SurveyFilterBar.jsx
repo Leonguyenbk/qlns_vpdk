@@ -1,7 +1,6 @@
 import { useUnits } from "../../hooks/useUnits";
 import { DATE_PRESET_LABELS } from "../../lib/constants";
 import { Select, TextInput } from "../ui/primitives";
-import { UnitPicker } from "../units/UnitPicker";
 
 export function SurveyFilterBar({ filters, onChange, branchOnly = false }) {
   const { data: units } = useUnits({ only_active: true });
@@ -44,14 +43,22 @@ export function SurveyFilterBar({ filters, onChange, branchOnly = false }) {
           </div>
         </>
       )}
-      <div className="min-w-0 flex-1">
-        <UnitPicker
-          units={units || []}
+      <div>
+        <label className="label">Chi nhánh</label>
+        <Select
           value={filters.branch_id || ""}
-          onChange={(unitId) => onChange({ branch_id: unitId })}
-          includeHeadOffice={false}
-          showLabels
-        />
+          onChange={(e) => onChange({ branch_id: e.target.value })}
+          className="w-56"
+        >
+          <option value="">Tất cả chi nhánh</option>
+          {units
+            ?.filter((unit) => unit.unit_type === "BRANCH")
+            .map((unit) => (
+              <option key={unit.id} value={unit.id}>
+                {unit.name}
+              </option>
+            ))}
+        </Select>
       </div>
     </div>
   );
