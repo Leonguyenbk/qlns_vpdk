@@ -5,6 +5,7 @@ import { useCan } from "../../components/Can";
 import { useTasks } from "../../hooks/useTasks";
 import { useUnits } from "../../hooks/useUnits";
 import { useCatalogGroups } from "../../hooks/useKpi";
+import { SelfReportModal } from "../../components/tasks/SelfReportModal";
 import { PageHeader, Button, Select, TextInput } from "../../components/ui/primitives";
 import { Table, Pagination } from "../../components/ui/Table";
 import { LoadingState, ErrorState, EmptyState } from "../../components/ui/DataStates";
@@ -64,6 +65,7 @@ export default function TaskListPage({ mode = "all" }) {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const [view, setView] = useState("table");
+  const [showSelfReport, setShowSelfReport] = useState(false);
   const [filters, setFilters] = useState({
     status: "", priority: "", business_group_code: "",
     unit_id: "", overdue: "", due_soon: "", search: "",
@@ -122,12 +124,21 @@ export default function TaskListPage({ mode = "all" }) {
                 Theo trạng thái
               </button>
             </div>
+            {mode === "mine" && (
+              <Button variant="secondary" onClick={() => setShowSelfReport(true)}>
+                Tự khai khối lượng
+              </Button>
+            )}
             {canAny([PERMISSIONS.TASK_CREATE]) && (
               <Button onClick={() => navigate("/cong-viec/danh-sach/moi")}>+ Giao việc</Button>
             )}
           </>
         }
       />
+
+      {mode === "mine" && (
+        <SelfReportModal open={showSelfReport} onClose={() => setShowSelfReport(false)} />
+      )}
 
       <div className="card mb-4 grid gap-3 p-4 md:grid-cols-3 xl:grid-cols-6">
         <TextInput placeholder="Tìm theo mã, tên nhiệm vụ…" value={filters.search}

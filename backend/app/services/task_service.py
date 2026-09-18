@@ -30,7 +30,9 @@ from ..common.exceptions import (
 from ..common.utils import clean_str, parse_date, parse_pagination, utcnow
 from ..extensions import db
 from ..models import (
+    KpiPeriod,
     OrganizationUnit,
+    Product,
     Task,
     TaskAssignment,
     TaskAttachment,
@@ -454,6 +456,124 @@ class _AllScope:
 
     def allows_unit(self, unit_id):
         return True
+
+
+_SELF_REPORT_OPEN_STATUSES = ("DRAFT", "ASSIGNED", "IN_PROGRESS", "PAUSED", "NEEDS_REVISION")
+
+
+def _current_open_period(period_id: int | None) -> KpiPeriod:
+    if period_id:
+        period = db.session.get(KpiPeriod, period_id)
+        if period is None or period.status != "OPEN":
+            raise BusinessRuleError("Kỳ đánh giá không hợp lệ hoặc đã khoá.")
+        return period
+    today = date.today()
+    period = (
+        db.session.query(KpiPeriod)
+        .filter(KpiPeriod.status == "OPEN", KpiPeriod.start_date <= today, KpiPeriod.end_date >= today)
+        .order_by(KpiPeriod.start_date.desc())
+        .first()
+    )
+    if period is None:
+        raise BusinessRuleError("Chưa có kỳ đánh giá KPI nào đang mở để tự khai khối lượng.")
+    return period
+
+
+def self_report_quantity(data: dict, *, actor: User, meta: dict) -> dict:
+    """Tự khai khối lượng đã xử lý cho MỘT sản phẩm/thủ tục trong kỳ hiện tại —
+    cộng dồn vào một nhiệm vụ "tự khai" duy nhất theo (người, sản phẩm, kỳ) thay
+    vì phải tạo/giao từng nhiệm vụ nhỏ cho từng hồ sơ. Nhiệm vụ vẫn phải được
+    người có quyền ``task.accept`` nghiệm thu (không phải chính người khai) —
+    không tự động tính là hoàn thành, không tự động vào điểm KPI.
+    """
+    product_id = data.get("product_id")
+    product = db.session.get(Product, product_id) if product_id else None
+    if product is None or not product.is_active:
+        raise ValidationError("Sản phẩm/thủ tục không hợp lệ.")
+
+    try:
+        quantity = float(data.get("quantity"))
+    except (TypeError, ValueError):
+        quantity = None
+    if quantity is None or quantity <= 0:
+        raise ValidationError("Số lượng phải lớn hơn 0.")
+
+    period = _current_open_period(data.get("period_id"))
+    snap = _current_snapshot(actor)
+    if snap["unit_id"] is None:
+        raise BusinessRuleError("Tài khoản chưa gắn với đơn vị công tác nào, không thể tự khai khối lượng.")
+
+    task = (
+        db.session.query(Task)
+        .join(TaskAssignment, TaskAssignment.task_id == Task.id)
+        .filter(
+            Task.source == "CASE_FILE",
+            Task.product_id == product.id,
+            Task.original_deadline == period.end_date,
+            Task.status.in_(_SELF_REPORT_OPEN_STATUSES),
+            TaskAssignment.user_id == actor.id,
+            TaskAssignment.role_in_task == "LEAD",
+            TaskAssignment.removed_at.is_(None),
+        )
+        .order_by(Task.id.desc())
+        .first()
+    )
+
+    if task is None:
+        task = Task(
+            code=generate_task_code(),
+            name=f"{product.name} — tự khai kỳ {period.code}",
+            description=(
+                "Nhiệm vụ tự khai khối lượng theo kỳ (thủ tục hành chính xử lý theo lô) — "
+                "không giao/nghiệm thu từng hồ sơ riêng lẻ."
+            ),
+            business_group_code=product.group_code,
+            product_id=product.id,
+            source="CASE_FILE",
+            creator_id=actor.id,
+            assigner_id=actor.id,
+            assigning_unit_id=snap["unit_id"],
+            executing_unit_id=snap["unit_id"],
+            has_own_product=True,
+            priority="NORMAL",
+            status="ASSIGNED",
+            assigned_date=date.today(),
+            original_deadline=period.end_date,
+            deadline_type="INTERNAL",
+            assigned_workload=0,
+            workload_unit=product.unit_of_measure or "hồ sơ",
+            created_by=actor.id,
+        )
+        db.session.add(task)
+        db.session.flush()
+        _add_assignment(task, user_id=actor.id, role_in_task="LEAD", contribution_percent=100, actor=actor)
+        db.session.add(TaskLog(
+            task_id=task.id, user_id=actor.id, log_kind="STATUS_CHANGE",
+            content="Tự tạo nhiệm vụ tự khai khối lượng theo kỳ",
+            meta={"to_status": task.status, "period_id": period.id},
+        ))
+
+    old_workload = float(task.assigned_workload or 0)
+    task.assigned_workload = old_workload + quantity
+    if task.status == "ASSIGNED":
+        task.status = "IN_PROGRESS"
+        task.start_date = task.start_date or date.today()
+    _bump(task)
+
+    note = clean_str(data.get("note"))
+    unit_label = task.workload_unit or ""
+    db.session.add(TaskLog(
+        task_id=task.id, user_id=actor.id, log_kind="SELF_REPORT",
+        content=note or f"Tự khai thêm {quantity:g} {unit_label}".strip(),
+        meta={"added_quantity": quantity, "old_workload": old_workload, "new_workload": task.assigned_workload},
+    ))
+    record_audit(
+        user_id=actor.id, action="task.self_report", entity_type="task", entity_id=task.id,
+        old_values={"assigned_workload": old_workload},
+        new_values={"assigned_workload": task.assigned_workload}, **meta,
+    )
+    db.session.commit()
+    return get_task(task.id, actor=actor, scope=_AllScope())
 
 
 def accept_task(task_id: int, data: dict, *, actor: User, scope, meta: dict) -> dict:

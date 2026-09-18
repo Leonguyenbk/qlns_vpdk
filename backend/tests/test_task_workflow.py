@@ -5,7 +5,10 @@ from __future__ import annotations
 
 from datetime import date, timedelta
 
-from app.permissions.constants import ROLE_UNIT_HEAD, ROLE_VIEWER
+from app.extensions import db
+from app.models import KpiPeriod, Product
+from app.permissions.constants import ROLE_OFFICE_LEADER, ROLE_UNIT_HEAD, ROLE_VIEWER
+from app.services import kpi_service
 
 
 def _make_org(make_unit, make_position):
@@ -204,3 +207,103 @@ def test_blocker_report_and_resume_excludes_pause(client, auth_header, make_unit
     assert data["status"] == "IN_PROGRESS"
     assert data["is_blocked"] is False
     assert data["pauses"][0]["ended_at"] is not None
+
+
+def test_self_report_quantity_accumulates_into_one_task_and_feeds_kpi(
+    client, auth_header, make_unit, make_position, make_staff
+):
+    """Văn thư (hay bất kỳ ai xử lý thủ tục hành chính theo lô) tự khai số lượng
+    nhiều lần trong kỳ — không cần người giao việc tạo từng nhiệm vụ; tất cả
+    cộng dồn vào MỘT nhiệm vụ duy nhất, rồi vẫn phải qua nghiệm thu như bình
+    thường trước khi tính vào KPI."""
+    root, branch, staff_pos, head_pos = _make_org(make_unit, make_position)
+    head = make_staff("head9", branch, head_pos, ROLE_UNIT_HEAD)
+    leader = make_staff("leader9", branch, head_pos, ROLE_OFFICE_LEADER)
+    staff = make_staff("staff9", branch, staff_pos, ROLE_VIEWER)
+
+    product = Product(group_code="N1", code="N1.SR", name="Chuyển hồ sơ tiếp nhận", created_by=head.id)
+    db.session.add(product)
+    db.session.flush()
+    period = KpiPeriod(
+        code="2026-SR", period_type="QUARTER",
+        start_date=date(2026, 1, 1), end_date=date(2026, 3, 31),
+        status="OPEN", created_by=head.id,
+    )
+    db.session.add(period)
+    db.session.commit()
+
+    headers = auth_header("staff9")
+    body = {"product_id": product.id, "quantity": 12, "period_id": period.id, "note": "Tuần 1"}
+    resp = client.post("/api/tasks/self-report", headers=headers, json=body)
+    assert resp.status_code == 201, resp.get_json()
+    task = resp.get_json()["data"]
+    assert task["assigned_workload"] == 12.0
+    assert task["status"] == "IN_PROGRESS"
+    assert task["source"] == "CASE_FILE"
+    task_id = task["id"]
+
+    # Khai thêm lần 2 (vd. tuần 2) — phải cộng dồn vào ĐÚNG task cũ, không tạo mới.
+    resp = client.post(
+        "/api/tasks/self-report", headers=headers,
+        json={"product_id": product.id, "quantity": 8, "period_id": period.id, "note": "Tuần 2"},
+    )
+    assert resp.status_code == 201, resp.get_json()
+    task2 = resp.get_json()["data"]
+    assert task2["id"] == task_id
+    assert task2["assigned_workload"] == 20.0
+
+    # Nhập số âm/0 phải bị chặn.
+    resp = client.post(
+        "/api/tasks/self-report", headers=headers,
+        json={"product_id": product.id, "quantity": 0, "period_id": period.id},
+    )
+    assert resp.status_code == 422
+
+    # Chốt kỳ: tự nộp rồi trưởng phòng nghiệm thu — đúng quy trình bình thường,
+    # người tự khai không tự nghiệm thu được cho chính mình.
+    resp = client.post(f"/api/tasks/{task_id}/submit", headers=headers, json={"result_summary": "Đã xử lý 20 hồ sơ"})
+    assert resp.status_code == 200, resp.get_json()
+    resp = client.post(f"/api/tasks/{task_id}/accept", headers=headers, json={"quality_level": 5})
+    assert resp.status_code == 403
+
+    resp = client.post(
+        f"/api/tasks/{task_id}/accept", headers=auth_header("head9"), json={"quality_level": 5}
+    )
+    assert resp.status_code == 200, resp.get_json()
+    assert resp.get_json()["data"]["status"] == "COMPLETED"
+
+    # Điểm KPI phải nhận đúng khối lượng đã tự khai — không cần người giao việc
+    # tạo Task riêng cho từng hồ sơ.
+    cset = kpi_service.create_criteria_set(
+        {
+            "name": "Bộ tiêu chí tự khai",
+            "effective_from": "2026-01-01",
+            "criteria": [
+                {"code": "SL", "name": "Số lượng", "kind": "TASK_QUANTITY", "max_points": 20, "formula_key": "QUANTITY_RATIO"},
+            ],
+        },
+        actor=leader,
+    )
+    period.criteria_set_id = cset["id"]
+    db.session.commit()
+    score = kpi_service.compute_score(period.id, staff.id, actor=head, meta={})
+    sl = next(d for d in score["details"] if d["criteria_code"] == "SL")
+    assert sl["raw_denominator"] == 20.0
+    assert sl["raw_numerator"] == 20.0
+    assert sl["ratio_percent"] == 100.0
+
+
+def test_self_report_quantity_requires_open_period(client, auth_header, make_unit, make_position, make_staff):
+    root, branch, staff_pos, head_pos = _make_org(make_unit, make_position)
+    head = make_staff("head10", branch, head_pos, ROLE_UNIT_HEAD)
+    staff = make_staff("staff10", branch, staff_pos, ROLE_VIEWER)
+    product = Product(group_code="N1", code="N1.SR2", name="Chuyển hồ sơ tiếp nhận 2", created_by=head.id)
+    db.session.add(product)
+    db.session.commit()
+
+    resp = client.post(
+        "/api/tasks/self-report", headers=auth_header("staff10"),
+        json={"product_id": product.id, "quantity": 5},
+    )
+    assert resp.status_code == 400
+    assert "kỳ đánh giá" in resp.get_json()["message"]

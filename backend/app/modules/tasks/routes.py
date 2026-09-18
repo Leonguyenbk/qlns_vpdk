@@ -52,6 +52,16 @@ def create_task():
     return success(data, "Tạo và giao nhiệm vụ thành công", status_code=201)
 
 
+@bp.post("/self-report")
+@require_permission(perms.TASK_VIEW_OWN)
+def self_report_quantity():
+    """Tự khai khối lượng đã xử lý theo kỳ (thủ tục hành chính xử lý theo lô,
+    ví dụ văn thư chuyển hồ sơ) — không cần người khác vào web giao từng việc."""
+    actor, _ = actor_and_scope()
+    data = task_service.self_report_quantity(json_body(), actor=actor, meta=audit_meta())
+    return success(data, "Đã ghi nhận khối lượng tự khai", status_code=201)
+
+
 @bp.get("/<int:task_id>")
 def get_task(task_id: int):
     actor, scope = actor_and_scope()

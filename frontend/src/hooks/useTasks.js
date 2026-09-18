@@ -39,6 +39,14 @@ export function useWorkload(userId) {
   });
 }
 
+export function useSelfReportQuantity() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body) => api.post("/tasks/self-report", body),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["tasks"] }),
+  });
+}
+
 export function useTaskMutations(taskId) {
   const qc = useQueryClient();
   const invalidate = () => {
