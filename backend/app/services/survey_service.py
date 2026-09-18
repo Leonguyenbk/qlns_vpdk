@@ -292,6 +292,18 @@ def duplicate_survey(survey_id: int, *, actor, meta: dict) -> dict:
             raise ValidationError("Câu hỏi phụ đang liên kết câu cha đã tắt; hãy kiểm tra trước khi sao chép.")
         copied.parent_question_id = parent_copy.id
         copied.trigger_option_id = option_copies.get(q.trigger_option_id)
+
+    existing_limits = (
+        db.session.query(SurveyBranchLimit).filter(SurveyBranchLimit.survey_id == survey.id).all()
+    )
+    for limit in existing_limits:
+        db.session.add(
+            SurveyBranchLimit(
+                survey_id=new_survey.id,
+                branch_id=limit.branch_id,
+                max_responses=limit.max_responses,
+            )
+        )
     db.session.flush()
     record_audit(
         user_id=actor.id,

@@ -799,3 +799,38 @@ def test_branch_quota_locks_branch_once_full(client, admin_user, auth_header, ma
     assert cleared.status_code == 200
     row = next(r for r in cleared.get_json()["data"] if r["branch_id"] == branch.id)
     assert row["max_responses"] is None
+
+
+def test_duplicate_survey_copies_branch_limits(client, admin_user, auth_header, make_unit):
+    headers = auth_header("admin_test")
+    branch = make_unit("DUP-BRANCH", name="CN Sao chép", unit_type="BRANCH")
+    survey = _create_survey(client, headers, title="Khảo sát gốc")
+    _add_choice_question(client, headers, survey["id"])
+    client.put(
+        f"/api/surveys/{survey['id']}/branch-limits",
+        headers=headers,
+        json={"items": [{"branch_id": branch.id, "max_responses": 200}]},
+    )
+
+    dup = client.post(f"/api/surveys/{survey['id']}/duplicate", headers=headers)
+    assert dup.status_code == 201, dup.get_json()
+    new_survey = dup.get_json()["data"]
+    assert new_survey["id"] != survey["id"]
+
+    dup_limits = client.get(
+        f"/api/surveys/{new_survey['id']}/branch-limits", headers=headers
+    ).get_json()["data"]
+    row = next(r for r in dup_limits if r["branch_id"] == branch.id)
+    assert row["max_responses"] == 200
+
+    # Sửa chỉ tiêu ở bản gốc không ảnh hưởng bản sao (hai bản ghi độc lập).
+    client.put(
+        f"/api/surveys/{survey['id']}/branch-limits",
+        headers=headers,
+        json={"items": [{"branch_id": branch.id, "max_responses": 50}]},
+    )
+    dup_limits_after = client.get(
+        f"/api/surveys/{new_survey['id']}/branch-limits", headers=headers
+    ).get_json()["data"]
+    row_after = next(r for r in dup_limits_after if r["branch_id"] == branch.id)
+    assert row_after["max_responses"] == 200
