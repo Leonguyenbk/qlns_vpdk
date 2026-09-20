@@ -24,7 +24,7 @@ import { LoadingState, ErrorState, EmptyState } from "../../components/ui/DataSt
 import { QuestionCard } from "../../components/surveys/QuestionCard";
 import { AddQuestionModal } from "../../components/surveys/AddQuestionModal";
 import { PreviewModal } from "../../components/surveys/PreviewModal";
-import { SectionManager } from "../../components/surveys/SectionManager";
+import { AddSectionRow } from "../../components/surveys/AddSectionRow";
 import { SectionGroup } from "../../components/surveys/SectionGroup";
 import { apiErrorMessage } from "../../lib/api";
 
@@ -166,6 +166,37 @@ export default function SurveyQuestionsPage() {
     toast.success("Đã thêm câu hỏi");
   };
 
+  const renameSection = async (sectionId, title) => {
+    try {
+      await sectionMutations.update.mutateAsync({ id: sectionId, body: { title } });
+    } catch (err) {
+      toast.error(apiErrorMessage(err));
+    }
+  };
+
+  const moveSection = async (index, offset) => {
+    const next = index + offset;
+    if (next < 0 || next >= sections.length) return;
+    const reordered = [...sections];
+    [reordered[index], reordered[next]] = [reordered[next], reordered[index]];
+    try {
+      await sectionMutations.reorder.mutateAsync(
+        reordered.map((item, order) => ({ id: item.id, sort_order: order + 1 }))
+      );
+    } catch (err) {
+      toast.error(apiErrorMessage(err));
+    }
+  };
+
+  const removeSection = async (sectionId) => {
+    try {
+      await sectionMutations.remove.mutateAsync(sectionId);
+      toast.success("Đã xóa phần");
+    } catch (err) {
+      toast.error(apiErrorMessage(err));
+    }
+  };
+
   return (
     <div className="mx-auto max-w-5xl">
       <PageHeader
@@ -198,25 +229,24 @@ export default function SurveyQuestionsPage() {
         }
       />
 
-      {canManage && <SectionManager sections={sections} mutations={sectionMutations} />}
-
       {isLoading ? (
         <LoadingState />
       ) : isError ? (
         <ErrorState error={error} onRetry={refetch} />
-      ) : !questions?.length ? (
-        <EmptyState
-          title="Khảo sát chưa có câu hỏi nào"
-          action={canManage && <Button onClick={() => openAdd(undefined)}>+ Thêm câu hỏi</Button>}
-        />
+      ) : !questions?.length && sections.length === 0 ? (
+        <>
+          {canManage && (
+            <div className="mb-4">
+              <AddSectionRow mutations={sectionMutations} />
+            </div>
+          )}
+          <EmptyState
+            title="Khảo sát chưa có câu hỏi nào"
+            action={canManage && <Button onClick={() => openAdd(undefined)}>+ Thêm câu hỏi</Button>}
+          />
+        </>
       ) : (
         <>
-        {sections.length === 0 && canManage && (
-          <p className="mb-3 rounded-lg border border-dashed border-rule px-3 py-2 text-xs text-muted">
-            Khảo sát chưa chia phần nào nên câu hỏi đang hiện chung một danh sách. Tạo phần ở khung
-            “Các phần của khảo sát” phía trên để câu hỏi được gom thành từng khối theo phần.
-          </p>
-        )}
         <DndContext sensors={sensors} collisionDetection={collisionDetection} onDragEnd={onDragEnd}>
           <div className="grid grid-cols-[minmax(0,1fr)] gap-4">
             {groups.map((group) => (
@@ -228,6 +258,11 @@ export default function SurveyQuestionsPage() {
                 onToggle={() => collapse.toggle(groupCollapseKey(group))}
                 canManage={canManage}
                 onAdd={() => openAdd(group.id ?? "")}
+                isFirst={sections.findIndex((sec) => sec.id === group.id) === 0}
+                isLast={sections.findIndex((sec) => sec.id === group.id) === sections.length - 1}
+                onRename={(title) => renameSection(group.id, title)}
+                onMove={(offset) => moveSection(sections.findIndex((sec) => sec.id === group.id), offset)}
+                onDelete={() => removeSection(group.id)}
               >
                 {group.items.map((q, i) => (
                   <div key={q.id} className="min-w-0">
@@ -250,10 +285,15 @@ export default function SurveyQuestionsPage() {
             ))}
           </div>
         </DndContext>
+        {canManage && (
+          <div className="mt-4">
+            <AddSectionRow mutations={sectionMutations} />
+          </div>
+        )}
         </>
       )}
 
-      {canManage && questions?.length > 0 && (
+      {canManage && questions?.length > 0 && sections.length === 0 && (
         <div className="mt-4 text-center">
           <Button variant="secondary" onClick={() => openAdd(undefined)}>
             + Thêm câu hỏi

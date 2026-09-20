@@ -19,7 +19,7 @@ function renderGroup(props) {
 describe("SectionGroup", () => {
   it("hiện tiêu đề, số câu và câu hỏi của phần", () => {
     renderGroup({ collapsed: false });
-    expect(screen.getByText("Phần 1. Tiếp nhận")).toBeTruthy();
+    expect(screen.getByDisplayValue("Phần 1. Tiếp nhận")).toBeTruthy();
     expect(screen.getByText("2 câu hỏi")).toBeTruthy();
     expect(screen.getByText("câu 1")).toBeTruthy();
   });
@@ -38,5 +38,22 @@ describe("SectionGroup", () => {
   it("phần trống hiện gợi ý", () => {
     renderGroup({ collapsed: false, group: { ...group, items: [] }, children: null });
     expect(screen.getByText(/Chưa có câu hỏi trong phần này/)).toBeTruthy();
+  });
+
+  it("đổi tên, đổi thứ tự và xóa phần ngay trên tiêu đề", () => {
+    const onRename = vi.fn();
+    const onMove = vi.fn();
+    const onDelete = vi.fn();
+    renderGroup({ collapsed: false, onRename, onMove, onDelete, isFirst: true });
+    const input = screen.getByLabelText("Tên phần");
+    fireEvent.change(input, { target: { value: "Phần A" } });
+    fireEvent.blur(input);
+    expect(onRename).toHaveBeenCalledWith("Phần A");
+    expect(screen.getByLabelText("Đưa phần lên").disabled).toBe(true);
+    fireEvent.click(screen.getByLabelText("Đưa phần xuống"));
+    expect(onMove).toHaveBeenCalledWith(1);
+    fireEvent.click(screen.getByLabelText("Xóa phần"));
+    fireEvent.click(screen.getByText("Xóa phần", { selector: "button.btn-danger, button" }));
+    expect(onDelete).toHaveBeenCalled();
   });
 });
