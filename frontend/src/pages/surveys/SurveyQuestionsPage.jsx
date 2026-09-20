@@ -81,7 +81,7 @@ export default function SurveyQuestionsPage() {
   let sectionCounter = 0;
 
   return (
-    <div className="mx-auto max-w-3xl">
+    <div className="mx-auto max-w-5xl">
       <PageHeader
         title={survey ? survey.title : "Quản lý câu hỏi"}
         subtitle="Kéo thả để đổi thứ tự câu hỏi và phương án trả lời"
