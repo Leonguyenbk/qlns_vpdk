@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
 import { DndContext, closestCenter, PointerSensor, useSensor, useSensors } from "@dnd-kit/core";
@@ -33,17 +33,44 @@ export default function SurveyQuestionsPage() {
   const sectionMutations = useSurveySectionMutations(id);
   const [showAdd, setShowAdd] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
+  const [preset, setPreset] = useState(null);
+  const [collapsedIds, setCollapsedIds] = useState(() => new Set());
+
+  // Câu hỏi phụ nằm lồng trong thẻ câu cha; chỉ câu gốc (hoặc câu phụ mồ côi) mới ở danh sách chính.
+  const topLevel = useMemo(() => {
+    const ids = new Set((questions || []).map((q) => q.id));
+    return (questions || []).filter((q) => !q.parent_question_id || !ids.has(q.parent_question_id));
+  }, [questions]);
+
+  const collapse = useMemo(
+    () => ({
+      ids: collapsedIds,
+      toggle: (id) =>
+        setCollapsedIds((prev) => {
+          const next = new Set(prev);
+          if (next.has(id)) next.delete(id);
+          else next.add(id);
+          return next;
+        }),
+    }),
+    [collapsedIds]
+  );
+  const collapseAll = () => setCollapsedIds(new Set((questions || []).map((q) => q.id)));
+  const expandAll = () => setCollapsedIds(new Set());
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 4 } }));
 
   const onDragEnd = (event) => {
     const { active, over } = event;
     if (!over || active.id === over.id || !questions) return;
-    const ids = questions.map((q) => `question-${q.id}`);
+    const ids = topLevel.map((q) => `question-${q.id}`);
     const oldIndex = ids.indexOf(active.id);
     const newIndex = ids.indexOf(over.id);
-    const reordered = arrayMove(questions, oldIndex, newIndex);
-    mutations.reorder.mutate(reordered.map((q, i) => ({ id: q.id, sort_order: i + 1 })));
+    if (oldIndex < 0 || newIndex < 0) return;
+    const reordered = arrayMove(topLevel, oldIndex, newIndex);
+    // Câu phụ đi liền ngay sau câu cha để thứ tự lưu luôn nhất quán.
+    const flat = reordered.flatMap((q) => [q, ...questions.filter((c) => c.parent_question_id === q.id)]);
+    mutations.reorder.mutate(flat.map((q, i) => ({ id: q.id, sort_order: i + 1 })));
   };
 
   const onCreate = async (body) => {
@@ -68,6 +95,16 @@ export default function SurveyQuestionsPage() {
             <Button variant="secondary" onClick={() => navigate(`/surveys/${id}`)}>
               ← Thông tin khảo sát
             </Button>
+            {questions?.length > 0 && (
+              <>
+                <Button variant="secondary" onClick={collapseAll}>
+                  Thu gọn tất cả
+                </Button>
+                <Button variant="secondary" onClick={expandAll}>
+                  Mở rộng tất cả
+                </Button>
+              </>
+            )}
             <Button variant="secondary" onClick={() => setShowPreview(true)}>
               Xem trước
             </Button>
@@ -88,10 +125,10 @@ export default function SurveyQuestionsPage() {
         />
       ) : (
         <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
-          <SortableContext items={questions.map((q) => `question-${q.id}`)} strategy={verticalListSortingStrategy}>
+          <SortableContext items={topLevel.map((q) => `question-${q.id}`)} strategy={verticalListSortingStrategy}>
             <div className="grid gap-4">
-              {questions.map((q, i) => {
-                const prevSection = questions[i - 1]?.section || "";
+              {topLevel.map((q, i) => {
+                const prevSection = topLevel[i - 1]?.section || "";
                 const curSection = q.section || "";
                 if (curSection !== prevSection) sectionCounter = 0;
                 sectionCounter += 1;
@@ -109,6 +146,11 @@ export default function SurveyQuestionsPage() {
                       index={sectionCounter - 1}
                       sections={sections}
                       questions={questions}
+                      collapse={collapse}
+                      onAddChild={(p) => {
+                        setPreset(p);
+                        setShowAdd(true);
+                      }}
                     />
                   </div>
                 );
@@ -128,7 +170,11 @@ export default function SurveyQuestionsPage() {
 
       <AddQuestionModal
         open={showAdd}
-        onClose={() => setShowAdd(false)}
+        preset={preset}
+        onClose={() => {
+          setShowAdd(false);
+          setPreset(null);
+        }}
         onCreate={onCreate}
         existingQuestions={questions || []}
         sections={sections}

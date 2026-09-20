@@ -10,10 +10,22 @@ import { IconGrip, IconTrash, IconCopy } from "../ui/icons";
 import { OptionRow } from "./OptionRow";
 import { ConfirmDialog } from "../ui/Modal";
 
-export function QuestionCard({ question, mutations, canManage, index, sections = [], questions = [] }) {
+export function QuestionCard({
+  question,
+  mutations,
+  canManage,
+  index,
+  sections = [],
+  questions = [],
+  nested = false,
+  collapse,
+  onAddChild,
+}) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: `question-${question.id}`,
+    disabled: nested,
   });
+  const collapsed = collapse?.ids.has(question.id) ?? false;
   const [text, setText] = useState(question.question_text);
   const [yesScore, setYesScore] = useState(question.yes_score ?? "");
   const [noScore, setNoScore] = useState(question.no_score ?? "");
@@ -30,15 +42,35 @@ export function QuestionCard({ question, mutations, canManage, index, sections =
   useEffect(() => setMaxScore(question.max_score ?? ""), [question.max_score]);
   useEffect(() => setZeroScoreAt(question.zero_score_at ?? ""), [question.zero_score_at]);
 
-  const parentQuestions = questions.filter(
-    (q) =>
-      q.id !== question.id &&
-      q.is_active &&
-      !q.parent_question_id &&
-      q.scoring_mode !== "deduction" &&
-      ["yes_no", "single_choice", "multiple_choice"].includes(q.question_type)
-  );
-  const selectedParent = parentQuestions.find((q) => q.id === question.parent_question_id);
+  const parentQuestion = questions.find((q) => q.id === question.parent_question_id);
+  const triggerLabel = question.trigger_answer
+    ? question.trigger_answer === "yes"
+      ? "Có"
+      : "Không"
+    : parentQuestion?.options?.find((o) => o.id === question.trigger_option_id)?.option_text;
+  const childQuestions = questions.filter((q) => q.parent_question_id === question.id);
+  const canAddChild =
+    canManage &&
+    !nested &&
+    !question.parent_question_id &&
+    question.is_active &&
+    question.scoring_mode !== "deduction" &&
+    ["yes_no", "single_choice", "multiple_choice"].includes(question.question_type);
+  const startChild = ({ triggerAnswer = null, option = null }) =>
+    onAddChild?.({
+      parentId: question.id,
+      parentText: question.question_text,
+      sectionId: question.section_id || "",
+      triggerAnswer,
+      triggerOptionId: option?.id ?? null,
+      triggerLabel: triggerAnswer ? (triggerAnswer === "yes" ? "Có" : "Không") : option?.option_text,
+    });
+  const childCountFor = ({ triggerAnswer, optionId }) =>
+    childQuestions.filter(
+      (c) =>
+        c.is_active &&
+        (triggerAnswer ? c.trigger_answer === triggerAnswer : c.trigger_option_id === optionId)
+    ).length;
 
   // Nhánh/phương án đang kích hoạt một câu hỏi phụ đang bật: điểm luôn lấy từ câu hỏi phụ
   // khi tính tổng, nên không cho nhập điểm ở đây nữa (tránh nhầm là điểm còn được dùng).
@@ -139,34 +171,13 @@ export function QuestionCard({ question, mutations, canManage, index, sections =
     }
   };
 
-  const changeParent = async (parentId) => {
-    const parent = parentQuestions.find((q) => String(q.id) === String(parentId));
-    const body = parent
-      ? {
-          parent_question_id: parent.id,
-          trigger_answer: parent.question_type === "yes_no" ? "yes" : null,
-          trigger_option_id:
-            parent.question_type === "yes_no"
-              ? null
-              : parent.options.find((o) => o.is_active)?.id || null,
-        }
-      : { parent_question_id: null, trigger_answer: null, trigger_option_id: null };
-    try {
-      await mutations.update.mutateAsync({ id: question.id, body });
-    } catch (err) {
-      toast.error(apiErrorMessage(err));
-    }
-  };
-
-  const changeTrigger = async (value) => {
+  const unlinkParent = async () => {
     try {
       await mutations.update.mutateAsync({
         id: question.id,
-        body:
-          selectedParent?.question_type === "yes_no"
-            ? { trigger_answer: value, trigger_option_id: null }
-            : { trigger_option_id: Number(value), trigger_answer: null },
+        body: { parent_question_id: null, trigger_answer: null, trigger_option_id: null },
       });
+      toast.success("Đã bỏ liên kết — câu hỏi trở thành câu hỏi thường");
     } catch (err) {
       toast.error(apiErrorMessage(err));
     }
@@ -283,9 +294,27 @@ export function QuestionCard({ question, mutations, canManage, index, sections =
         )}
         <div className="min-w-0 flex-1">
           <div className="mb-1.5 flex flex-wrap items-center gap-2 text-xs font-medium text-muted">
-            <span>Câu {index + 1}</span>
+            <button
+              type="button"
+              className="-ml-1 rounded px-1 text-sm text-muted hover:bg-paper-2 hover:text-ink-2"
+              onClick={() => collapse?.toggle(question.id)}
+              aria-expanded={!collapsed}
+              aria-label={collapsed ? "Mở rộng câu hỏi" : "Thu gọn câu hỏi"}
+              title={collapsed ? "Mở rộng" : "Thu gọn"}
+            >
+              {collapsed ? "▸" : "▾"}
+            </button>
+            <span>{nested ? "Câu phụ" : `Câu ${index + 1}`}</span>
             {!question.is_active && <span className="text-danger">(Đã tắt)</span>}
-            {canManage ? (
+            {collapsed ? (
+              <>
+                <span className="text-[#cbd5e1]">·</span>
+                <span>{QUESTION_TYPE_LABELS[question.question_type]}</span>
+                {question.is_required && <span>· Bắt buộc</span>}
+                {nested && triggerLabel && <span>· Khi trả lời «{triggerLabel}»</span>}
+                {childQuestions.length > 0 && <span>· {childQuestions.length} câu phụ</span>}
+              </>
+            ) : canManage && !nested ? (
               <>
                 <span className="text-[#cbd5e1]">·</span>
                 <Select
@@ -300,9 +329,29 @@ export function QuestionCard({ question, mutations, canManage, index, sections =
                 </Select>
               </>
             ) : (
-              question.section && <span>· {question.section}</span>
+              !nested && question.section && <span>· {question.section}</span>
             )}
           </div>
+
+          {collapsed && (
+            <p className="truncate text-[0.95rem] font-medium text-ink">{question.question_text}</p>
+          )}
+
+          {!collapsed && (
+          <>
+          {question.parent_question_id && (
+            <div className="mb-3 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-rule bg-paper-2 px-3 py-2 text-xs text-ink-2">
+              <span>
+                {nested ? "Chỉ hiển thị khi" : `Chỉ hiển thị khi «${parentQuestion?.question_text ?? "câu hỏi cha"}»`}{" "}
+                trả lời <strong className="text-ink">«{triggerLabel ?? "?"}»</strong>. Điểm câu phụ thay điểm của đáp án đó.
+              </span>
+              {canManage && (
+                <button type="button" className="shrink-0 text-danger hover:underline" onClick={unlinkParent}>
+                  Bỏ liên kết
+                </button>
+              )}
+            </div>
+          )}
 
           <textarea
             className="input mb-3 text-[0.95rem] font-medium"
@@ -312,48 +361,6 @@ export function QuestionCard({ question, mutations, canManage, index, sections =
             onChange={(e) => setText(e.target.value)}
             onBlur={saveText}
           />
-
-          {canManage && parentQuestions.length > 0 && (
-            <div className="mb-3 grid gap-2 rounded-lg border border-rule bg-paper-2 p-3 sm:grid-cols-2">
-              {question.parent_question_id && (
-                <p className="text-xs text-muted sm:col-span-2">Điểm câu phụ thay điểm đáp án kích hoạt; chỉ tính một lần trong tổng hợp. Hỗ trợ một cấp câu hỏi phụ.</p>
-              )}
-              <label className="text-xs font-medium text-ink-2">
-                Câu hỏi phụ của
-                <Select
-                  className="mt-1"
-                  value={question.parent_question_id || ""}
-                  onChange={(e) => changeParent(e.target.value)}
-                >
-                  <option value="">Không phải câu hỏi phụ</option>
-                  {parentQuestions.map((q) => (
-                    <option key={q.id} value={q.id}>{q.question_text}</option>
-                  ))}
-                </Select>
-              </label>
-              {selectedParent && (
-                <label className="text-xs font-medium text-ink-2">
-                  Hiển thị khi trả lời
-                  <Select
-                    className="mt-1"
-                    value={question.trigger_answer || question.trigger_option_id || ""}
-                    onChange={(e) => changeTrigger(e.target.value)}
-                  >
-                    {selectedParent.question_type === "yes_no" ? (
-                      <>
-                        <option value="yes">Có</option>
-                        <option value="no">Không</option>
-                      </>
-                    ) : (
-                      selectedParent.options.filter((o) => o.is_active).map((o) => (
-                        <option key={o.id} value={o.id}>{o.option_text}</option>
-                      ))
-                    )}
-                  </Select>
-                </label>
-              )}
-            </div>
-          )}
 
           <div className="mb-3 flex flex-wrap items-center gap-3">
             <Select
@@ -395,32 +402,56 @@ export function QuestionCard({ question, mutations, canManage, index, sections =
                 if (!event.currentTarget.contains(event.relatedTarget)) saveYesNoScores();
               }}
             >
-              <label className="text-xs font-medium text-ink-2">
-                Điểm Có
-                <input
-                  type="number"
-                  step="any"
-                  className="input mt-1 py-1.5 text-sm"
-                  value={yesLocked ? "" : yesScore}
-                  disabled={!canManage || yesLocked}
-                  placeholder={yesLocked ? "Câu hỏi phụ" : undefined}
-                  title={yesLocked ? "Điểm lấy từ câu hỏi phụ" : undefined}
-                  onChange={(e) => setYesScore(e.target.value)}
-                />
-              </label>
-              <label className="text-xs font-medium text-ink-2">
-                Điểm Không
-                <input
-                  type="number"
-                  step="any"
-                  className="input mt-1 py-1.5 text-sm"
-                  value={noLocked ? "" : noScore}
-                  disabled={!canManage || noLocked}
-                  placeholder={noLocked ? "Câu hỏi phụ" : undefined}
-                  title={noLocked ? "Điểm lấy từ câu hỏi phụ" : undefined}
-                  onChange={(e) => setNoScore(e.target.value)}
-                />
-              </label>
+              <div>
+                <label className="text-xs font-medium text-ink-2">
+                  Điểm Có
+                  <input
+                    type="number"
+                    step="any"
+                    className="input mt-1 py-1.5 text-sm"
+                    value={yesLocked ? "" : yesScore}
+                    disabled={!canManage || yesLocked}
+                    placeholder={yesLocked ? "Câu hỏi phụ" : undefined}
+                    title={yesLocked ? "Điểm lấy từ câu hỏi phụ" : undefined}
+                    onChange={(e) => setYesScore(e.target.value)}
+                  />
+                </label>
+                {canAddChild && (
+                  <button
+                    type="button"
+                    className="mt-1.5 text-xs font-medium text-accent-text hover:underline"
+                    onClick={() => startChild({ triggerAnswer: "yes" })}
+                  >
+                    + Câu hỏi phụ khi trả lời «Có»
+                    {childCountFor({ triggerAnswer: "yes" }) > 0 && ` (${childCountFor({ triggerAnswer: "yes" })})`}
+                  </button>
+                )}
+              </div>
+              <div>
+                <label className="text-xs font-medium text-ink-2">
+                  Điểm Không
+                  <input
+                    type="number"
+                    step="any"
+                    className="input mt-1 py-1.5 text-sm"
+                    value={noLocked ? "" : noScore}
+                    disabled={!canManage || noLocked}
+                    placeholder={noLocked ? "Câu hỏi phụ" : undefined}
+                    title={noLocked ? "Điểm lấy từ câu hỏi phụ" : undefined}
+                    onChange={(e) => setNoScore(e.target.value)}
+                  />
+                </label>
+                {canAddChild && (
+                  <button
+                    type="button"
+                    className="mt-1.5 text-xs font-medium text-accent-text hover:underline"
+                    onClick={() => startChild({ triggerAnswer: "no" })}
+                  >
+                    + Câu hỏi phụ khi trả lời «Không»
+                    {childCountFor({ triggerAnswer: "no" }) > 0 && ` (${childCountFor({ triggerAnswer: "no" })})`}
+                  </button>
+                )}
+              </div>
               {(yesLocked || noLocked) && (
                 <p className="col-span-2 text-[11px] text-muted">
                   Nhánh đang có câu hỏi phụ lấy điểm từ câu hỏi phụ đó, không nhập điểm ở đây.
@@ -483,10 +514,17 @@ export function QuestionCard({ question, mutations, canManage, index, sections =
 
           {hasOptions && (
             <div className="mb-3 ml-1 grid gap-1.5">
-              <div className="hidden grid-cols-[1rem_minmax(0,1fr)_5rem_1.5rem] gap-2 px-0.5 text-[11px] font-medium text-muted sm:grid">
+              <div
+                className={`hidden gap-2 px-0.5 text-[11px] font-medium text-muted sm:grid ${
+                  canAddChild
+                    ? "grid-cols-[1rem_minmax(0,1fr)_5rem_6.5rem_1.5rem]"
+                    : "grid-cols-[1rem_minmax(0,1fr)_5rem_1.5rem]"
+                }`}
+              >
                 <span />
                 <span>Nội dung phương án</span>
                 <span>{question.scoring_mode === "deduction" ? "Điểm trừ" : "Điểm"}</span>
+                {canAddChild && <span>Câu phụ</span>}
                 <span />
               </div>
               {lockedOptionIds.size > 0 && (
@@ -508,6 +546,8 @@ export function QuestionCard({ question, mutations, canManage, index, sections =
                       onDelete={() => deleteOption(o)}
                       scoreLabel={question.scoring_mode === "deduction" ? "Điểm trừ" : "Điểm"}
                       scoreLocked={lockedOptionIds.has(o.id)}
+                      onAddChild={canAddChild && o.is_active ? () => startChild({ option: o }) : undefined}
+                      childCount={childCountFor({ optionId: o.id })}
                     />
                   ))}
                 </SortableContext>
@@ -537,6 +577,29 @@ export function QuestionCard({ question, mutations, canManage, index, sections =
                 </div>
               )}
             </div>
+          )}
+
+          {childQuestions.length > 0 && (
+            <div className="mt-1 grid gap-3 border-l-2 border-rule pl-3">
+              <p className="text-xs font-medium text-muted">
+                Câu hỏi phụ ({childQuestions.filter((c) => c.is_active).length} đang bật)
+              </p>
+              {childQuestions.map((child) => (
+                <QuestionCard
+                  key={child.id}
+                  question={child}
+                  mutations={mutations}
+                  canManage={canManage}
+                  index={0}
+                  sections={sections}
+                  questions={questions}
+                  nested
+                  collapse={collapse}
+                />
+              ))}
+            </div>
+          )}
+          </>
           )}
         </div>
 

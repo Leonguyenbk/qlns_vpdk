@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import toast from "react-hot-toast";
 import { Modal } from "../ui/Modal";
 import { Button, FormField, Select, Textarea, TextInput } from "../ui/primitives";
@@ -21,7 +21,7 @@ const EMPTY = {
   trigger_answer: "",
 };
 
-export function AddQuestionModal({ open, onClose, onCreate, existingQuestions = [], sections = [] }) {
+export function AddQuestionModal({ open, onClose, onCreate, existingQuestions = [], sections = [], preset = null }) {
   const lastSectionId = existingQuestions[existingQuestions.length - 1]?.section_id || "";
   const [form, setForm] = useState({ ...EMPTY, section_id: lastSectionId });
   const [options, setOptions] = useState([
@@ -33,15 +33,19 @@ export function AddQuestionModal({ open, onClose, onCreate, existingQuestions = 
   const hasOptions = QUESTION_TYPES_WITH_OPTIONS.has(form.question_type);
 
   const sourceQuestions = existingQuestions.filter((q) => q.is_active);
-  const parentQuestions = sourceQuestions.filter(
-    (q) =>
-      !q.parent_question_id &&
-      q.scoring_mode !== "deduction" &&
-      ["yes_no", "single_choice", "multiple_choice"].includes(q.question_type)
-  );
-  const selectedParent = parentQuestions.find(
-    (q) => String(q.id) === String(form.parent_question_id)
-  );
+  useEffect(() => {
+    if (open && preset) {
+      setForm({
+        ...EMPTY,
+        section_id: preset.sectionId || "",
+        parent_question_id: String(preset.parentId),
+        trigger_answer: preset.triggerAnswer || "",
+        trigger_option_id: preset.triggerOptionId ? String(preset.triggerOptionId) : "",
+      });
+    } else if (open) {
+      setForm((f) => ({ ...f, parent_question_id: "", trigger_answer: "", trigger_option_id: "" }));
+    }
+  }, [open, preset]);
 
   const reset = () => {
     setForm({ ...EMPTY, section_id: lastSectionId });
@@ -66,9 +70,9 @@ export function AddQuestionModal({ open, onClose, onCreate, existingQuestions = 
       scoring_mode: source.scoring_mode || "standard",
       max_score: source.max_score ?? "",
       zero_score_at: source.zero_score_at ?? "",
-      parent_question_id: source.parent_question_id || "",
-      trigger_option_id: source.trigger_option_id || "",
-      trigger_answer: source.trigger_answer || "",
+      parent_question_id: preset ? String(preset.parentId) : "",
+      trigger_option_id: preset?.triggerOptionId ? String(preset.triggerOptionId) : "",
+      trigger_answer: preset?.triggerAnswer || "",
     });
     const copied = source.options
       .filter((o) => o.is_active)
@@ -140,7 +144,7 @@ export function AddQuestionModal({ open, onClose, onCreate, existingQuestions = 
     <Modal
       open={open}
       onClose={onClose}
-      title="Thêm câu hỏi"
+      title={preset ? "Thêm câu hỏi phụ" : "Thêm câu hỏi"}
       footer={
         <>
           <Button variant="secondary" onClick={onClose}>
@@ -195,53 +199,11 @@ export function AddQuestionModal({ open, onClose, onCreate, existingQuestions = 
             ))}
           </Select>
         </FormField>
-        {parentQuestions.length > 0 && (
-          <div className="grid gap-3 rounded-lg border border-rule bg-paper-2 p-3 sm:grid-cols-2">
-            <p className="text-xs text-muted sm:col-span-2">Khi được kích hoạt, điểm câu phụ thay điểm đáp án cha. Nếu có nhiều câu phụ cho cùng đáp án, cộng điểm các câu phụ. Hỗ trợ một cấp.</p>
-            <FormField label="Câu hỏi phụ của">
-              <Select
-                value={form.parent_question_id}
-                onChange={(e) => {
-                  const parent = parentQuestions.find((q) => String(q.id) === e.target.value);
-                  setForm((f) => ({
-                    ...f,
-                    parent_question_id: e.target.value,
-                    trigger_answer: parent?.question_type === "yes_no" ? "yes" : "",
-                    trigger_option_id:
-                      parent && parent.question_type !== "yes_no"
-                        ? String(parent.options.find((o) => o.is_active)?.id || "")
-                        : "",
-                  }));
-                }}
-              >
-                <option value="">Không phải câu hỏi phụ</option>
-                {parentQuestions.map((q) => (
-                  <option key={q.id} value={q.id}>{q.question_text}</option>
-                ))}
-              </Select>
-            </FormField>
-            {selectedParent && (
-              <FormField label="Hiển thị khi trả lời">
-                {selectedParent.question_type === "yes_no" ? (
-                  <Select
-                    value={form.trigger_answer}
-                    onChange={(e) => setForm((f) => ({ ...f, trigger_answer: e.target.value }))}
-                  >
-                    <option value="yes">Có</option>
-                    <option value="no">Không</option>
-                  </Select>
-                ) : (
-                  <Select
-                    value={form.trigger_option_id}
-                    onChange={(e) => setForm((f) => ({ ...f, trigger_option_id: e.target.value }))}
-                  >
-                    {selectedParent.options.filter((o) => o.is_active).map((o) => (
-                      <option key={o.id} value={o.id}>{o.option_text}</option>
-                    ))}
-                  </Select>
-                )}
-              </FormField>
-            )}
+        {preset && (
+          <div className="rounded-lg border border-rule bg-paper-2 px-3 py-2 text-sm text-ink-2">
+            Câu hỏi phụ này chỉ hiện khi người trả lời chọn{" "}
+            <strong className="text-ink">«{preset.triggerLabel}»</strong> ở câu hỏi{" "}
+            <strong className="text-ink">«{preset.parentText}»</strong>. Điểm của câu phụ sẽ thay điểm của đáp án đó.
           </div>
         )}
         <label className="flex items-center gap-2 text-sm">

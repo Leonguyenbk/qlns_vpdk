@@ -11,6 +11,8 @@ export function OptionRow({
   scoreLabel = "Điểm",
   scoreLocked = false,
   scoreLockedHint = "Câu hỏi phụ",
+  onAddChild,
+  childCount = 0,
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: `option-${option.id}`,
@@ -79,6 +81,16 @@ export function OptionRow({
         onChange={(e) => setScore(e.target.value)}
         onKeyDown={(e) => e.key === "Enter" && e.currentTarget.blur()}
       />
+      {onAddChild && (
+        <button
+          type="button"
+          className="w-[6.5rem] shrink-0 whitespace-nowrap text-left text-xs font-medium text-accent-text hover:underline"
+          onClick={onAddChild}
+          title="Thêm câu hỏi chỉ hiện khi người trả lời chọn đáp án này"
+        >
+          + Câu phụ{childCount > 0 ? ` (${childCount})` : ""}
+        </button>
+      )}
       <button
         type="button"
         className="p-1 text-muted hover:text-danger disabled:opacity-40"
