@@ -67,6 +67,7 @@ function SectionRow({ section, index, total, mutations }) {
 
 export function SectionManager({ sections, mutations }) {
   const [title, setTitle] = useState("");
+  const [collapsed, setCollapsed] = useState(false);
 
   const create = async () => {
     const value = title.trim();
@@ -82,24 +83,46 @@ export function SectionManager({ sections, mutations }) {
 
   return (
     <div className="card mb-5 p-4">
-      <div className="mb-3">
-        <h3 className="font-display text-sm font-semibold text-ink">Các phần của khảo sát</h3>
-        <p className="mt-0.5 text-xs text-muted">Tạo các phần trước, sau đó chọn phần khi thêm hoặc sửa câu hỏi.</p>
+      <div className={`flex items-start gap-2 ${collapsed ? "" : "mb-3"}`}>
+        <button
+          type="button"
+          className="rounded px-1.5 py-0.5 text-base text-muted hover:bg-paper-2 hover:text-ink-2"
+          onClick={() => setCollapsed((c) => !c)}
+          aria-expanded={!collapsed}
+          aria-label={collapsed ? "Mở rộng khung các phần" : "Thu gọn khung các phần"}
+        >
+          {collapsed ? "▸" : "▾"}
+        </button>
+        <div className="min-w-0 flex-1">
+          <h3 className="font-display text-sm font-semibold text-ink">
+            Các phần của khảo sát{sections.length > 0 ? ` (${sections.length})` : ""}
+          </h3>
+          {!collapsed && (
+            <p className="mt-0.5 text-xs text-muted">
+              Tạo phần ở đây; mỗi phần sẽ hiện thành một khối riêng bên dưới, bấm “+ Thêm câu hỏi”
+              trong khối đó hoặc kéo câu hỏi vào để đưa câu hỏi về đúng phần.
+            </p>
+          )}
+        </div>
       </div>
-      <div className="mb-3 grid gap-2">
-        {sections.map((section, index) => (
-          <SectionRow key={section.id} section={section} index={index} total={sections} mutations={mutations} />
-        ))}
-      </div>
-      <div className="flex gap-2">
-        <TextInput
-          value={title}
-          onChange={(event) => setTitle(event.target.value)}
-          onKeyDown={(event) => event.key === "Enter" && create()}
-          placeholder="Tên phần mới, ví dụ: Phần 1. Tiếp cận dịch vụ"
-        />
-        <Button variant="secondary" onClick={create} disabled={mutations.create.isPending}>+ Tạo phần</Button>
-      </div>
+      {!collapsed && (
+        <>
+          <div className="mb-3 grid gap-2">
+            {sections.map((section, index) => (
+              <SectionRow key={section.id} section={section} index={index} total={sections} mutations={mutations} />
+            ))}
+          </div>
+          <div className="flex gap-2">
+            <TextInput
+              value={title}
+              onChange={(event) => setTitle(event.target.value)}
+              onKeyDown={(event) => event.key === "Enter" && create()}
+              placeholder="Tên phần mới, ví dụ: Phần 1. Tiếp cận dịch vụ"
+            />
+            <Button variant="secondary" onClick={create} disabled={mutations.create.isPending}>+ Tạo phần</Button>
+          </div>
+        </>
+      )}
     </div>
   );
 }

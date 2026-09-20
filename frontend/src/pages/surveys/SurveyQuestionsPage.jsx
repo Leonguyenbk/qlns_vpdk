@@ -210,6 +210,13 @@ export default function SurveyQuestionsPage() {
           action={canManage && <Button onClick={() => openAdd(undefined)}>+ Thêm câu hỏi</Button>}
         />
       ) : (
+        <>
+        {sections.length === 0 && canManage && (
+          <p className="mb-3 rounded-lg border border-dashed border-rule px-3 py-2 text-xs text-muted">
+            Khảo sát chưa chia phần nào nên câu hỏi đang hiện chung một danh sách. Tạo phần ở khung
+            “Các phần của khảo sát” phía trên để câu hỏi được gom thành từng khối theo phần.
+          </p>
+        )}
         <DndContext sensors={sensors} collisionDetection={collisionDetection} onDragEnd={onDragEnd}>
           <div className="grid grid-cols-[minmax(0,1fr)] gap-4">
             {groups.map((group) => (
@@ -243,6 +250,7 @@ export default function SurveyQuestionsPage() {
             ))}
           </div>
         </DndContext>
+        </>
       )}
 
       {canManage && questions?.length > 0 && (
