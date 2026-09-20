@@ -126,14 +126,14 @@ export default function SurveyQuestionsPage() {
       ) : (
         <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
           <SortableContext items={topLevel.map((q) => `question-${q.id}`)} strategy={verticalListSortingStrategy}>
-            <div className="grid gap-4">
+            <div className="grid grid-cols-[minmax(0,1fr)] gap-4">
               {topLevel.map((q, i) => {
                 const prevSection = topLevel[i - 1]?.section || "";
                 const curSection = q.section || "";
                 if (curSection !== prevSection) sectionCounter = 0;
                 sectionCounter += 1;
                 return (
-                  <div key={q.id}>
+                  <div key={q.id} className="min-w-0">
                     {q.section && q.section !== prevSection && (
                       <h3 className="mb-2 mt-1 font-display text-sm font-semibold text-ink first:mt-0">
                         {q.section}

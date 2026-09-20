@@ -279,7 +279,7 @@ export function QuestionCard({
   };
 
   return (
-    <div ref={setNodeRef} style={style} className={`card p-4 ${!question.is_active ? "opacity-60" : ""}`}>
+    <div ref={setNodeRef} style={style} className={`card min-w-0 p-4 ${!question.is_active ? "opacity-60" : ""}`}>
       <div className="flex items-start gap-2">
         {canManage && (
           <button
@@ -334,7 +334,7 @@ export function QuestionCard({
           </div>
 
           {collapsed && (
-            <p className="truncate text-[0.95rem] font-medium text-ink">{question.question_text}</p>
+            <p className="block truncate text-[0.95rem] font-medium text-ink">{question.question_text}</p>
           )}
 
           {!collapsed && (
@@ -461,7 +461,7 @@ export function QuestionCard({
           )}
 
           {question.question_type === "multiple_choice" && (
-            <div className="mb-3 grid gap-2 rounded-lg bg-paper-2 p-3">
+            <div className="mb-3 grid grid-cols-[minmax(0,1fr)] gap-2 rounded-lg bg-paper-2 p-3">
               <label className="text-xs font-medium text-ink-2">
                 Cách tính điểm
                 <Select
@@ -513,7 +513,7 @@ export function QuestionCard({
           )}
 
           {hasOptions && (
-            <div className="mb-3 ml-1 grid gap-1.5">
+            <div className="mb-3 ml-1 grid grid-cols-[minmax(0,1fr)] gap-1.5">
               <div
                 className={`hidden gap-2 px-0.5 text-[11px] font-medium text-muted sm:grid ${
                   canAddChild
@@ -580,7 +580,7 @@ export function QuestionCard({
           )}
 
           {childQuestions.length > 0 && (
-            <div className="mt-1 grid gap-3 border-l-2 border-rule pl-3">
+            <div className="mt-1 grid grid-cols-[minmax(0,1fr)] gap-3 border-l-2 border-rule pl-3">
               <p className="text-xs font-medium text-muted">
                 Câu hỏi phụ ({childQuestions.filter((c) => c.is_active).length} đang bật)
               </p>
