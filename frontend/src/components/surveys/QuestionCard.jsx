@@ -15,7 +15,6 @@ export function QuestionCard({
   mutations,
   canManage,
   index,
-  sections = [],
   questions = [],
   nested = false,
   collapse,
@@ -107,17 +106,6 @@ export function QuestionCard({
     } catch (err) {
       toast.error(apiErrorMessage(err));
       setText(question.question_text);
-    }
-  };
-
-  const saveSection = async (sectionId) => {
-    try {
-      await mutations.update.mutateAsync({
-        id: question.id,
-        body: { section_id: sectionId ? Number(sectionId) : null },
-      });
-    } catch (err) {
-      toast.error(apiErrorMessage(err));
     }
   };
 
@@ -314,23 +302,7 @@ export function QuestionCard({
                 {nested && triggerLabel && <span>· Khi trả lời «{triggerLabel}»</span>}
                 {childQuestions.length > 0 && <span>· {childQuestions.length} câu phụ</span>}
               </>
-            ) : canManage && !nested ? (
-              <>
-                <span className="text-[#cbd5e1]">·</span>
-                <Select
-                  className="h-7 w-56 py-0 text-xs"
-                  value={question.section_id || ""}
-                  onChange={(e) => saveSection(e.target.value)}
-                >
-                  <option value="">Không thuộc phần</option>
-                  {sections.map((section) => (
-                    <option key={section.id} value={section.id}>{section.title}</option>
-                  ))}
-                </Select>
-              </>
-            ) : (
-              !nested && question.section && <span>· {question.section}</span>
-            )}
+            ) : null}
           </div>
 
           {collapsed && (
@@ -591,7 +563,6 @@ export function QuestionCard({
                   mutations={mutations}
                   canManage={canManage}
                   index={0}
-                  sections={sections}
                   questions={questions}
                   nested
                   collapse={collapse}

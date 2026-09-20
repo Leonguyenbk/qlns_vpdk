@@ -21,7 +21,7 @@ const EMPTY = {
   trigger_answer: "",
 };
 
-export function AddQuestionModal({ open, onClose, onCreate, existingQuestions = [], sections = [], preset = null }) {
+export function AddQuestionModal({ open, onClose, onCreate, existingQuestions = [], sections = [], preset = null, defaultSectionId }) {
   const lastSectionId = existingQuestions[existingQuestions.length - 1]?.section_id || "";
   const [form, setForm] = useState({ ...EMPTY, section_id: lastSectionId });
   const [options, setOptions] = useState([
@@ -43,9 +43,15 @@ export function AddQuestionModal({ open, onClose, onCreate, existingQuestions = 
         trigger_option_id: preset.triggerOptionId ? String(preset.triggerOptionId) : "",
       });
     } else if (open) {
-      setForm((f) => ({ ...f, parent_question_id: "", trigger_answer: "", trigger_option_id: "" }));
+      setForm((f) => ({
+        ...f,
+        parent_question_id: "",
+        trigger_answer: "",
+        trigger_option_id: "",
+        section_id: defaultSectionId === undefined ? f.section_id : String(defaultSectionId),
+      }));
     }
-  }, [open, preset]);
+  }, [open, preset, defaultSectionId]);
 
   const reset = () => {
     setForm({ ...EMPTY, section_id: lastSectionId });

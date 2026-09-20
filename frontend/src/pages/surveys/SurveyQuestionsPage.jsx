@@ -1,8 +1,15 @@
 import { useMemo, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
-import { DndContext, closestCenter, PointerSensor, useSensor, useSensors } from "@dnd-kit/core";
-import { SortableContext, verticalListSortingStrategy, arrayMove } from "@dnd-kit/sortable";
+import {
+  DndContext,
+  closestCenter,
+  pointerWithin,
+  PointerSensor,
+  useSensor,
+  useSensors,
+} from "@dnd-kit/core";
+import { arrayMove } from "@dnd-kit/sortable";
 import { useSurvey } from "../../hooks/useSurveys";
 import {
   useSurveyQuestions,
@@ -18,6 +25,8 @@ import { QuestionCard } from "../../components/surveys/QuestionCard";
 import { AddQuestionModal } from "../../components/surveys/AddQuestionModal";
 import { PreviewModal } from "../../components/surveys/PreviewModal";
 import { SectionManager } from "../../components/surveys/SectionManager";
+import { SectionGroup } from "../../components/surveys/SectionGroup";
+import { apiErrorMessage } from "../../lib/api";
 
 export default function SurveyQuestionsPage() {
   const { id } = useParams();
@@ -34,6 +43,7 @@ export default function SurveyQuestionsPage() {
   const [showAdd, setShowAdd] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
   const [preset, setPreset] = useState(null);
+  const [addSectionId, setAddSectionId] = useState(undefined);
   const [collapsedIds, setCollapsedIds] = useState(() => new Set());
 
   // Câu hỏi phụ nằm lồng trong thẻ câu cha; chỉ câu gốc (hoặc câu phụ mồ côi) mới ở danh sách chính.
@@ -55,30 +65,106 @@ export default function SurveyQuestionsPage() {
     }),
     [collapsedIds]
   );
-  const collapseAll = () => setCollapsedIds(new Set((questions || []).map((q) => q.id)));
-  const expandAll = () => setCollapsedIds(new Set());
-
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 4 } }));
 
-  const onDragEnd = (event) => {
+  // Nhóm câu hỏi theo Phần: mỗi phần có danh sách câu hỏi riêng, không cần chọn phần từng câu.
+  const groups = useMemo(() => {
+    const sectionIds = new Set(sections.map((sec) => sec.id));
+    const loose = topLevel.filter((q) => !q.section_id || !sectionIds.has(q.section_id));
+    const result = [];
+    if (loose.length > 0 || sections.length === 0) {
+      result.push({ key: "none", id: null, title: "Chưa thuộc phần nào", items: loose });
+    }
+    for (const sec of sections) {
+      result.push({
+        key: `s${sec.id}`,
+        id: sec.id,
+        title: sec.title,
+        items: topLevel.filter((q) => q.section_id === sec.id),
+      });
+    }
+    return result;
+  }, [topLevel, sections]);
+
+  const groupCollapseKey = (group) => `section-${group.key}`;
+  const collapseAll = () =>
+    setCollapsedIds(
+      new Set([...(questions || []).map((q) => q.id), ...groups.map(groupCollapseKey)])
+    );
+  const expandAll = () => setCollapsedIds(new Set());
+
+  // Thả vào câu hỏi thì xếp cạnh câu đó; thả vào khung phần (kể cả phần trống) thì xếp cuối phần.
+  const collisionDetection = (args) => {
+    const only = (prefix) =>
+      args.droppableContainers.filter((c) => String(c.id).startsWith(prefix));
+    const hitQuestion = pointerWithin({ ...args, droppableContainers: only("question-") });
+    if (hitQuestion.length) return hitQuestion;
+    const hitSection = pointerWithin({ ...args, droppableContainers: only("section-") });
+    if (hitSection.length) return hitSection;
+    return closestCenter({ ...args, droppableContainers: only("question-") });
+  };
+
+  const onDragEnd = async (event) => {
     const { active, over } = event;
     if (!over || active.id === over.id || !questions) return;
-    const ids = topLevel.map((q) => `question-${q.id}`);
-    const oldIndex = ids.indexOf(active.id);
-    const newIndex = ids.indexOf(over.id);
-    if (oldIndex < 0 || newIndex < 0) return;
-    const reordered = arrayMove(topLevel, oldIndex, newIndex);
+    const activeId = Number(String(active.id).replace("question-", ""));
+    const src = groups.find((g) => g.items.some((q) => q.id === activeId));
+    let dst;
+    let dstIndex;
+    if (String(over.id).startsWith("question-")) {
+      const overId = Number(String(over.id).replace("question-", ""));
+      dst = groups.find((g) => g.items.some((q) => q.id === overId));
+      dstIndex = dst ? dst.items.findIndex((q) => q.id === overId) : -1;
+    } else {
+      dst = groups.find((g) => `section-${g.key}` === over.id);
+      dstIndex = dst ? dst.items.length : -1;
+    }
+    if (!src || !dst || dstIndex < 0) return;
+    const moving = src.items.find((q) => q.id === activeId);
+
+    const nextGroups = groups.map((g) => {
+      if (g === src && g === dst) {
+        const from = g.items.findIndex((q) => q.id === activeId);
+        return { ...g, items: arrayMove(g.items, from, dstIndex) };
+      }
+      if (g === src) return { ...g, items: g.items.filter((q) => q.id !== activeId) };
+      if (g === dst) {
+        const items = [...g.items];
+        items.splice(dstIndex, 0, moving);
+        return { ...g, items };
+      }
+      return g;
+    });
     // Câu phụ đi liền ngay sau câu cha để thứ tự lưu luôn nhất quán.
-    const flat = reordered.flatMap((q) => [q, ...questions.filter((c) => c.parent_question_id === q.id)]);
-    mutations.reorder.mutate(flat.map((q, i) => ({ id: q.id, sort_order: i + 1 })));
+    const flat = nextGroups.flatMap((g) =>
+      g.items.flatMap((q) => [q, ...questions.filter((c) => c.parent_question_id === q.id)])
+    );
+    try {
+      if (src !== dst) {
+        const ids = [
+          activeId,
+          ...questions.filter((c) => c.parent_question_id === activeId).map((c) => c.id),
+        ];
+        for (const qid of ids) {
+          await mutations.update.mutateAsync({ id: qid, body: { section_id: dst.id } });
+        }
+      }
+      await mutations.reorder.mutateAsync(flat.map((q, i) => ({ id: q.id, sort_order: i + 1 })));
+    } catch (err) {
+      toast.error(apiErrorMessage(err));
+    }
+  };
+
+  const openAdd = (sectionId) => {
+    setPreset(null);
+    setAddSectionId(sectionId);
+    setShowAdd(true);
   };
 
   const onCreate = async (body) => {
     await mutations.create.mutateAsync(body);
     toast.success("Đã thêm câu hỏi");
   };
-
-  let sectionCounter = 0;
 
   return (
     <div className="mx-auto max-w-5xl">
@@ -121,48 +207,47 @@ export default function SurveyQuestionsPage() {
       ) : !questions?.length ? (
         <EmptyState
           title="Khảo sát chưa có câu hỏi nào"
-          action={canManage && <Button onClick={() => setShowAdd(true)}>+ Thêm câu hỏi</Button>}
+          action={canManage && <Button onClick={() => openAdd(undefined)}>+ Thêm câu hỏi</Button>}
         />
       ) : (
-        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
-          <SortableContext items={topLevel.map((q) => `question-${q.id}`)} strategy={verticalListSortingStrategy}>
-            <div className="grid grid-cols-[minmax(0,1fr)] gap-4">
-              {topLevel.map((q, i) => {
-                const prevSection = topLevel[i - 1]?.section || "";
-                const curSection = q.section || "";
-                if (curSection !== prevSection) sectionCounter = 0;
-                sectionCounter += 1;
-                return (
+        <DndContext sensors={sensors} collisionDetection={collisionDetection} onDragEnd={onDragEnd}>
+          <div className="grid grid-cols-[minmax(0,1fr)] gap-4">
+            {groups.map((group) => (
+              <SectionGroup
+                key={group.key}
+                group={group}
+                plain={sections.length === 0}
+                collapsed={collapsedIds.has(groupCollapseKey(group))}
+                onToggle={() => collapse.toggle(groupCollapseKey(group))}
+                canManage={canManage}
+                onAdd={() => openAdd(group.id ?? "")}
+              >
+                {group.items.map((q, i) => (
                   <div key={q.id} className="min-w-0">
-                    {q.section && q.section !== prevSection && (
-                      <h3 className="mb-2 mt-1 font-display text-sm font-semibold text-ink first:mt-0">
-                        {q.section}
-                      </h3>
-                    )}
                     <QuestionCard
                       question={q}
                       mutations={mutations}
                       canManage={canManage}
-                      index={sectionCounter - 1}
-                      sections={sections}
+                      index={i}
                       questions={questions}
                       collapse={collapse}
                       onAddChild={(p) => {
                         setPreset(p);
+                        setAddSectionId(undefined);
                         setShowAdd(true);
                       }}
                     />
                   </div>
-                );
-              })}
-            </div>
-          </SortableContext>
+                ))}
+              </SectionGroup>
+            ))}
+          </div>
         </DndContext>
       )}
 
       {canManage && questions?.length > 0 && (
         <div className="mt-4 text-center">
-          <Button variant="secondary" onClick={() => setShowAdd(true)}>
+          <Button variant="secondary" onClick={() => openAdd(undefined)}>
             + Thêm câu hỏi
           </Button>
         </div>
@@ -171,6 +256,7 @@ export default function SurveyQuestionsPage() {
       <AddQuestionModal
         open={showAdd}
         preset={preset}
+        defaultSectionId={addSectionId}
         onClose={() => {
           setShowAdd(false);
           setPreset(null);
