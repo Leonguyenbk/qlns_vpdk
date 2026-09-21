@@ -10,7 +10,28 @@ export function isQuestionVisible(question, answers) {
   return false;
 }
 
+function activeFields(question) {
+  return (question.options || []).filter((o) => o.is_active !== false);
+}
+
+/** Câu nhiều ô nhập: value là { [option_id]: text }. */
+export function filledFieldAnswers(question, value) {
+  const values = value && typeof value === "object" ? value : {};
+  return activeFields(question)
+    .map((o) => ({ option_id: o.id, answer_text: String(values[o.id] ?? "").trim() }))
+    .filter((f) => f.answer_text !== "");
+}
+
+/** Tên các ô bắt buộc còn để trống của câu nhiều ô nhập. */
+export function missingRequiredFields(question, value) {
+  const filled = new Set(filledFieldAnswers(question, value).map((f) => f.option_id));
+  return activeFields(question)
+    .filter((o) => o.is_required && !filled.has(o.id))
+    .map((o) => o.option_text);
+}
+
 export function isQuestionAnswered(question, value) {
+  if (question.question_type === "text_fields") return filledFieldAnswers(question, value).length > 0;
   if (question.question_type === "multiple_choice" && question.scoring_mode === "deduction") {
     return true;
   }
@@ -22,6 +43,7 @@ export function isQuestionAnswered(question, value) {
 
 export function questionValue(question, answers) {
   if (answers[question.id] !== undefined) return answers[question.id];
+  if (question.question_type === "text_fields") return {};
   return question.question_type === "multiple_choice" ? [] : null;
 }
 

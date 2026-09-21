@@ -6,7 +6,9 @@ import { Button, FormField, Select } from "../../components/ui/primitives";
 import { Spinner } from "../../components/ui/Spinner";
 import { apiErrorMessage } from "../../lib/api";
 import {
+  filledFieldAnswers,
   isQuestionAnswered,
+  missingRequiredFields,
   visibleSurveyQuestions,
   updateSurveyAnswer,
   questionValue,
@@ -24,6 +26,8 @@ function makeClientToken() {
 
 function buildAnswerItem(question, value) {
   const { id, question_type } = question;
+  if (question_type === "text_fields")
+    return { question_id: id, field_answers: filledFieldAnswers(question, value) };
   if (question_type === "single_choice") return { question_id: id, option_id: value };
   if (question_type === "multiple_choice") return { question_id: id, option_ids: value };
   if (question_type === "rating" || question_type === "number")
@@ -67,7 +71,10 @@ export default function PublicSurveyPage() {
       nextErrors._branch = "Vui lòng chọn chi nhánh được khảo sát.";
     }
     for (const q of visibleQuestions) {
-      if (q.is_required && !isQuestionAnswered(q, questionValue(q, answers))) {
+      if (q.question_type === "text_fields") {
+        const missing = missingRequiredFields(q, questionValue(q, answers));
+        if (missing.length) nextErrors[q.id] = `Vui lòng nhập: ${missing.join(", ")}.`;
+      } else if (q.is_required && !isQuestionAnswered(q, questionValue(q, answers))) {
         nextErrors[q.id] = "Câu hỏi này là bắt buộc.";
       }
     }

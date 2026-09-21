@@ -21,6 +21,9 @@ from .survey_service import get_survey_or_404
 from .survey_scoring import record_scores
 
 
+MAX_FIELD_ANSWER_LENGTH = 500
+
+
 def _assert_submittable(survey: Survey) -> None:
     if survey.status != "active":
         raise BusinessRuleError("Khảo sát hiện không nhận phản hồi.")
@@ -95,6 +98,9 @@ def get_public_survey(slug: str) -> dict:
 def _is_answered(item: dict | None, question: SurveyQuestion) -> bool:
     qtype = question.question_type
     if qtype == "multiple_choice" and question.scoring_mode == "deduction":
+        return True
+    if qtype == "text_fields":
+        # Luôn đi qua _validate_answer để kiểm ô bắt buộc kể cả khi không gửi gì.
         return True
     if item is None:
         return False
@@ -179,6 +185,30 @@ def _validate_answer(question: SurveyQuestion, item: dict) -> list[dict]:
             raise ValidationError(f"Câu hỏi '{label}' cần chọn ngày.")
         return [{"answer_text": d.isoformat()}]
 
+    if qtype == "text_fields":
+        active = {o.id: o for o in question.options if o.is_active}
+        filled: dict[int, str] = {}
+        for entry in item.get("field_answers") or []:
+            oid = entry.get("option_id")
+            if oid not in active:
+                raise ValidationError(f"Ô nhập không hợp lệ cho câu hỏi '{label}'.")
+            value = clean_str(entry.get("answer_text"))
+            if value and len(value) > MAX_FIELD_ANSWER_LENGTH:
+                raise ValidationError(
+                    f"'{active[oid].option_text}' không được dài quá {MAX_FIELD_ANSWER_LENGTH} ký tự."
+                )
+            if value:
+                filled[oid] = value
+        for oid, option in active.items():
+            if option.is_required and oid not in filled:
+                raise ValidationError(f"Vui lòng nhập '{option.option_text}'.")
+        # Giữ đúng thứ tự ô đã cấu hình; ô bỏ trống không lưu dòng nào.
+        return [
+            {"option_id": o.id, "answer_text": filled[o.id]}
+            for o in question.options
+            if o.id in filled
+        ]
+
     # text, textarea
     text = clean_str(item.get("answer_text"))
     if not text:
@@ -220,7 +250,9 @@ def submit_response(survey_id: int, data: dict, *, meta: dict) -> tuple[dict, bo
             if q.is_required:
                 raise ValidationError(f"Câu hỏi '{q.question_text}' là bắt buộc.")
             continue
-        planned.append((q, _validate_answer(q, item or {"question_id": q.id, "option_ids": []})))
+        rows = _validate_answer(q, item or {"question_id": q.id, "option_ids": []})
+        if rows:
+            planned.append((q, rows))
 
     record_scores(planned, visible_questions)
 

@@ -13,6 +13,7 @@ export function OptionRow({
   scoreLockedHint = "Câu hỏi phụ",
   onAddChild,
   childCount = 0,
+  fieldMode = false,
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: `option-${option.id}`,
@@ -34,6 +35,10 @@ export function OptionRow({
     const nextScore = scoreLocked ? null : score === "" ? null : Number(score);
     if (!nextText) {
       setText(option.option_text);
+      return;
+    }
+    if (fieldMode) {
+      if (nextText !== option.option_text) onSave({ option_text: nextText });
       return;
     }
     if (nextText !== option.option_text || nextScore !== (option.score ?? null)) {
@@ -65,6 +70,17 @@ export function OptionRow({
         onChange={(e) => setText(e.target.value)}
         onKeyDown={(e) => e.key === "Enter" && e.currentTarget.blur()}
       />
+      {fieldMode ? (
+        <label className="flex w-[5.5rem] shrink-0 items-center gap-1.5 text-xs text-ink-2">
+          <input
+            type="checkbox"
+            checked={!!option.is_required}
+            disabled={disabled}
+            onChange={(e) => onSave({ is_required: e.target.checked })}
+          />
+          Bắt buộc
+        </label>
+      ) : (
       <input
         type="number"
         step="any"
@@ -81,6 +97,7 @@ export function OptionRow({
         onChange={(e) => setScore(e.target.value)}
         onKeyDown={(e) => e.key === "Enter" && e.currentTarget.blur()}
       />
+      )}
       {onAddChild && (
         <button
           type="button"

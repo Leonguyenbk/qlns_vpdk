@@ -146,6 +146,31 @@ export function QuestionRenderer({ question, value, onChange, error, disabled })
         className="text-base"
       />
     );
+  } else if (type === "text_fields") {
+    const values = value && typeof value === "object" ? value : {};
+    control = (
+      <div className="grid gap-3">
+        {options.map((o) => (
+          <label key={o.id} className="grid gap-1 text-sm text-ink-2">
+            <span>
+              {o.option_text}
+              {o.is_required && (
+                <span className="text-danger" aria-hidden="true">
+                  {" "}
+                  *
+                </span>
+              )}
+            </span>
+            <TextInput
+              disabled={disabled}
+              value={values[o.id] ?? ""}
+              onChange={(e) => onChange({ ...values, [o.id]: e.target.value })}
+              className="text-base"
+            />
+          </label>
+        ))}
+      </div>
+    );
   } else if (type === "textarea") {
     control = (
       <Textarea

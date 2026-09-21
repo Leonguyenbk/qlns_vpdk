@@ -277,6 +277,7 @@ def duplicate_survey(survey_id: int, *, actor, meta: dict) -> dict:
                     option_text=o.option_text,
                     option_value=o.option_value,
                     score=o.score,
+                    is_required=o.is_required,
                     sort_order=o.sort_order,
                     is_active=True,
                 )

@@ -20,6 +20,7 @@ from sqlalchemy import (
     String,
     Text,
     UniqueConstraint,
+    false,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -37,10 +38,15 @@ QUESTION_TYPES = {
     "textarea",
     "number",
     "date",
+    "text_fields",
 }
 
 # Loại câu hỏi cần danh sách phương án trả lời (option) đi kèm.
 QUESTION_TYPES_WITH_OPTIONS = {"single_choice", "multiple_choice"}
+
+# Câu hỏi nhiều ô nhập: mỗi "phương án" là một ô có nhãn (vd. Họ và tên, CCCD),
+# người trả lời gõ văn bản vào từng ô; cờ SurveyOption.is_required bật/tắt bắt buộc.
+QUESTION_TYPES_WITH_FIELDS = {"text_fields"}
 
 
 def _iso(value: datetime | date | None) -> str | None:
@@ -234,6 +240,10 @@ class SurveyOption(TimestampMixin, db.Model):
     score: Mapped[float | None] = mapped_column(Float)
     sort_order: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    # Chỉ có nghĩa với ô nhập của câu hỏi `text_fields`.
+    is_required: Mapped[bool] = mapped_column(
+        Boolean, default=False, nullable=False, server_default=false()
+    )
 
     question: Mapped["SurveyQuestion"] = relationship(
         "SurveyQuestion", back_populates="options", foreign_keys=[question_id]
@@ -247,6 +257,7 @@ class SurveyOption(TimestampMixin, db.Model):
             "option_value": self.option_value,
             "sort_order": self.sort_order,
             "is_active": self.is_active,
+            "is_required": self.is_required,
         }
         if include_score:
             data["score"] = self.score

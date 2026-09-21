@@ -2,7 +2,11 @@ import { useEffect, useState } from "react";
 import toast from "react-hot-toast";
 import { Modal } from "../ui/Modal";
 import { Button, FormField, Select, Textarea, TextInput } from "../ui/primitives";
-import { QUESTION_TYPE_LABELS, QUESTION_TYPES_WITH_OPTIONS } from "../../lib/constants";
+import {
+  QUESTION_TYPE_LABELS,
+  QUESTION_TYPES_WITH_FIELDS,
+  QUESTION_TYPES_WITH_OPTIONS,
+} from "../../lib/constants";
 import { apiErrorMessage } from "../../lib/api";
 import { IconTrash } from "../ui/icons";
 
@@ -28,9 +32,11 @@ export function AddQuestionModal({ open, onClose, onCreate, existingQuestions = 
     { option_text: "", score: "" },
     { option_text: "", score: "" },
   ]);
+  const [fields, setFields] = useState([{ option_text: "", is_required: false }]);
   const [copyFromId, setCopyFromId] = useState("");
   const [saving, setSaving] = useState(false);
   const hasOptions = QUESTION_TYPES_WITH_OPTIONS.has(form.question_type);
+  const hasFields = QUESTION_TYPES_WITH_FIELDS.has(form.question_type);
 
   const sourceQuestions = existingQuestions.filter((q) => q.is_active);
   useEffect(() => {
@@ -59,6 +65,7 @@ export function AddQuestionModal({ open, onClose, onCreate, existingQuestions = 
       { option_text: "", score: "" },
       { option_text: "", score: "" },
     ]);
+    setFields([{ option_text: "", is_required: false }]);
     setCopyFromId("");
   };
 
@@ -80,9 +87,16 @@ export function AddQuestionModal({ open, onClose, onCreate, existingQuestions = 
       trigger_option_id: preset?.triggerOptionId ? String(preset.triggerOptionId) : "",
       trigger_answer: preset?.triggerAnswer || "",
     });
-    const copied = source.options
-      .filter((o) => o.is_active)
-      .map((o) => ({ option_text: o.option_text, score: o.score ?? "" }));
+    const activeOptions = source.options.filter((o) => o.is_active);
+    if (QUESTION_TYPES_WITH_FIELDS.has(source.question_type)) {
+      setFields(
+        activeOptions.length
+          ? activeOptions.map((o) => ({ option_text: o.option_text, is_required: !!o.is_required }))
+          : [{ option_text: "", is_required: false }]
+      );
+      return;
+    }
+    const copied = activeOptions.map((o) => ({ option_text: o.option_text, score: o.score ?? "" }));
     setOptions(copied.length ? copied : [{ option_text: "", score: "" }, { option_text: "", score: "" }]);
   };
 
@@ -101,6 +115,13 @@ export function AddQuestionModal({ open, onClose, onCreate, existingQuestions = 
       toast.error("Cần ít nhất 2 phương án trả lời");
       return;
     }
+    const fieldRows = fields
+      .map((f) => ({ option_text: f.option_text.trim(), is_required: f.is_required }))
+      .filter((f) => f.option_text);
+    if (hasFields && fieldRows.length < 1) {
+      toast.error("Cần ít nhất 1 ô nhập");
+      return;
+    }
     if (
       form.question_type === "multiple_choice" &&
       form.scoring_mode === "deduction" &&
@@ -114,7 +135,7 @@ export function AddQuestionModal({ open, onClose, onCreate, existingQuestions = 
       await onCreate({
         question_text: form.question_text.trim(),
         question_type: form.question_type,
-        is_required: form.is_required,
+        is_required: hasFields ? false : form.is_required,
         section_id: form.section_id ? Number(form.section_id) : null,
         yes_score:
           form.question_type === "yes_no" && form.yes_score !== "" ? Number(form.yes_score) : null,
@@ -135,7 +156,7 @@ export function AddQuestionModal({ open, onClose, onCreate, existingQuestions = 
         parent_question_id: form.parent_question_id ? Number(form.parent_question_id) : null,
         trigger_option_id: form.trigger_option_id ? Number(form.trigger_option_id) : null,
         trigger_answer: form.trigger_answer || null,
-        options: hasOptions ? opts : [],
+        options: hasFields ? fieldRows : hasOptions ? opts : [],
       });
       reset();
       onClose();
@@ -212,14 +233,16 @@ export function AddQuestionModal({ open, onClose, onCreate, existingQuestions = 
             <strong className="text-ink">«{preset.parentText}»</strong>. Điểm của câu phụ sẽ thay điểm của đáp án đó.
           </div>
         )}
-        <label className="flex items-center gap-2 text-sm">
-          <input
-            type="checkbox"
-            checked={form.is_required}
-            onChange={(e) => setForm((f) => ({ ...f, is_required: e.target.checked }))}
-          />
-          Bắt buộc trả lời
-        </label>
+        {!hasFields && (
+          <label className="flex items-center gap-2 text-sm">
+            <input
+              type="checkbox"
+              checked={form.is_required}
+              onChange={(e) => setForm((f) => ({ ...f, is_required: e.target.checked }))}
+            />
+            Bắt buộc trả lời
+          </label>
+        )}
 
         {form.question_type === "yes_no" && (
           <FormField label="Điểm cho đáp án Có / Không" hint="Có thể để trống nếu câu hỏi này không tính điểm">
@@ -274,6 +297,59 @@ export function AddQuestionModal({ open, onClose, onCreate, existingQuestions = 
               </div>
             )}
           </div>
+        )}
+
+        {hasFields && (
+          <FormField
+            label="Các ô nhập"
+            required
+            hint="Mỗi ô là một dòng người trả lời tự gõ (vd. Họ và tên, CCCD, Địa chỉ). Bật «Bắt buộc» cho ô nào phải điền."
+          >
+            <div className="grid gap-2">
+              {fields.map((f, i) => (
+                <div key={i} className="flex items-center gap-2">
+                  <TextInput
+                    value={f.option_text}
+                    placeholder={`Tên ô ${i + 1}`}
+                    onChange={(e) =>
+                      setFields((arr) =>
+                        arr.map((v, idx) => (idx === i ? { ...v, option_text: e.target.value } : v))
+                      )
+                    }
+                  />
+                  <label className="flex w-24 shrink-0 items-center gap-1.5 text-xs text-ink-2">
+                    <input
+                      type="checkbox"
+                      checked={f.is_required}
+                      onChange={(e) =>
+                        setFields((arr) =>
+                          arr.map((v, idx) => (idx === i ? { ...v, is_required: e.target.checked } : v))
+                        )
+                      }
+                    />
+                    Bắt buộc
+                  </label>
+                  {fields.length > 1 && (
+                    <button
+                      type="button"
+                      className="p-1 text-muted hover:text-danger"
+                      aria-label={`Xóa ô ${i + 1}`}
+                      onClick={() => setFields((arr) => arr.filter((_, idx) => idx !== i))}
+                    >
+                      <IconTrash size={15} />
+                    </button>
+                  )}
+                </div>
+              ))}
+              <Button
+                variant="secondary"
+                className="w-fit px-3 py-1 text-xs"
+                onClick={() => setFields((arr) => [...arr, { option_text: "", is_required: false }])}
+              >
+                + Thêm ô nhập
+              </Button>
+            </div>
+          </FormField>
         )}
 
         {hasOptions && (

@@ -545,6 +545,27 @@ def _question_stats(question: dict, response_ids: list[int]) -> dict:
             "max": max(values) if values else None,
         }
 
+    if qtype == "text_fields":
+        rows = (
+            db.session.query(SurveyOption.option_text, SurveyAnswer.answer_text)
+            .join(SurveyOption, SurveyOption.id == SurveyAnswer.option_id)
+            .filter(SurveyAnswer.question_id == qid, SurveyAnswer.response_id.in_(response_ids))
+            .order_by(SurveyAnswer.id.desc())
+            .limit(20)
+            .all()
+        )
+        respondents = (
+            db.session.query(func.count(func.distinct(SurveyAnswer.response_id)))
+            .filter(SurveyAnswer.question_id == qid, SurveyAnswer.response_id.in_(response_ids))
+            .scalar()
+            or 0
+        )
+        return {
+            "type": "open_text",
+            "total_respondents": respondents,
+            "samples": [f"{label}: {value}" for label, value in rows if value],
+        }
+
     # text, textarea, date — câu trả lời mở, không gộp; trả mẫu gần nhất để tham khảo
     samples = [
         r[0]

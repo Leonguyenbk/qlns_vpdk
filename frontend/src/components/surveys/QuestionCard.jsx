@@ -3,7 +3,11 @@ import toast from "react-hot-toast";
 import { DndContext, closestCenter, PointerSensor, useSensor, useSensors } from "@dnd-kit/core";
 import { SortableContext, verticalListSortingStrategy, useSortable, arrayMove } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { QUESTION_TYPE_LABELS, QUESTION_TYPES_WITH_OPTIONS } from "../../lib/constants";
+import {
+  QUESTION_TYPE_LABELS,
+  QUESTION_TYPES_WITH_FIELDS,
+  QUESTION_TYPES_WITH_OPTIONS,
+} from "../../lib/constants";
 import { apiErrorMessage } from "../../lib/api";
 import { Button, Select } from "../ui/primitives";
 import { IconGrip, IconTrash, IconCopy } from "../ui/icons";
@@ -33,7 +37,11 @@ export function QuestionCard({
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [newOption, setNewOption] = useState("");
   const [newOptionScore, setNewOptionScore] = useState("");
+  const [newOptionRequired, setNewOptionRequired] = useState(false);
   const hasOptions = QUESTION_TYPES_WITH_OPTIONS.has(question.question_type);
+  const hasFields = QUESTION_TYPES_WITH_FIELDS.has(question.question_type);
+  // Ô nhập đã bị thay bằng bản mới (do đã có câu trả lời) không hiện lại trong danh sách.
+  const fieldOptions = question.options.filter((o) => o.is_active);
 
   useEffect(() => setText(question.question_text), [question.question_text]);
   useEffect(() => setYesScore(question.yes_score ?? ""), [question.yes_score]);
@@ -177,11 +185,15 @@ export function QuestionCard({
         id: question.id,
         body: {
           question_type: type,
-          options: QUESTION_TYPES_WITH_OPTIONS.has(type)
-            ? hasOptions
-              ? question.options.map((o) => ({ option_text: o.option_text, score: o.score }))
-              : ["Phương án 1", "Phương án 2"].map((option_text) => ({ option_text, score: null }))
-            : undefined,
+          options: QUESTION_TYPES_WITH_FIELDS.has(type)
+            ? hasFields
+              ? fieldOptions.map((o) => ({ option_text: o.option_text, is_required: o.is_required }))
+              : [{ option_text: "Ô nhập 1", is_required: false }]
+            : QUESTION_TYPES_WITH_OPTIONS.has(type)
+              ? hasOptions
+                ? question.options.map((o) => ({ option_text: o.option_text, score: o.score }))
+                : ["Phương án 1", "Phương án 2"].map((option_text) => ({ option_text, score: null }))
+              : undefined,
         },
       });
       notifyRevision(resp.data.data);
@@ -224,10 +236,11 @@ export function QuestionCard({
     try {
       await mutations.createOption.mutateAsync({
         questionId: question.id,
-        body: { option_text: t, score },
+        body: hasFields ? { option_text: t, is_required: newOptionRequired } : { option_text: t, score },
       });
       setNewOption("");
       setNewOptionScore("");
+      setNewOptionRequired(false);
     } catch (err) {
       toast.error(apiErrorMessage(err));
     }
@@ -256,10 +269,11 @@ export function QuestionCard({
   const onOptionDragEnd = (event) => {
     const { active, over } = event;
     if (!over || active.id === over.id) return;
-    const ids = question.options.map((o) => `option-${o.id}`);
+    const list = hasFields ? fieldOptions : question.options;
+    const ids = list.map((o) => `option-${o.id}`);
     const oldIndex = ids.indexOf(active.id);
     const newIndex = ids.indexOf(over.id);
-    const reordered = arrayMove(question.options, oldIndex, newIndex);
+    const reordered = arrayMove(list, oldIndex, newIndex);
     mutations.reorderOptions.mutate({
       questionId: question.id,
       items: reordered.map((o, i) => ({ id: o.id, sort_order: i + 1 })),
@@ -347,15 +361,17 @@ export function QuestionCard({
                 </option>
               ))}
             </Select>
-            <label className="flex items-center gap-1.5 text-xs text-ink-2">
-              <input
-                type="checkbox"
-                checked={question.is_required}
-                disabled={!canManage}
-                onChange={(e) => toggle("is_required", e.target.checked)}
-              />
-              Bắt buộc
-            </label>
+            {!hasFields && (
+              <label className="flex items-center gap-1.5 text-xs text-ink-2">
+                <input
+                  type="checkbox"
+                  checked={question.is_required}
+                  disabled={!canManage}
+                  onChange={(e) => toggle("is_required", e.target.checked)}
+                />
+                Bắt buộc
+              </label>
+            )}
             <label className="flex items-center gap-1.5 text-xs text-ink-2">
               <input
                 type="checkbox"
@@ -543,6 +559,56 @@ export function QuestionCard({
                     onChange={(e) => setNewOptionScore(e.target.value)}
                     onKeyDown={(e) => e.key === "Enter" && addOption()}
                   />
+                  <Button variant="secondary" className="px-2.5 py-1 text-xs" onClick={addOption}>
+                    Thêm
+                  </Button>
+                </div>
+              )}
+            </div>
+          )}
+
+          {hasFields && (
+            <div className="mb-3 ml-1 grid grid-cols-[minmax(0,1fr)] gap-1.5">
+              <div className="hidden grid-cols-[1rem_minmax(0,1fr)_5.5rem_1.5rem] gap-2 px-0.5 text-[11px] font-medium text-muted sm:grid">
+                <span />
+                <span>Tên ô nhập (vd. Họ và tên, CCCD)</span>
+                <span>Bắt buộc</span>
+                <span />
+              </div>
+              <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onOptionDragEnd}>
+                <SortableContext
+                  items={fieldOptions.map((o) => `option-${o.id}`)}
+                  strategy={verticalListSortingStrategy}
+                >
+                  {fieldOptions.map((o) => (
+                    <OptionRow
+                      key={o.id}
+                      option={o}
+                      fieldMode
+                      disabled={!canManage}
+                      onSave={(body) => saveOption(o, body)}
+                      onDelete={() => deleteOption(o)}
+                    />
+                  ))}
+                </SortableContext>
+              </DndContext>
+              {canManage && (
+                <div className="ml-6 flex items-center gap-2">
+                  <input
+                    className="input flex-1 py-1.5 text-sm"
+                    placeholder="+ Thêm ô nhập"
+                    value={newOption}
+                    onChange={(e) => setNewOption(e.target.value)}
+                    onKeyDown={(e) => e.key === "Enter" && addOption()}
+                  />
+                  <label className="flex w-[5.5rem] shrink-0 items-center gap-1.5 text-xs text-ink-2">
+                    <input
+                      type="checkbox"
+                      checked={newOptionRequired}
+                      onChange={(e) => setNewOptionRequired(e.target.checked)}
+                    />
+                    Bắt buộc
+                  </label>
                   <Button variant="secondary" className="px-2.5 py-1 text-xs" onClick={addOption}>
                     Thêm
                   </Button>

@@ -218,9 +218,12 @@ export const QUESTION_TYPE_LABELS = {
   textarea: "Văn bản dài",
   number: "Số",
   date: "Ngày",
+  text_fields: "Nhiều ô nhập",
 };
 
 export const QUESTION_TYPES_WITH_OPTIONS = new Set(["single_choice", "multiple_choice"]);
+// Câu hỏi nhiều ô nhập: mỗi "phương án" là một ô có nhãn, bật/tắt bắt buộc riêng.
+export const QUESTION_TYPES_WITH_FIELDS = new Set(["text_fields"]);
 
 export const RATING_LEVEL_LABELS = {
   5: "Rất hài lòng",

@@ -316,6 +316,7 @@ class SurveyOptionInputSchema(ApiSchema):
     option_text = fields.String(required=True, error_messages=required)
     option_value = fields.String(allow_none=True)
     score = fields.Float(allow_none=True)
+    is_required = fields.Boolean()
 
 
 class SurveySectionCreateSchema(ApiSchema):
@@ -377,6 +378,7 @@ class SurveyOptionCreateSchema(ApiSchema):
     option_text = fields.String(required=True, error_messages=required)
     option_value = fields.String(allow_none=True)
     score = fields.Float(allow_none=True)
+    is_required = fields.Boolean()
 
 
 class SurveyOptionUpdateSchema(ApiSchema):
@@ -384,6 +386,7 @@ class SurveyOptionUpdateSchema(ApiSchema):
     option_text = fields.String()
     option_value = fields.String(allow_none=True)
     score = fields.Float(allow_none=True)
+    is_required = fields.Boolean()
 
 
 class ReorderItemSchema(ApiSchema):
@@ -395,6 +398,12 @@ class ReorderSchema(ApiSchema):
     items = fields.List(fields.Nested(ReorderItemSchema), required=True, error_messages=required)
 
 
+class SurveyFieldAnswerSchema(ApiSchema):
+    nullable_fields = {"answer_text"}
+    option_id = fields.Integer(required=True, strict=True, error_messages=required)
+    answer_text = fields.String(allow_none=True)
+
+
 class SurveyAnswerItemSchema(ApiSchema):
     nullable_fields = {"option_id", "answer_text", "answer_number"}
     question_id = fields.Integer(required=True, strict=True, error_messages=required)
@@ -402,6 +411,8 @@ class SurveyAnswerItemSchema(ApiSchema):
     option_ids = fields.List(fields.Integer(strict=True))
     answer_text = fields.String(allow_none=True)
     answer_number = fields.Float(allow_none=True)
+    # Câu hỏi nhiều ô nhập (text_fields): mỗi phần tử là một ô đã điền.
+    field_answers = fields.List(fields.Nested(SurveyFieldAnswerSchema))
 
 
 class SurveySubmitSchema(ApiSchema):

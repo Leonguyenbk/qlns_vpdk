@@ -18,6 +18,8 @@ def _style_header(ws) -> None:
 
 
 def _format_answer(answer) -> str:
+    if answer.question and answer.question.question_type == "text_fields" and answer.option:
+        return f"{answer.option.option_text}: {answer.answer_text or ''}"
     if answer.option_id and answer.option:
         return answer.option.option_text
     if answer.answer_text is not None:

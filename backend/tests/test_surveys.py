@@ -932,3 +932,127 @@ def test_duplicate_survey_copies_branch_limits(client, admin_user, auth_header, 
     ).get_json()["data"]
     row_after = next(r for r in dup_limits_after if r["branch_id"] == branch.id)
     assert row_after["max_responses"] == 200
+
+
+def _create_text_fields_question(client, headers, survey_id):
+    resp = client.post(
+        f"/api/surveys/{survey_id}/questions",
+        headers=headers,
+        json={
+            "question_text": "Thông tin người được khảo sát",
+            "question_type": "text_fields",
+            "is_required": True,
+            "options": [
+                {"option_text": "Họ và tên", "is_required": True},
+                {"option_text": "CCCD", "is_required": True},
+                {"option_text": "Địa chỉ", "is_required": False},
+            ],
+        },
+    )
+    assert resp.status_code == 201, resp.get_json()
+    return resp.get_json()["data"]
+
+
+def test_text_fields_question_per_field_required_and_storage(client, admin_user, auth_header):
+    headers = auth_header("admin_test")
+    survey = _create_survey(client, headers)
+    sid = survey["id"]
+    q = _create_text_fields_question(client, headers, sid)
+
+    # Bắt buộc do từng ô quyết định, cờ cấp câu hỏi bị bỏ qua.
+    assert q["is_required"] is False
+    ho_ten, cccd, dia_chi = q["options"]
+    assert [o["is_required"] for o in q["options"]] == [True, True, False]
+
+    client.post(f"/api/surveys/{sid}/status", headers=headers, json={"status": "active"})
+    public = client.get(f"/api/public/surveys/{survey['slug']}").get_json()["data"]
+    assert [o["is_required"] for o in public["questions"][0]["options"]] == [True, True, False]
+
+    url = f"/api/public/surveys/{sid}/submit"
+    # Không gửi gì -> báo thiếu ô bắt buộc đầu tiên.
+    missing = client.post(url, json={"answers": []})
+    assert missing.status_code == 422
+    assert "Họ và tên" in missing.get_json()["message"]
+
+    # Ô bắt buộc để trống khoảng trắng vẫn bị từ chối.
+    blank = client.post(
+        url,
+        json={"answers": [{"question_id": q["id"], "field_answers": [
+            {"option_id": ho_ten["id"], "answer_text": "Nguyễn Văn A"},
+            {"option_id": cccd["id"], "answer_text": "   "},
+        ]}]},
+    )
+    assert blank.status_code == 422
+    assert "CCCD" in blank.get_json()["message"]
+
+    # Ô không bắt buộc có thể bỏ trống; ô thuộc câu hỏi khác bị từ chối.
+    ok = client.post(
+        url,
+        json={"answers": [{"question_id": q["id"], "field_answers": [
+            {"option_id": cccd["id"], "answer_text": "012345678901"},
+            {"option_id": ho_ten["id"], "answer_text": "Nguyễn Văn A"},
+        ]}]},
+    )
+    assert ok.status_code == 201, ok.get_json()
+    saved = ok.get_json()["data"]["answers"]
+    assert [(a["option_text"], a["answer_text"]) for a in saved] == [
+        ("Họ và tên", "Nguyễn Văn A"),
+        ("CCCD", "012345678901"),
+    ]
+
+    bad_field = client.post(
+        url,
+        json={"answers": [{"question_id": q["id"], "field_answers": [
+            {"option_id": 999999, "answer_text": "x"},
+        ]}]},
+    )
+    assert bad_field.status_code == 422
+
+    # Thống kê + xuất Excel không lỗi và có nhãn ô.
+    stats = client.get(f"/api/surveys/{sid}/statistics", headers=headers).get_json()["data"]
+    qstats = next(x for x in stats["by_question"] if x["id"] == q["id"])["stats"]
+    assert qstats["total_respondents"] == 1
+    assert "Họ và tên: Nguyễn Văn A" in qstats["samples"]
+    export = client.get(f"/api/surveys/{sid}/export", headers=headers)
+    assert export.status_code == 200
+
+
+def test_text_fields_question_needs_at_least_one_field_and_toggle_required(client, admin_user, auth_header):
+    headers = auth_header("admin_test")
+    survey = _create_survey(client, headers)
+    sid = survey["id"]
+    empty = client.post(
+        f"/api/surveys/{sid}/questions",
+        headers=headers,
+        json={"question_text": "Thông tin", "question_type": "text_fields", "options": []},
+    )
+    assert empty.status_code == 422
+
+    q = _create_text_fields_question(client, headers, sid)
+    dia_chi = q["options"][2]
+    toggled = client.put(
+        f"/api/survey-options/{dia_chi['id']}", headers=headers, json={"is_required": True}
+    )
+    assert toggled.status_code == 200, toggled.get_json()
+    assert toggled.get_json()["data"]["is_required"] is True
+    assert toggled.get_json()["data"]["id"] == dia_chi["id"]  # bật/tắt bắt buộc sửa tại chỗ
+
+    added = client.post(
+        f"/api/survey-questions/{q['id']}/options",
+        headers=headers,
+        json={"option_text": "Số điện thoại", "is_required": True},
+    )
+    assert added.status_code == 201, added.get_json()
+    assert added.get_json()["data"]["is_required"] is True
+
+    copy = client.post(f"/api/survey-questions/{q['id']}/duplicate", headers=headers)
+    assert copy.status_code in (200, 201), copy.get_json()
+    assert [o["is_required"] for o in copy.get_json()["data"]["options"]] == [True, True, True, True]
+
+    # Không được xóa ô cuối cùng.
+    rows = client.get(f"/api/surveys/{sid}/questions", headers=headers).get_json()["data"]
+    first = next(r for r in rows if r["id"] == q["id"])
+    for opt in first["options"][:-1]:
+        assert client.delete(f"/api/survey-options/{opt['id']}", headers=headers).status_code == 200
+    last = first["options"][-1]
+    assert client.delete(f"/api/survey-options/{last['id']}", headers=headers).status_code == 422

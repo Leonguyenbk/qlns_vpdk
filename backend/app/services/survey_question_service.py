@@ -15,6 +15,7 @@ from ..common.utils import clean_str
 from ..extensions import db
 from ..models.survey import (
     QUESTION_TYPES,
+    QUESTION_TYPES_WITH_FIELDS,
     QUESTION_TYPES_WITH_OPTIONS,
     SurveyAnswer,
     SurveyOption,
@@ -23,6 +24,20 @@ from ..models.survey import (
 )
 from .audit_service import record_audit
 from .survey_service import get_survey_or_404
+
+
+# Loại câu hỏi có danh sách SurveyOption đi kèm (phương án chọn hoặc ô nhập).
+_TYPES_WITH_OPTION_ROWS = QUESTION_TYPES_WITH_OPTIONS | QUESTION_TYPES_WITH_FIELDS
+
+
+def _min_options(qtype: str) -> int:
+    return 1 if qtype in QUESTION_TYPES_WITH_FIELDS else 2
+
+
+def _options_error(qtype: str) -> str:
+    if qtype in QUESTION_TYPES_WITH_FIELDS:
+        return "Câu hỏi nhiều ô nhập phải có ít nhất 1 ô nhập."
+    return f"Câu hỏi loại '{qtype}' phải có ít nhất 2 phương án trả lời."
 
 
 def _question_has_responses(question_id: int) -> bool:
@@ -195,6 +210,7 @@ def _clone_question(q: SurveyQuestion) -> SurveyQuestion:
             option_text=o.option_text,
             option_value=o.option_value,
             score=o.score,
+            is_required=o.is_required,
             sort_order=o.sort_order,
             is_active=True,
         )
@@ -227,6 +243,7 @@ def _apply_options(question: SurveyQuestion, items: list[dict]) -> None:
         if not text:
             raise ValidationError("Nội dung phương án không được để trống.")
         value = clean_str(item.get("option_value"))
+        required = bool(item.get("is_required", False))
         order = item.get("sort_order", i)
         oid = item.get("id")
         score = None if oid and _is_trigger_option(oid) else item.get("score")
@@ -242,6 +259,7 @@ def _apply_options(question: SurveyQuestion, items: list[dict]) -> None:
                     option_text=text,
                     option_value=value,
                     score=score,
+                    is_required=required,
                     sort_order=order,
                     is_active=True,
                 )
@@ -259,6 +277,7 @@ def _apply_options(question: SurveyQuestion, items: list[dict]) -> None:
                 opt.option_text = text
                 opt.option_value = value
                 opt.score = score
+                opt.is_required = required
                 opt.sort_order = order
         else:
             db.session.add(
@@ -267,6 +286,7 @@ def _apply_options(question: SurveyQuestion, items: list[dict]) -> None:
                     option_text=text,
                     option_value=value,
                     score=score,
+                    is_required=required,
                     sort_order=order,
                     is_active=True,
                 )
@@ -287,8 +307,12 @@ def _apply_options(question: SurveyQuestion, items: list[dict]) -> None:
             db.session.delete(opt)
     db.session.flush()
     active = [o for o in question.options if o.is_active]
-    if len(active) < 2:
-        raise ValidationError("Câu hỏi cần ít nhất 2 phương án trả lời đang hoạt động.")
+    if len(active) < _min_options(question.question_type):
+        raise ValidationError(
+            "Câu hỏi nhiều ô nhập cần ít nhất 1 ô nhập đang hoạt động."
+            if question.question_type in QUESTION_TYPES_WITH_FIELDS
+            else "Câu hỏi cần ít nhất 2 phương án trả lời đang hoạt động."
+        )
 
 
 # ----------------------------- Phần khảo sát -----------------------------
@@ -454,8 +478,8 @@ def create_question(survey_id: int, data: dict, *, actor, meta: dict) -> dict:
     if qtype not in QUESTION_TYPES:
         raise ValidationError("Loại câu hỏi không hợp lệ.")
     options_payload = data.get("options") or []
-    if qtype in QUESTION_TYPES_WITH_OPTIONS and len(options_payload) < 2:
-        raise ValidationError(f"Câu hỏi loại '{qtype}' phải có ít nhất 2 phương án trả lời.")
+    if qtype in _TYPES_WITH_OPTION_ROWS and len(options_payload) < _min_options(qtype):
+        raise ValidationError(_options_error(qtype))
 
     section_record = _section_for_survey(data.get("section_id"), survey_id)
     scoring_mode, max_score, zero_score_at = _scoring_values(data, qtype=qtype)
@@ -467,7 +491,8 @@ def create_question(survey_id: int, data: dict, *, actor, meta: dict) -> dict:
         survey_id=survey_id,
         question_text=text,
         question_type=qtype,
-        is_required=bool(data.get("is_required", False)),
+        # Câu nhiều ô nhập: bắt buộc được quyết định riêng ở từng ô.
+        is_required=bool(data.get("is_required", False)) and qtype not in QUESTION_TYPES_WITH_FIELDS,
         is_active=bool(data.get("is_active", True)),
         section=section_record.title if section_record else clean_str(data.get("section")),
         section_id=section_record.id if section_record else None,
@@ -483,17 +508,22 @@ def create_question(survey_id: int, data: dict, *, actor, meta: dict) -> dict:
     )
     db.session.add(question)
     db.session.flush()
-    if qtype in QUESTION_TYPES_WITH_OPTIONS:
+    if qtype in _TYPES_WITH_OPTION_ROWS:
         for i, item in enumerate(options_payload, start=1):
             otext = clean_str(item.get("option_text"))
             if not otext:
-                raise ValidationError("Nội dung phương án không được để trống.")
+                raise ValidationError(
+                    "Tên ô nhập không được để trống."
+                    if qtype in QUESTION_TYPES_WITH_FIELDS
+                    else "Nội dung phương án không được để trống."
+                )
             db.session.add(
                 SurveyOption(
                     question_id=question.id,
                     option_text=otext,
                     option_value=clean_str(item.get("option_value")),
-                    score=item.get("score"),
+                    score=None if qtype in QUESTION_TYPES_WITH_FIELDS else item.get("score"),
+                    is_required=bool(item.get("is_required", False)),
                     sort_order=i,
                     is_active=True,
                 )
@@ -583,6 +613,8 @@ def update_question(question_id: int, data: dict, *, actor, meta: dict) -> dict:
     target.trigger_answer = new_trigger_answer
     if "is_required" in data:
         target.is_required = bool(data["is_required"])
+    if new_type in QUESTION_TYPES_WITH_FIELDS:
+        target.is_required = False
     if "is_active" in data:
         target.is_active = bool(data["is_active"])
     if "section_id" in data:
@@ -598,11 +630,11 @@ def update_question(question_id: int, data: dict, *, actor, meta: dict) -> dict:
         new_scoring_mode,
         options_payload if options_payload is not None else [o.to_dict() for o in target.options if o.is_active],
     )
-    if new_type in QUESTION_TYPES_WITH_OPTIONS:
+    if new_type in _TYPES_WITH_OPTION_ROWS:
         if options_payload is not None:
             _apply_options(target, options_payload)
         elif not any(o.is_active for o in target.options):
-            raise ValidationError(f"Câu hỏi loại '{new_type}' phải có ít nhất 2 phương án trả lời.")
+            raise ValidationError(_options_error(new_type))
     else:
         for o in target.options:
             o.is_active = False
@@ -684,6 +716,7 @@ def duplicate_question(question_id: int, *, actor, meta: dict) -> dict:
                 option_text=o.option_text,
                 option_value=o.option_value,
                 score=o.score,
+                is_required=o.is_required,
                 sort_order=o.sort_order,
                 is_active=True,
             )
@@ -732,7 +765,7 @@ def reorder_questions(survey_id: int, items: list[dict], *, actor, meta: dict) -
 def create_option(question_id: int, data: dict, *, actor, meta: dict) -> dict:
     q = _get_question_or_404(question_id)
     _validate_deduction_options(q.scoring_mode, [data])
-    if q.question_type not in QUESTION_TYPES_WITH_OPTIONS:
+    if q.question_type not in _TYPES_WITH_OPTION_ROWS:
         raise ValidationError("Loại câu hỏi này không sử dụng phương án trả lời.")
     text = clean_str(data.get("option_text"))
     if not text:
@@ -742,7 +775,8 @@ def create_option(question_id: int, data: dict, *, actor, meta: dict) -> dict:
         question_id=q.id,
         option_text=text,
         option_value=clean_str(data.get("option_value")),
-        score=data.get("score"),
+        score=None if q.question_type in QUESTION_TYPES_WITH_FIELDS else data.get("score"),
+        is_required=bool(data.get("is_required", False)),
         sort_order=max_order + 1,
         is_active=True,
     )
@@ -769,6 +803,7 @@ def update_option(option_id: int, data: dict, *, actor, meta: dict) -> dict:
         raise ValidationError("Nội dung phương án không được để trống.")
     new_value = clean_str(data["option_value"]) if "option_value" in data else opt.option_value
     new_score = None if _is_trigger_option(opt.id) else data.get("score", opt.score)
+    new_required = bool(data["is_required"]) if "is_required" in data else opt.is_required
     _validate_deduction_options(opt.question.scoring_mode, [{"score": new_score}])
     if data.get("is_active") is False and db.session.query(SurveyQuestion.id).filter(
         SurveyQuestion.trigger_option_id == opt.id,
@@ -786,6 +821,7 @@ def update_option(option_id: int, data: dict, *, actor, meta: dict) -> dict:
             option_text=new_text,
             option_value=new_value,
             score=new_score,
+            is_required=new_required,
             sort_order=opt.sort_order,
             is_active=True,
         )
@@ -796,6 +832,7 @@ def update_option(option_id: int, data: dict, *, actor, meta: dict) -> dict:
         target.option_text = new_text
         target.option_value = new_value
         target.score = new_score
+        target.is_required = new_required
 
     if target is not opt:
         db.session.flush()
@@ -836,8 +873,14 @@ def delete_option(option_id: int, *, actor, meta: dict) -> dict:
         )
     q = db.session.get(SurveyQuestion, opt.question_id)
     remaining_active = [o for o in q.options if o.is_active and o.id != opt.id]
-    if q.question_type in QUESTION_TYPES_WITH_OPTIONS and len(remaining_active) < 2:
-        raise ValidationError("Câu hỏi phải còn ít nhất 2 phương án đang hoạt động.")
+    if q.question_type in _TYPES_WITH_OPTION_ROWS and len(remaining_active) < _min_options(
+        q.question_type
+    ):
+        raise ValidationError(
+            "Câu hỏi phải còn ít nhất 1 ô nhập đang hoạt động."
+            if q.question_type in QUESTION_TYPES_WITH_FIELDS
+            else "Câu hỏi phải còn ít nhất 2 phương án đang hoạt động."
+        )
     old = opt.to_dict()
     if _option_has_answers(opt.id):
         opt.is_active = False
