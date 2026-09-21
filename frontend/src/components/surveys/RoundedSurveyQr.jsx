@@ -16,8 +16,8 @@ function roundedRect(context, x, y, size, radius) {
   context.fill();
 }
 
-export function renderRoundedSurveyQr(value, size = 420) {
-  if (!value || typeof document === "undefined") return Promise.resolve("");
+export async function renderRoundedSurveyQr(value, size = 420) {
+  if (!value || typeof document === "undefined") return "";
   const qr = QRCode.create(value, { errorCorrectionLevel: "H" });
   const moduleCount = qr.modules.size;
   const margin = 4;
@@ -36,15 +36,30 @@ export function renderRoundedSurveyQr(value, size = 420) {
     }
   }
   const center = canvas.width / 2;
-  const logoSize = cell * 7;
+  const logoSize = cell * 8;
   context.fillStyle = "#ffffff";
   roundedRect(context, center - logoSize / 2, center - logoSize / 2, logoSize, cell);
-  context.fillStyle = "#111827";
-  context.font = `700 ${Math.max(8, cell * 1.7)}px Arial, sans-serif`;
-  context.textAlign = "center";
-  context.textBaseline = "middle";
-  context.fillText("VPĐK", center, center);
-  return Promise.resolve(canvas.toDataURL("image/png"));
+  const logo = await new Promise((resolve) => {
+    const image = new Image();
+    image.onload = () => resolve(image);
+    image.onerror = () => resolve(null);
+    image.src = "/vpdk-logo.png";
+  });
+  if (logo) {
+    context.save();
+    context.beginPath();
+    context.arc(center, center, logoSize / 2 - cell * 0.35, 0, Math.PI * 2);
+    context.clip();
+    context.drawImage(logo, center - logoSize / 2, center - logoSize / 2, logoSize, logoSize);
+    context.restore();
+  } else {
+    context.fillStyle = "#111827";
+    context.font = `700 ${Math.max(8, cell * 1.7)}px Arial, sans-serif`;
+    context.textAlign = "center";
+    context.textBaseline = "middle";
+    context.fillText("VPĐK", center, center);
+  }
+  return canvas.toDataURL("image/png");
 }
 
 export function RoundedSurveyQr({ value, size = 224, className }) {
