@@ -42,6 +42,7 @@ const NAV_GROUPS = [
         label: "Tổng quan",
         Icon: IconOverview,
         exact: true,
+        activePaths: ["/tin-tuc"],
         anyOf: [PERMISSIONS.ANNOUNCEMENT_VIEW],
       },
       {
@@ -150,47 +151,66 @@ const CRUMBS = {
 const COLLAPSE_KEY = "qlns:sidebar_collapsed";
 
 function SidebarItem({ item, collapsed, onNavigate }) {
-  const { Icon, label, to, exact } = item;
+  const { Icon, label, to, exact, activePaths } = item;
+  const { pathname } = useLocation();
+
+  const isCustomActive = (navActive) => {
+    if (navActive) return true;
+    if (
+      activePaths &&
+      activePaths.some((p) => pathname === p || pathname.startsWith(`${p}/`))
+    ) {
+      return true;
+    }
+    return false;
+  };
+
   return (
     <NavLink
       to={to}
       end={exact}
       onClick={onNavigate}
-      className={({ isActive }) =>
-        clsx(
+      className={({ isActive: navActive }) => {
+        const isActive = isCustomActive(navActive);
+        return clsx(
           "group/item relative mx-2.5 my-1 flex h-11 items-center gap-3 rounded-[10px] px-3 text-sm transition-all duration-150",
           collapsed && "justify-center px-0",
           isActive
             ? "font-semibold text-white shadow-[var(--shadow-active)]"
             : "font-medium text-[#475569] hover:translate-x-0.5 hover:bg-[#f1f5f9] hover:text-accent-text",
-        )
-      }
-      style={({ isActive }) =>
-        isActive ? { backgroundImage: "var(--gradient-brand-h)" } : undefined
+        );
+      }}
+      style={({ isActive: navActive }) =>
+        isCustomActive(navActive)
+          ? { backgroundImage: "var(--gradient-brand-h)" }
+          : undefined
       }
     >
-      {({ isActive }) => (
-        <>
-          <Icon
-            size={19}
-            className={clsx(
-              "shrink-0 transition-colors",
-              isActive
-                ? "text-white"
-                : "text-[#64748b] group-hover/item:text-[#6366f1]",
+      {({ isActive: navActive }) => {
+        const isActive = isCustomActive(navActive);
+        return (
+          <>
+            <Icon
+              size={19}
+              className={clsx(
+                "shrink-0 transition-colors",
+                isActive
+                  ? "text-white"
+                  : "text-[#64748b] group-hover/item:text-[#6366f1]",
+              )}
+            />
+            {!collapsed && <span className="truncate">{label}</span>}
+            {collapsed && (
+              <span
+                role="tooltip"
+                className="pointer-events-none absolute left-full ml-3 whitespace-nowrap rounded-md bg-graphite px-2 py-1 text-xs font-medium text-graphite-ink opacity-0 shadow-[var(--shadow-pop)] transition-opacity delay-100 duration-150 group-hover/item:opacity-100"
+              >
+                {label}
+              </span>
             )}
-          />
-          {!collapsed && <span className="truncate">{label}</span>}
-          {collapsed && (
-            <span
-              role="tooltip"
-              className="pointer-events-none absolute left-full ml-3 whitespace-nowrap rounded-md bg-graphite px-2 py-1 text-xs font-medium text-graphite-ink opacity-0 shadow-[var(--shadow-pop)] transition-opacity delay-100 duration-150 group-hover/item:opacity-100"
-            >
-              {label}
-            </span>
-          )}
-        </>
-      )}
+          </>
+        );
+      }}
     </NavLink>
   );
 }

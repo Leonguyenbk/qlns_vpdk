@@ -1,0 +1,7 @@
+playwright==1.47.0
+python-slugify==8.0.4
+python-dateutil==2.9.0
+
+playwright
+python-slugify
+python-dateutil

@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import toast from "react-hot-toast";
 import { useAuth } from "../auth/AuthContext";
 import { EmptyState, ErrorState, LoadingState } from "../components/ui/DataStates";
+import NewsTabBar from "../components/NewsTabBar";
 import { Modal } from "../components/ui/Modal";
 import { Pagination } from "../components/ui/Table";
 import {
@@ -353,6 +354,8 @@ export default function OverviewPage() {
           )
         }
       />
+
+      <NewsTabBar />
 
       {data?.unread > 0 && (
         <div className="mb-5 rounded-xl border border-[var(--color-focus)] bg-[var(--color-accent-quiet)] px-4 py-3 text-sm text-accent-text">

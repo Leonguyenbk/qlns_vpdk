@@ -8,6 +8,8 @@ import LogoutPage from "./pages/LogoutPage";
 import OverviewPage from "./pages/OverviewPage";
 import ChangePasswordPage from "./pages/ChangePasswordPage";
 import DashboardPage from "./pages/DashboardPage";
+import NewsPage from "./pages/news/NewsPage";
+import NewsDetailPage from "./pages/news/NewsDetailPage";
 import EmployeeListPage from "./pages/employees/EmployeeListPage";
 import EmployeeCreatePage from "./pages/employees/EmployeeCreatePage";
 import EmployeeDetailPage from "./pages/employees/EmployeeDetailPage";
@@ -61,404 +63,427 @@ const GOISO_STAFF = [PERMISSIONS.GOISO_COUNTER, PERMISSIONS.GOISO_ADMIN];
 
 export default function App() {
   return (
-    <Routes>
-      <Route path="/login" element={<LoginPage />} />
-      <Route path="/logout" element={<LogoutPage />} />
+      <Routes>
+        <Route path="/login" element={<LoginPage />} />
+        <Route path="/logout" element={<LogoutPage />} />
 
-      {/* Gọi số — trang toàn màn hình riêng, KHÔNG dùng khung Layout (sidebar) */}
-      <Route path="/cho" element={<BranchPickerPage />} />
-      <Route path="/b/:code/cho" element={<BoardPage />} />
-      <Route path="/dat-lich" element={<BookingPage />} />
-      <Route path="/lich-hen/:token" element={<BookingLookupPage />} />
+        {/* Gọi số — trang toàn màn hình riêng, KHÔNG dùng khung Layout (sidebar) */}
+        <Route path="/cho" element={<BranchPickerPage />} />
+        <Route path="/b/:code/cho" element={<BoardPage />} />
+        <Route path="/dat-lich" element={<BookingPage />} />
+        <Route path="/lich-hen/:token" element={<BookingLookupPage />} />
 
-      {/* Khảo sát – Đánh giá mức độ hài lòng: trang công khai cho người dân, không cần đăng nhập */}
-      <Route path="/khao-sat/:slug" element={<PublicSurveyPage />} />
-      <Route
-        path="/b/:code/counter"
-        element={
-          <ProtectedRoute anyOf={GOISO_STAFF}>
-            <CounterPage />
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/b/:code/man-hinh"
-        element={
-          <ProtectedRoute anyOf={GOISO_STAFF}>
-            <ScreensPickPage />
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/b/:code/display"
-        element={
-          <ProtectedRoute anyOf={GOISO_STAFF}>
-            <DisplayPage />
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/b/:code/display/simple"
-        element={
-          <ProtectedRoute anyOf={GOISO_STAFF}>
-            <DisplaySimplePage />
-          </ProtectedRoute>
-        }
-      />
-
-      {/* Module Nhân sự + Quản trị hệ thống — trong khung Layout */}
-      <Route
-        element={
-          <ProtectedRoute>
-            <Layout />
-          </ProtectedRoute>
-        }
-      >
+        {/* Khảo sát – Đánh giá mức độ hài lòng: trang công khai cho người dân, không cần đăng nhập */}
+        <Route path="/khao-sat/:slug" element={<PublicSurveyPage />} />
         <Route
-          index
+          path="/b/:code/counter"
           element={
-            <ProtectedRoute permission={PERMISSIONS.ANNOUNCEMENT_VIEW}>
-              <OverviewPage />
+            <ProtectedRoute anyOf={GOISO_STAFF}>
+              <CounterPage />
             </ProtectedRoute>
           }
         />
         <Route
-          path="nhan-su"
+          path="/b/:code/man-hinh"
           element={
-            <ProtectedRoute anyOf={MODULE_PERMS.NHANSU}>
-              <DashboardPage />
-            </ProtectedRoute>
-          }
-        />
-        <Route path="doi-mat-khau" element={<ChangePasswordPage />} />
-
-        <Route
-          path="employees"
-          element={
-            <ProtectedRoute permission={PERMISSIONS.EMPLOYEE_VIEW}>
-              <EmployeeListPage />
+            <ProtectedRoute anyOf={GOISO_STAFF}>
+              <ScreensPickPage />
             </ProtectedRoute>
           }
         />
         <Route
-          path="employees/new"
+          path="/b/:code/display"
           element={
-            <ProtectedRoute permission={PERMISSIONS.EMPLOYEE_CREATE}>
-              <EmployeeCreatePage />
+            <ProtectedRoute anyOf={GOISO_STAFF}>
+              <DisplayPage />
             </ProtectedRoute>
           }
         />
         <Route
-          path="employees/:id"
+          path="/b/:code/display/simple"
           element={
-            <ProtectedRoute permission={PERMISSIONS.EMPLOYEE_VIEW}>
-              <EmployeeDetailPage />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="employees/:id/edit"
-          element={
-            <ProtectedRoute permission={PERMISSIONS.EMPLOYEE_UPDATE}>
-              <EmployeeEditPage />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="employees/:id/transfer"
-          element={
-            <ProtectedRoute permission={PERMISSIONS.EMPLOYEE_TRANSFER}>
-              <EmployeeTransferPage />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="employees/:id/history"
-          element={
-            <ProtectedRoute permission={PERMISSIONS.EMPLOYEE_VIEW}>
-              <EmployeeHistoryPage />
+            <ProtectedRoute anyOf={GOISO_STAFF}>
+              <DisplaySimplePage />
             </ProtectedRoute>
           }
         />
 
+        {/* Module Nhân sự + Quản trị hệ thống — trong khung Layout */}
         <Route
-          path="units"
           element={
-            <ProtectedRoute permission={PERMISSIONS.UNIT_VIEW}>
-              <UnitTreePage />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="positions"
-          element={
-            <ProtectedRoute permission={PERMISSIONS.POSITION_VIEW}>
-              <PositionsPage />
-            </ProtectedRoute>
-          }
-        />
-
-        {/* Khảo sát – Đánh giá mức độ hài lòng */}
-        <Route
-          path="surveys"
-          element={
-            <ProtectedRoute permission={PERMISSIONS.SURVEY_VIEW}>
-              <SurveyListPage />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="surveys/new"
-          element={
-            <ProtectedRoute permission={PERMISSIONS.SURVEY_CREATE}>
-              <SurveyEditPage />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="surveys/results"
-          element={
-            <ProtectedRoute permission={PERMISSIONS.SURVEY_VIEW_STATISTICS}>
-              <SurveyResultsHubPage />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="surveys/statistics"
-          element={
-            <ProtectedRoute permission={PERMISSIONS.SURVEY_VIEW_STATISTICS}>
-              <SurveyStatisticsHubPage />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="surveys/:id"
-          element={
-            <ProtectedRoute permission={PERMISSIONS.SURVEY_VIEW}>
-              <SurveyEditPage />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="surveys/:id/questions"
-          element={
-            <ProtectedRoute permission={PERMISSIONS.SURVEY_VIEW}>
-              <SurveyQuestionsPage />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="surveys/:id/responses"
-          element={
-            <ProtectedRoute permission={PERMISSIONS.SURVEY_VIEW_STATISTICS}>
-              <SurveyResponsesPage />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="surveys/:id/statistics"
-          element={
-            <ProtectedRoute permission={PERMISSIONS.SURVEY_VIEW_STATISTICS}>
-              <SurveyStatisticsPage />
-            </ProtectedRoute>
-          }
-        />
-
-        {/* Công việc — MỘT trang duy nhất, có tab (Giao việc + KPI); mở rộng bằng cách thêm route con */}
-        <Route
-          path="cong-viec"
-          element={
-            <ProtectedRoute anyOf={MODULE_PERMS.WORK}>
-              <WorkPage />
+            <ProtectedRoute>
+              <Layout />
             </ProtectedRoute>
           }
         >
-          <Route index element={<WorkIndexRedirect />} />
           <Route
-            path="tong-quan"
+            index
             element={
-              <ProtectedRoute permission={PERMISSIONS.TASK_VIEW_ALL}>
-                <ExecutiveDashboardPage />
+              <ProtectedRoute permission={PERMISSIONS.ANNOUNCEMENT_VIEW}>
+                <OverviewPage />
               </ProtectedRoute>
             }
           />
           <Route
-            path="danh-sach"
+            path="nhan-su"
             element={
-              <ProtectedRoute anyOf={[PERMISSIONS.TASK_VIEW_ALL, PERMISSIONS.TASK_VIEW_OWN]}>
-                <TaskListPage mode="all" />
+              <ProtectedRoute anyOf={MODULE_PERMS.NHANSU}>
+                <DashboardPage />
               </ProtectedRoute>
             }
           />
-          <Route
-            path="danh-sach/moi"
-            element={
-              <ProtectedRoute permission={PERMISSIONS.TASK_CREATE}>
-                <TaskCreatePage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="danh-sach/:id"
-            element={
-              <ProtectedRoute anyOf={[PERMISSIONS.TASK_VIEW_ALL, PERMISSIONS.TASK_VIEW_OWN]}>
-                <TaskDetailPage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="cua-toi"
-            element={
-              <ProtectedRoute permission={PERMISSIONS.TASK_VIEW_OWN}>
-                <TaskListPage mode="mine" />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="da-giao"
-            element={
-              <ProtectedRoute anyOf={[PERMISSIONS.TASK_CREATE, PERMISSIONS.TASK_ASSIGN]}>
-                <TaskListPage mode="assigned" />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="kpi"
-            element={
-              <ProtectedRoute permission={PERMISSIONS.KPI_VIEW_OWN}>
-                <MyKpiPage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="kpi/:id"
-            element={
-              <ProtectedRoute anyOf={[PERMISSIONS.KPI_VIEW_OWN, PERMISSIONS.KPI_VIEW_ALL]}>
-                <KpiScoreDetailPage />
-              </ProtectedRoute>
-            }
-          />
-        </Route>
+          <Route path="doi-mat-khau" element={<ChangePasswordPage />} />
 
-        {/* Quản trị — MỘT trang duy nhất, có tab; mở rộng bằng cách thêm route con */}
-        <Route
-          path="admin"
-          element={
-            <ProtectedRoute
-              anyOf={[
-                PERMISSIONS.USER_VIEW,
-                PERMISSIONS.ROLE_VIEW,
-                PERMISSIONS.AUDIT_VIEW,
-                PERMISSIONS.GOISO_ADMIN,
-                PERMISSIONS.GOISO_VIEW,
-                PERMISSIONS.KPI_PERIOD_MANAGE,
-                PERMISSIONS.KPI_CRITERIA_MANAGE,
-              ]}
-            >
-              <AdminPage />
-            </ProtectedRoute>
-          }
-        >
-          <Route index element={<AdminIndexRedirect />} />
+          {/* Tin tức đất đai — chỉ cần đăng nhập, không yêu cầu quyền cụ thể */}
+          <Route path="tin-tuc" element={<NewsPage />} />
+          <Route path="tin-tuc/:slug" element={<NewsDetailPage />} />
+
+          <Route
+            path="employees"
+            element={
+              <ProtectedRoute permission={PERMISSIONS.EMPLOYEE_VIEW}>
+                <EmployeeListPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="employees/new"
+            element={
+              <ProtectedRoute permission={PERMISSIONS.EMPLOYEE_CREATE}>
+                <EmployeeCreatePage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="employees/:id"
+            element={
+              <ProtectedRoute permission={PERMISSIONS.EMPLOYEE_VIEW}>
+                <EmployeeDetailPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="employees/:id/edit"
+            element={
+              <ProtectedRoute permission={PERMISSIONS.EMPLOYEE_UPDATE}>
+                <EmployeeEditPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="employees/:id/transfer"
+            element={
+              <ProtectedRoute permission={PERMISSIONS.EMPLOYEE_TRANSFER}>
+                <EmployeeTransferPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="employees/:id/history"
+            element={
+              <ProtectedRoute permission={PERMISSIONS.EMPLOYEE_VIEW}>
+                <EmployeeHistoryPage />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="units"
+            element={
+              <ProtectedRoute permission={PERMISSIONS.UNIT_VIEW}>
+                <UnitTreePage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="positions"
+            element={
+              <ProtectedRoute permission={PERMISSIONS.POSITION_VIEW}>
+                <PositionsPage />
+              </ProtectedRoute>
+            }
+          />
+
+          {/* Khảo sát – Đánh giá mức độ hài lòng */}
+          <Route
+            path="surveys"
+            element={
+              <ProtectedRoute permission={PERMISSIONS.SURVEY_VIEW}>
+                <SurveyListPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="surveys/new"
+            element={
+              <ProtectedRoute permission={PERMISSIONS.SURVEY_CREATE}>
+                <SurveyEditPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="surveys/results"
+            element={
+              <ProtectedRoute permission={PERMISSIONS.SURVEY_VIEW_STATISTICS}>
+                <SurveyResultsHubPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="surveys/statistics"
+            element={
+              <ProtectedRoute permission={PERMISSIONS.SURVEY_VIEW_STATISTICS}>
+                <SurveyStatisticsHubPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="surveys/:id"
+            element={
+              <ProtectedRoute permission={PERMISSIONS.SURVEY_VIEW}>
+                <SurveyEditPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="surveys/:id/questions"
+            element={
+              <ProtectedRoute permission={PERMISSIONS.SURVEY_VIEW}>
+                <SurveyQuestionsPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="surveys/:id/responses"
+            element={
+              <ProtectedRoute permission={PERMISSIONS.SURVEY_VIEW_STATISTICS}>
+                <SurveyResponsesPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="surveys/:id/statistics"
+            element={
+              <ProtectedRoute permission={PERMISSIONS.SURVEY_VIEW_STATISTICS}>
+                <SurveyStatisticsPage />
+              </ProtectedRoute>
+            }
+          />
+
+          {/* Công việc — MỘT trang duy nhất, có tab (Giao việc + KPI); mở rộng bằng cách thêm route con */}
+          <Route
+            path="cong-viec"
+            element={
+              <ProtectedRoute anyOf={MODULE_PERMS.WORK}>
+                <WorkPage />
+              </ProtectedRoute>
+            }
+          >
+            <Route index element={<WorkIndexRedirect />} />
+            <Route
+              path="tong-quan"
+              element={
+                <ProtectedRoute permission={PERMISSIONS.TASK_VIEW_ALL}>
+                  <ExecutiveDashboardPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="danh-sach"
+              element={
+                <ProtectedRoute
+                  anyOf={[PERMISSIONS.TASK_VIEW_ALL, PERMISSIONS.TASK_VIEW_OWN]}
+                >
+                  <TaskListPage mode="all" />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="danh-sach/moi"
+              element={
+                <ProtectedRoute permission={PERMISSIONS.TASK_CREATE}>
+                  <TaskCreatePage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="danh-sach/:id"
+              element={
+                <ProtectedRoute
+                  anyOf={[PERMISSIONS.TASK_VIEW_ALL, PERMISSIONS.TASK_VIEW_OWN]}
+                >
+                  <TaskDetailPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="cua-toi"
+              element={
+                <ProtectedRoute permission={PERMISSIONS.TASK_VIEW_OWN}>
+                  <TaskListPage mode="mine" />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="da-giao"
+              element={
+                <ProtectedRoute
+                  anyOf={[PERMISSIONS.TASK_CREATE, PERMISSIONS.TASK_ASSIGN]}
+                >
+                  <TaskListPage mode="assigned" />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="kpi"
+              element={
+                <ProtectedRoute permission={PERMISSIONS.KPI_VIEW_OWN}>
+                  <MyKpiPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="kpi/:id"
+              element={
+                <ProtectedRoute
+                  anyOf={[PERMISSIONS.KPI_VIEW_OWN, PERMISSIONS.KPI_VIEW_ALL]}
+                >
+                  <KpiScoreDetailPage />
+                </ProtectedRoute>
+              }
+            />
+          </Route>
+
+          {/* Quản trị — MỘT trang duy nhất, có tab; mở rộng bằng cách thêm route con */}
+          <Route
+            path="admin"
+            element={
+              <ProtectedRoute
+                anyOf={[
+                  PERMISSIONS.USER_VIEW,
+                  PERMISSIONS.ROLE_VIEW,
+                  PERMISSIONS.AUDIT_VIEW,
+                  PERMISSIONS.GOISO_ADMIN,
+                  PERMISSIONS.GOISO_VIEW,
+                  PERMISSIONS.KPI_PERIOD_MANAGE,
+                  PERMISSIONS.KPI_CRITERIA_MANAGE,
+                ]}
+              >
+                <AdminPage />
+              </ProtectedRoute>
+            }
+          >
+            <Route index element={<AdminIndexRedirect />} />
+            <Route
+              path="users"
+              element={
+                <ProtectedRoute permission={PERMISSIONS.USER_VIEW}>
+                  <UsersPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="roles"
+              element={
+                <ProtectedRoute permission={PERMISSIONS.ROLE_VIEW}>
+                  <RolesPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="audit-logs"
+              element={
+                <ProtectedRoute permission={PERMISSIONS.AUDIT_VIEW}>
+                  <AuditLogPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="goiso/branches"
+              element={
+                <ProtectedRoute permission={PERMISSIONS.GOISO_ADMIN}>
+                  <GoisoBranchesPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="goiso/branches/:code"
+              element={
+                <ProtectedRoute permission={PERMISSIONS.GOISO_ADMIN}>
+                  <GoisoBranchConfigPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="goiso/stats"
+              element={
+                <ProtectedRoute
+                  anyOf={[PERMISSIONS.GOISO_ADMIN, PERMISSIONS.GOISO_VIEW]}
+                >
+                  <GoisoStatsPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="goiso/devices"
+              element={
+                <ProtectedRoute permission={PERMISSIONS.GOISO_ADMIN}>
+                  <GoisoDevicesPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="kpi/ky-danh-gia"
+              element={
+                <ProtectedRoute permission={PERMISSIONS.KPI_PERIOD_MANAGE}>
+                  <PeriodsPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="kpi/ky-danh-gia/:periodId"
+              element={
+                <ProtectedRoute permission={PERMISSIONS.KPI_VIEW_ALL}>
+                  <PeriodScoresPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="kpi/bo-tieu-chi"
+              element={
+                <ProtectedRoute permission={PERMISSIONS.KPI_CRITERIA_MANAGE}>
+                  <CriteriaSetsPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="kpi/danh-muc-san-pham"
+              element={
+                <ProtectedRoute permission={PERMISSIONS.KPI_CRITERIA_MANAGE}>
+                  <ProductsPage />
+                </ProtectedRoute>
+              }
+            />
+          </Route>
+          {/* Đường cũ — chuyển tiếp cho ai còn lưu link */}
           <Route
             path="users"
-            element={
-              <ProtectedRoute permission={PERMISSIONS.USER_VIEW}>
-                <UsersPage />
-              </ProtectedRoute>
-            }
+            element={<Navigate to="/admin/users" replace />}
           />
           <Route
             path="roles"
-            element={
-              <ProtectedRoute permission={PERMISSIONS.ROLE_VIEW}>
-                <RolesPage />
-              </ProtectedRoute>
-            }
+            element={<Navigate to="/admin/roles" replace />}
           />
           <Route
             path="audit-logs"
-            element={
-              <ProtectedRoute permission={PERMISSIONS.AUDIT_VIEW}>
-                <AuditLogPage />
-              </ProtectedRoute>
-            }
+            element={<Navigate to="/admin/audit-logs" replace />}
           />
-          <Route
-            path="goiso/branches"
-            element={
-              <ProtectedRoute permission={PERMISSIONS.GOISO_ADMIN}>
-                <GoisoBranchesPage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="goiso/branches/:code"
-            element={
-              <ProtectedRoute permission={PERMISSIONS.GOISO_ADMIN}>
-                <GoisoBranchConfigPage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="goiso/stats"
-            element={
-              <ProtectedRoute anyOf={[PERMISSIONS.GOISO_ADMIN, PERMISSIONS.GOISO_VIEW]}>
-                <GoisoStatsPage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="goiso/devices"
-            element={
-              <ProtectedRoute permission={PERMISSIONS.GOISO_ADMIN}>
-                <GoisoDevicesPage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="kpi/ky-danh-gia"
-            element={
-              <ProtectedRoute permission={PERMISSIONS.KPI_PERIOD_MANAGE}>
-                <PeriodsPage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="kpi/ky-danh-gia/:periodId"
-            element={
-              <ProtectedRoute permission={PERMISSIONS.KPI_VIEW_ALL}>
-                <PeriodScoresPage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="kpi/bo-tieu-chi"
-            element={
-              <ProtectedRoute permission={PERMISSIONS.KPI_CRITERIA_MANAGE}>
-                <CriteriaSetsPage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="kpi/danh-muc-san-pham"
-            element={
-              <ProtectedRoute permission={PERMISSIONS.KPI_CRITERIA_MANAGE}>
-                <ProductsPage />
-              </ProtectedRoute>
-            }
-          />
+
+          <Route path="403" element={<ForbiddenPage />} />
+          <Route path="*" element={<NotFoundPage />} />
         </Route>
-        {/* Đường cũ — chuyển tiếp cho ai còn lưu link */}
-        <Route path="users" element={<Navigate to="/admin/users" replace />} />
-        <Route path="roles" element={<Navigate to="/admin/roles" replace />} />
-        <Route path="audit-logs" element={<Navigate to="/admin/audit-logs" replace />} />
 
-        <Route path="403" element={<ForbiddenPage />} />
-        <Route path="*" element={<NotFoundPage />} />
-      </Route>
-
-      <Route path="*" element={<Navigate to="/" replace />} />
-    </Routes>
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
   );
 }

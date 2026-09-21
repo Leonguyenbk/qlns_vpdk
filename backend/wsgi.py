@@ -5,6 +5,9 @@ Sử dụng:
     gunicorn "wsgi:app"
 """
 from __future__ import annotations
+from apscheduler.schedulers.background import BackgroundScheduler
+from cronjob import my_task
+from datetime import datetime
 
 import os
 
@@ -16,5 +19,9 @@ from app import create_app  # noqa: E402
 
 app = create_app(os.getenv("FLASK_ENV"))
 
+scheduler = BackgroundScheduler()
+scheduler.add_job(my_task, 'interval', hours=3)
+scheduler.start()
+
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=int(os.getenv("PORT", "5000")))
+    app.run(host="0.0.0.0", port=int(os.getenv("PORT", "5000")), use_reloader=False)
