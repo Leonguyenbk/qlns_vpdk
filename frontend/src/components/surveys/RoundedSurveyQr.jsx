@@ -16,6 +16,28 @@ function roundedRect(context, x, y, size, radius) {
   context.fill();
 }
 
+function isFinderCell(column, row, moduleCount) {
+  return (
+    (column < 7 && row < 7) ||
+    (column >= moduleCount - 7 && row < 7) ||
+    (column < 7 && row >= moduleCount - 7)
+  );
+}
+
+function drawFinder(context, x, y, cell) {
+  const outer = cell * 7;
+  const inner = cell * 5;
+  const center = cell * 3;
+  context.fillStyle = "#000000";
+  roundedRect(context, x, y, outer, cell * 1.25);
+  context.fillStyle = "#ffffff";
+  roundedRect(context, x + cell, y + cell, inner, cell * 0.9);
+  context.fillStyle = "#000000";
+  context.beginPath();
+  context.arc(x + outer / 2, y + outer / 2, center / 2, 0, Math.PI * 2);
+  context.fill();
+}
+
 export async function renderRoundedSurveyQr(value, size = 420) {
   if (!value || typeof document === "undefined") return "";
   const qr = QRCode.create(value, { errorCorrectionLevel: "H" });
@@ -28,17 +50,29 @@ export async function renderRoundedSurveyQr(value, size = 420) {
   const context = canvas.getContext("2d");
   context.fillStyle = "#ffffff";
   context.fillRect(0, 0, canvas.width, canvas.height);
-  context.fillStyle = "#111827";
+  context.fillStyle = "#000000";
   for (let row = 0; row < moduleCount; row += 1) {
     for (let column = 0; column < moduleCount; column += 1) {
       if (!qr.modules.data[row * moduleCount + column]) continue;
-      roundedRect(context, (column + margin) * cell, (row + margin) * cell, cell, cell * 0.24);
+      if (isFinderCell(column, row, moduleCount)) continue;
+      context.beginPath();
+      context.arc(
+        (column + margin + 0.5) * cell,
+        (row + margin + 0.5) * cell,
+        cell * 0.46,
+        0,
+        Math.PI * 2
+      );
+      context.fill();
     }
   }
+  drawFinder(context, margin * cell, margin * cell, cell);
+  drawFinder(context, (margin + moduleCount - 7) * cell, margin * cell, cell);
+  drawFinder(context, margin * cell, (margin + moduleCount - 7) * cell, cell);
   const center = canvas.width / 2;
   const logoSize = cell * 8;
   context.fillStyle = "#ffffff";
-  roundedRect(context, center - logoSize / 2, center - logoSize / 2, logoSize, cell);
+  roundedRect(context, center - logoSize / 2, center - logoSize / 2, logoSize, cell * 1.25);
   const logo = await new Promise((resolve) => {
     const image = new Image();
     image.onload = () => resolve(image);
