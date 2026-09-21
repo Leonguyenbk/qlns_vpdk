@@ -38,6 +38,7 @@ import TaskCreatePage from "./pages/tasks/TaskCreatePage";
 import MyKpiPage from "./pages/kpi/MyKpiPage";
 import KpiScoreDetailPage from "./pages/kpi/KpiScoreDetailPage";
 import WorkPage, { WorkIndexRedirect } from "./pages/work/WorkPage";
+import HrPage, { LegacyEmployeeRedirect } from "./pages/hr/HrPage";
 
 import BranchPickerPage from "./pages/goiso/BranchPickerPage";
 import BoardPage from "./pages/goiso/BoardPage";
@@ -122,81 +123,87 @@ export default function App() {
             </ProtectedRoute>
           }
         />
+        <Route path="doi-mat-khau" element={<ChangePasswordPage />} />
+
+        {/* Nhân sự — MỘT trang duy nhất, có tab (Tổng quan, Danh sách, Cơ cấu, Chức vụ) */}
         <Route
           path="nhan-su"
           element={
             <ProtectedRoute anyOf={MODULE_PERMS.NHANSU}>
-              <DashboardPage />
+              <HrPage />
             </ProtectedRoute>
           }
-        />
-        <Route path="doi-mat-khau" element={<ChangePasswordPage />} />
-
-        <Route
-          path="employees"
-          element={
-            <ProtectedRoute permission={PERMISSIONS.EMPLOYEE_VIEW}>
-              <EmployeeListPage />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="employees/new"
-          element={
-            <ProtectedRoute permission={PERMISSIONS.EMPLOYEE_CREATE}>
-              <EmployeeCreatePage />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="employees/:id"
-          element={
-            <ProtectedRoute permission={PERMISSIONS.EMPLOYEE_VIEW}>
-              <EmployeeDetailPage />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="employees/:id/edit"
-          element={
-            <ProtectedRoute permission={PERMISSIONS.EMPLOYEE_UPDATE}>
-              <EmployeeEditPage />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="employees/:id/transfer"
-          element={
-            <ProtectedRoute permission={PERMISSIONS.EMPLOYEE_TRANSFER}>
-              <EmployeeTransferPage />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="employees/:id/history"
-          element={
-            <ProtectedRoute permission={PERMISSIONS.EMPLOYEE_VIEW}>
-              <EmployeeHistoryPage />
-            </ProtectedRoute>
-          }
-        />
-
-        <Route
-          path="units"
-          element={
-            <ProtectedRoute permission={PERMISSIONS.UNIT_VIEW}>
-              <UnitTreePage />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="positions"
-          element={
-            <ProtectedRoute permission={PERMISSIONS.POSITION_VIEW}>
-              <PositionsPage />
-            </ProtectedRoute>
-          }
-        />
+        >
+          <Route index element={<DashboardPage />} />
+          <Route
+            path="nhan-vien"
+            element={
+              <ProtectedRoute permission={PERMISSIONS.EMPLOYEE_VIEW}>
+                <EmployeeListPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="nhan-vien/new"
+            element={
+              <ProtectedRoute permission={PERMISSIONS.EMPLOYEE_CREATE}>
+                <EmployeeCreatePage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="nhan-vien/:id"
+            element={
+              <ProtectedRoute permission={PERMISSIONS.EMPLOYEE_VIEW}>
+                <EmployeeDetailPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="nhan-vien/:id/edit"
+            element={
+              <ProtectedRoute permission={PERMISSIONS.EMPLOYEE_UPDATE}>
+                <EmployeeEditPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="nhan-vien/:id/transfer"
+            element={
+              <ProtectedRoute permission={PERMISSIONS.EMPLOYEE_TRANSFER}>
+                <EmployeeTransferPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="nhan-vien/:id/history"
+            element={
+              <ProtectedRoute permission={PERMISSIONS.EMPLOYEE_VIEW}>
+                <EmployeeHistoryPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="co-cau"
+            element={
+              <ProtectedRoute permission={PERMISSIONS.UNIT_VIEW}>
+                <UnitTreePage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="chuc-vu"
+            element={
+              <ProtectedRoute permission={PERMISSIONS.POSITION_VIEW}>
+                <PositionsPage />
+              </ProtectedRoute>
+            }
+          />
+        </Route>
+        {/* Đường cũ — chuyển tiếp cho ai còn lưu link */}
+        <Route path="employees/*" element={<LegacyEmployeeRedirect />} />
+        <Route path="units" element={<Navigate to="/nhan-su/co-cau" replace />} />
+        <Route path="positions" element={<Navigate to="/nhan-su/chuc-vu" replace />} />
 
         {/* Khảo sát – Đánh giá mức độ hài lòng */}
         <Route

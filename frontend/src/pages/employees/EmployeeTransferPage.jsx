@@ -55,7 +55,7 @@ export default function EmployeeTransferPage() {
       } else {
         toast.success("Chuyển đơn vị thành công");
       }
-      navigate(`/employees/${id}`);
+      navigate(`/nhan-su/nhan-vien/${id}`);
     } catch (err) {
       const p = conflictPayload(err);
       if (p?.conflict === "POSITION_LIMIT_REACHED") {

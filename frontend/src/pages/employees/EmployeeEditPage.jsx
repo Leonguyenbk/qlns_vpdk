@@ -53,7 +53,7 @@ export default function EmployeeEditPage() {
     try {
       await update.mutateAsync({ id, body });
       toast.success("Cập nhật nhân sự thành công");
-      navigate(`/employees/${id}`);
+      navigate(`/nhan-su/nhan-vien/${id}`);
     } catch (err) {
       toast.error(apiErrorMessage(err));
     }

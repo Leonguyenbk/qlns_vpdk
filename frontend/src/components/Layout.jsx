@@ -50,34 +50,18 @@ const NAV_GROUPS = [
         Icon: IconTask,
         anyOf: MODULE_PERMS.WORK,
       },
-    ],
-  },
-  {
-    title: "Nhân sự",
-    items: [
       {
         to: "/nhan-su",
-        label: "Tổng quan nhân sự",
-        Icon: IconChart,
-        anyOf: MODULE_PERMS.NHANSU,
-      },
-      {
-        to: "/employees",
-        label: "Hồ sơ nhân sự",
+        label: "Nhân sự",
         Icon: IconPeople,
-        anyOf: [PERMISSIONS.EMPLOYEE_VIEW],
-      },
-      {
-        to: "/units",
-        label: "Cơ cấu đơn vị",
-        Icon: IconOrg,
-        anyOf: [PERMISSIONS.UNIT_VIEW],
-      },
-      {
-        to: "/positions",
-        label: "Chức vụ",
-        Icon: IconPosition,
-        anyOf: [PERMISSIONS.POSITION_VIEW],
+        anyOf: MODULE_PERMS.NHANSU,
+        // Chỉ dùng cho ô "Đi tới trang" (Ctrl K): nhảy thẳng tới từng tab của trang Nhân sự.
+        shortcuts: [
+          { to: "/nhan-su", label: "Tổng quan nhân sự", Icon: IconChart, anyOf: MODULE_PERMS.NHANSU },
+          { to: "/nhan-su/nhan-vien", label: "Danh sách nhân sự", Icon: IconPeople, anyOf: [PERMISSIONS.EMPLOYEE_VIEW] },
+          { to: "/nhan-su/co-cau", label: "Cơ cấu đơn vị", Icon: IconOrg, anyOf: [PERMISSIONS.UNIT_VIEW] },
+          { to: "/nhan-su/chuc-vu", label: "Chức vụ", Icon: IconPosition, anyOf: [PERMISSIONS.POSITION_VIEW] },
+        ],
       },
     ],
   },
@@ -113,11 +97,11 @@ const NAV_GROUPS = [
 
 const CRUMBS = {
   "": "Tổng quan",
-  "nhan-su": "Tổng quan nhân sự",
+  "nhan-su": "Nhân sự",
+  "nhan-vien": "Danh sách nhân sự",
+  "co-cau": "Cơ cấu đơn vị",
+  "chuc-vu": "Chức vụ",
   "doi-mat-khau": "Đổi mật khẩu",
-  employees: "Hồ sơ nhân sự",
-  units: "Cơ cấu đơn vị",
-  positions: "Chức vụ",
   admin: "Quản trị",
   users: "Tài khoản",
   roles: "Vai trò & quyền",
@@ -311,11 +295,16 @@ export function Layout() {
   })).filter((g) => g.items.length > 0);
 
   const paletteItems = visibleGroups.flatMap((g) =>
-    g.items.map((it) => ({
-      to: it.to,
-      label: it.label,
-      icon: <it.Icon size={16} />,
-    })),
+    g.items.flatMap((it) =>
+      (it.shortcuts
+        ? it.shortcuts.filter((sc) => !sc.anyOf || hasAnyPermission(sc.anyOf))
+        : [it]
+      ).map((entry) => ({
+        to: entry.to,
+        label: entry.label,
+        icon: <entry.Icon size={16} />,
+      })),
+    ),
   );
 
   const crumbs = location.pathname

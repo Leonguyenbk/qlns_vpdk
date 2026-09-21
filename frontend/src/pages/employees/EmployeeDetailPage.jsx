@@ -50,14 +50,14 @@ export default function EmployeeDetailPage() {
         title="Chi tiết nhân sự"
         actions={
           <div className="flex gap-2">
-            <Button variant="secondary" onClick={() => navigate("/employees")}>
+            <Button variant="secondary" onClick={() => navigate("/nhan-su/nhan-vien")}>
               Danh sách
             </Button>
             {can(PERMISSIONS.EMPLOYEE_UPDATE) && !data.is_deleted && (
-              <Button onClick={() => navigate(`/employees/${id}/edit`)}>Chỉnh sửa</Button>
+              <Button onClick={() => navigate(`/nhan-su/nhan-vien/${id}/edit`)}>Chỉnh sửa</Button>
             )}
             {can(PERMISSIONS.EMPLOYEE_TRANSFER) && !data.is_deleted && (
-              <Button variant="secondary" onClick={() => navigate(`/employees/${id}/transfer`)}>
+              <Button variant="secondary" onClick={() => navigate(`/nhan-su/nhan-vien/${id}/transfer`)}>
                 Chuyển đơn vị
               </Button>
             )}
@@ -120,7 +120,7 @@ export default function EmployeeDetailPage() {
       <Card className="mt-4">
         <div className="mb-3 flex items-center justify-between">
           <h3 className="font-semibold text-slate-800">Quá trình công tác</h3>
-          <Link to={`/employees/${id}/history`} className="text-sm text-brand-600 hover:underline">
+          <Link to={`/nhan-su/nhan-vien/${id}/history`} className="text-sm text-brand-600 hover:underline">
             Xem đầy đủ →
           </Link>
         </div>

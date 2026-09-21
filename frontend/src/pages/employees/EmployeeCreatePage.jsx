@@ -25,7 +25,7 @@ export default function EmployeeCreatePage() {
     try {
       const res = await create.mutateAsync(buildPayload(values, replace));
       toast.success("Thêm nhân sự thành công");
-      navigate(`/employees/${res.data.data.id}`);
+      navigate(`/nhan-su/nhan-vien/${res.data.data.id}`);
     } catch (err) {
       const p = conflictPayload(err);
       if (p?.conflict === "POSITION_LIMIT_REACHED") {

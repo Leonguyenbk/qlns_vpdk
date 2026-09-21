@@ -87,7 +87,7 @@ export default function EmployeeListPage() {
         <div className="flex items-center gap-3">
           <Avatar name={r.full_name} url={r.avatar_url} size={36} />
           <div>
-            <Link to={`/employees/${r.id}`} className="font-medium text-brand-700 hover:underline">
+            <Link to={`/nhan-su/nhan-vien/${r.id}`} className="font-medium text-brand-700 hover:underline">
               {r.full_name}
             </Link>
             <div className="flex items-center gap-2 text-xs text-slate-400">
@@ -125,7 +125,7 @@ export default function EmployeeListPage() {
       align: "right",
       render: (r) => (
         <div className="flex justify-end gap-1">
-          <Button variant="ghost" className="px-2 py-1 text-xs" onClick={() => navigate(`/employees/${r.id}`)}>
+          <Button variant="ghost" className="px-2 py-1 text-xs" onClick={() => navigate(`/nhan-su/nhan-vien/${r.id}`)}>
             Xem
           </Button>
           {can(PERMISSIONS.EMPLOYEE_RESTORE) && r.is_deleted && (
@@ -142,7 +142,7 @@ export default function EmployeeListPage() {
             <Button
               variant="ghost"
               className="px-2 py-1 text-xs"
-              onClick={() => navigate(`/employees/${r.id}/edit`)}
+              onClick={() => navigate(`/nhan-su/nhan-vien/${r.id}/edit`)}
             >
               Sửa
             </Button>
@@ -151,7 +151,7 @@ export default function EmployeeListPage() {
             <Button
               variant="ghost"
               className="px-2 py-1 text-xs"
-              onClick={() => navigate(`/employees/${r.id}/transfer`)}
+              onClick={() => navigate(`/nhan-su/nhan-vien/${r.id}/transfer`)}
             >
               Chuyển
             </Button>
@@ -181,7 +181,7 @@ export default function EmployeeListPage() {
               {exporting ? "Đang xuất…" : "Xuất Excel (Phụ lục 4)"}
             </Button>
             {can(PERMISSIONS.EMPLOYEE_CREATE) && (
-              <Button onClick={() => navigate("/employees/new")}>+ Thêm nhân sự</Button>
+              <Button onClick={() => navigate("/nhan-su/nhan-vien/new")}>+ Thêm nhân sự</Button>
             )}
           </>
         }
