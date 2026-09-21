@@ -57,6 +57,7 @@ import SurveyStatisticsPage from "./pages/surveys/SurveyStatisticsPage";
 import SurveyResultsHubPage from "./pages/surveys/SurveyResultsHubPage";
 import SurveyStatisticsHubPage from "./pages/surveys/SurveyStatisticsHubPage";
 import PublicSurveyPage from "./pages/public/PublicSurveyPage";
+import QrGeneratorPage from "./pages/public/QrGeneratorPage";
 
 const GOISO_STAFF = [PERMISSIONS.GOISO_COUNTER, PERMISSIONS.GOISO_ADMIN];
 
@@ -74,6 +75,7 @@ export default function App() {
 
       {/* Khảo sát – Đánh giá mức độ hài lòng: trang công khai cho người dân, không cần đăng nhập */}
       <Route path="/khao-sat/:slug" element={<PublicSurveyPage />} />
+      <Route path="/tao-ma-qr" element={<QrGeneratorPage />} />
       <Route
         path="/b/:code/counter"
         element={
