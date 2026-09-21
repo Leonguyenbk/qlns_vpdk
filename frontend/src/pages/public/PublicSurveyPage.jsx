@@ -1,8 +1,8 @@
 import { useMemo, useState } from "react";
 import { useParams, useSearchParams } from "react-router-dom";
 import { usePublicSurvey, useSubmitSurveyResponse } from "../../hooks/usePublicSurvey";
-import { QuestionRenderer } from "../../components/surveys/QuestionRenderer";
-import { Button, FormField, Select, TextInput } from "../../components/ui/primitives";
+import { SurveyQuestionList } from "../../components/surveys/SurveyQuestionList";
+import { Button, FormField, Select } from "../../components/ui/primitives";
 import { Spinner } from "../../components/ui/Spinner";
 import { apiErrorMessage } from "../../lib/api";
 import {
@@ -13,8 +13,6 @@ import {
 } from "../../lib/surveyQuestions";
 
 const EMPTY_LIST = [];
-// CCCD: đúng 12 số (được phép có số 0 đầu). CMND cũ: đúng 9 số.
-const ID_NUMBER_RE = /^(\d{9}|\d{12})$/;
 
 function makeClientToken() {
   try {
@@ -40,10 +38,6 @@ export default function PublicSurveyPage() {
   const submit = useSubmitSurveyResponse(survey?.id);
   const [answers, setAnswers] = useState({});
   const [errors, setErrors] = useState({});
-  const [respondentName, setRespondentName] = useState("");
-  const [respondentPhone, setRespondentPhone] = useState("");
-  const [respondentIdNumber, setRespondentIdNumber] = useState("");
-  const [respondentAddress, setRespondentAddress] = useState("");
   const [done, setDone] = useState(false);
   const [clientToken] = useState(makeClientToken);
 
@@ -61,7 +55,6 @@ export default function PublicSurveyPage() {
   }, [branches, branchParam]);
   const [branchId, setBranchId] = useState("");
   const effectiveBranchId = presetBranch ? presetBranch.id : branchId;
-  const requireContact = survey?.is_anonymous === false;
 
   const setAnswer = (qid, value) => {
     setAnswers((a) => updateSurveyAnswer(questions, a, qid, value));
@@ -73,17 +66,6 @@ export default function PublicSurveyPage() {
     if (branches.length > 0 && !effectiveBranchId) {
       nextErrors._branch = "Vui lòng chọn chi nhánh được khảo sát.";
     }
-    if (requireContact && !respondentName.trim()) {
-      nextErrors._name = "Vui lòng nhập họ và tên.";
-    }
-    if (requireContact && !respondentPhone.trim()) {
-      nextErrors._phone = "Vui lòng nhập số điện thoại.";
-    }
-    if (requireContact && !respondentIdNumber.trim()) {
-      nextErrors._idNumber = "Vui lòng nhập số CCCD/CMND.";
-    } else if (respondentIdNumber.trim() && !ID_NUMBER_RE.test(respondentIdNumber.trim())) {
-      nextErrors._idNumber = "CCCD phải đủ 12 số hoặc CMND đủ 9 số.";
-    }
     for (const q of visibleQuestions) {
       if (q.is_required && !isQuestionAnswered(q, questionValue(q, answers))) {
         nextErrors[q.id] = "Câu hỏi này là bắt buộc.";
@@ -93,9 +75,7 @@ export default function PublicSurveyPage() {
       setErrors(nextErrors);
       const anchorId = nextErrors._branch
         ? "q-branch"
-        : nextErrors._name || nextErrors._phone || nextErrors._idNumber
-          ? "q-contact"
-          : `q-${questions.find((q) => nextErrors[q.id])?.id}`;
+        : `q-${visibleQuestions.find((q) => nextErrors[q.id])?.id}`;
       document.getElementById(anchorId)?.scrollIntoView({ behavior: "smooth", block: "center" });
       return;
     }
@@ -106,10 +86,6 @@ export default function PublicSurveyPage() {
       await submit.mutateAsync({
         client_token: clientToken,
         branch_id: effectiveBranchId || undefined,
-        respondent_name: respondentName || undefined,
-        respondent_phone: respondentPhone || undefined,
-        respondent_id_number: respondentIdNumber || undefined,
-        respondent_address: respondentAddress || undefined,
         answers: items,
       });
       setDone(true);
@@ -210,47 +186,13 @@ export default function PublicSurveyPage() {
         </div>
       )}
 
-      <div className="mb-5 grid gap-3" id="q-contact">
-        <FormField label="Họ và tên" required={requireContact} error={errors._name}>
-          <TextInput value={respondentName} onChange={(e) => { setRespondentName(e.target.value); setErrors((er) => ({ ...er, _name: null })); }} />
-        </FormField>
-        <FormField label="Số điện thoại" required={requireContact} error={errors._phone}>
-          <TextInput value={respondentPhone} onChange={(e) => { setRespondentPhone(e.target.value); setErrors((er) => ({ ...er, _phone: null })); }} />
-        </FormField>
-        <FormField label="Số CCCD/CMND" required={requireContact} error={errors._idNumber}>
-          <TextInput
-            value={respondentIdNumber}
-            inputMode="numeric"
-            maxLength={12}
-            placeholder="CCCD 12 số hoặc CMND 9 số"
-            onChange={(e) => {
-              setRespondentIdNumber(e.target.value.replace(/\D/g, ""));
-              setErrors((er) => ({ ...er, _idNumber: null }));
-            }}
-          />
-        </FormField>
-        <FormField label="Địa chỉ" hint="Nếu có">
-          <TextInput value={respondentAddress} onChange={(e) => setRespondentAddress(e.target.value)} />
-        </FormField>
-      </div>
-
-      <div className="grid gap-6">
-        {visibleQuestions.map((q) => (
-          <div
-            key={q.id}
-            id={`q-${q.id}`}
-            className={q.parent_question_id ? "ml-3 border-l-2 border-rule pl-4" : ""}
-          >
-            <QuestionRenderer
-              question={q}
-              value={questionValue(q, answers)}
-              onChange={(v) => setAnswer(q.id, v)}
-              error={errors[q.id]}
-              disabled={submit.isPending}
-            />
-          </div>
-        ))}
-      </div>
+      <SurveyQuestionList
+        questions={visibleQuestions}
+        answers={answers}
+        onChange={setAnswer}
+        errors={errors}
+        disabled={submit.isPending}
+      />
 
       <Button
         className="mt-7 w-full justify-center py-3 text-base"

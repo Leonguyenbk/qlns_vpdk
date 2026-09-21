@@ -221,15 +221,6 @@ export default function SurveyEditPage() {
                 />
               </FormField>
             </div>
-            <label className="flex items-center gap-2 text-sm">
-              <input
-                type="checkbox"
-                {...register("is_anonymous")}
-                disabled={locked || !canEdit}
-              />
-              Khảo sát ẩn danh (không bắt buộc nhập họ tên/SĐT — người dân vẫn
-              luôn thấy ô nhập, chỉ khác là không bắt buộc điền)
-            </label>
             {canEdit && !locked && (
               <div>
                 <Button

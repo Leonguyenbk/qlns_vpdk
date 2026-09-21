@@ -15,6 +15,7 @@ from ..exports.survey_export import build_workbook
 from ..extensions import db
 from ..models import Employee, OrganizationUnit
 from ..models.survey import Survey, SurveyAnswer, SurveyBranchLimit, SurveyQuestion, SurveyResponse
+from .survey_question_service import order_by_section
 from .survey_filters import apply_branch_scope, apply_response_filters
 from .survey_service import get_survey_or_404
 from .survey_scoring import record_scores
@@ -45,12 +46,11 @@ def get_public_survey(slug: str) -> dict:
     data["unavailable_reason"] = reason
     data["questions"] = []
     if available:
-        questions = (
-            db.session.query(SurveyQuestion)
-            .filter(SurveyQuestion.survey_id == survey.id, SurveyQuestion.is_active.is_(True))
-            .order_by(SurveyQuestion.sort_order)
-            .all()
-        )
+        questions = order_by_section(
+            db.session.query(SurveyQuestion).filter(
+                SurveyQuestion.survey_id == survey.id, SurveyQuestion.is_active.is_(True)
+            )
+        ).all()
         # Điểm là cấu hình quản trị, không công khai cho người trả lời khảo sát.
         data["questions"] = [
             q.to_dict(
@@ -200,12 +200,11 @@ def submit_response(survey_id: int, data: dict, *, meta: dict) -> tuple[dict, bo
         if existing:
             return existing.to_dict(include_answers=True), True
 
-    questions = (
-        db.session.query(SurveyQuestion)
-        .filter(SurveyQuestion.survey_id == survey.id, SurveyQuestion.is_active.is_(True))
-        .order_by(SurveyQuestion.sort_order, SurveyQuestion.id)
-        .all()
-    )
+    questions = order_by_section(
+        db.session.query(SurveyQuestion).filter(
+            SurveyQuestion.survey_id == survey.id, SurveyQuestion.is_active.is_(True)
+        )
+    ).all()
     answers_by_question = {a["question_id"]: a for a in data.get("answers", [])}
     active_ids = {q.id for q in questions}
     visible_questions = [
@@ -248,17 +247,11 @@ def submit_response(survey_id: int, data: dict, *, meta: dict) -> tuple[dict, bo
     employee_id = data.get("employee_id")
     if employee_id is not None and db.session.get(Employee, employee_id) is None:
         raise ValidationError("Cán bộ không hợp lệ.")
+    # Thông tin người được khảo sát nay do người tạo khảo sát tự dựng thành một
+    # Phần câu hỏi nên không còn bắt buộc; các cột respondent_* chỉ còn nhận/lưu
+    # nếu client cũ vẫn gửi lên.
     respondent_id_number = clean_str(data.get("respondent_id_number"))
     validate_id_number(respondent_id_number, "respondent_id_number")
-    respondent_name = clean_str(data.get("respondent_name"))
-    respondent_phone = clean_str(data.get("respondent_phone"))
-    if not survey.is_anonymous:
-        if not respondent_name:
-            raise ValidationError("Vui lòng nhập họ và tên.")
-        if not respondent_phone:
-            raise ValidationError("Vui lòng nhập số điện thoại.")
-        if not respondent_id_number:
-            raise ValidationError("Vui lòng nhập số CCCD/CMND.")
 
     response = SurveyResponse(
         survey_id=survey.id,
@@ -266,8 +259,8 @@ def submit_response(survey_id: int, data: dict, *, meta: dict) -> tuple[dict, bo
         service_id=data.get("service_id"),
         counter_id=data.get("counter_id"),
         employee_id=employee_id,
-        respondent_name=respondent_name,
-        respondent_phone=respondent_phone,
+        respondent_name=clean_str(data.get("respondent_name")),
+        respondent_phone=clean_str(data.get("respondent_phone")),
         respondent_id_number=respondent_id_number,
         respondent_address=clean_str(data.get("respondent_address")),
         ip_address=meta.get("ip_address"),

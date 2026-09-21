@@ -799,7 +799,9 @@ def test_publish_requires_at_least_one_active_question(client, admin_user, auth_
     assert resp.status_code == 422
 
 
-def test_non_anonymous_survey_requires_name_phone_and_id_number(client, admin_user, auth_header):
+def test_submit_does_not_require_builtin_respondent_fields(client, admin_user, auth_header):
+    # Thông tin người khảo sát là câu hỏi do người tạo dựng; cờ is_anonymous=False
+    # không còn buộc phải gửi họ tên/SĐT/CCCD.
     headers = auth_header("admin_test")
     created = client.post(
         "/api/surveys",
@@ -807,48 +809,52 @@ def test_non_anonymous_survey_requires_name_phone_and_id_number(client, admin_us
         json={"title": "Khảo sát định danh", "is_anonymous": False},
     )
     survey = created.get_json()["data"]
-    assert survey["is_anonymous"] is False
     q = _add_choice_question(client, headers, survey["id"])
     client.post(f"/api/surveys/{survey['id']}/status", headers=headers, json={"status": "active"})
 
-    opt_id = q["options"][0]["id"]
-    missing = client.post(
+    resp = client.post(
         f"/api/public/surveys/{survey['id']}/submit",
-        json={"answers": [{"question_id": q["id"], "option_id": opt_id}]},
+        json={"answers": [{"question_id": q["id"], "option_id": q["options"][0]["id"]}]},
     )
-    assert missing.status_code == 422
+    assert resp.status_code == 201, resp.get_json()
 
-    missing_id_number = client.post(
-        f"/api/public/surveys/{survey['id']}/submit",
-        json={
-            "respondent_name": "Trần Thị B",
-            "respondent_phone": "0909000111",
-            "answers": [{"question_id": q["id"], "option_id": opt_id}],
-        },
-    )
-    assert missing_id_number.status_code == 422
 
-    ok_cmnd = client.post(
-        f"/api/public/surveys/{survey['id']}/submit",
-        json={
-            "respondent_name": "Trần Thị B",
-            "respondent_phone": "0909000111",
-            "respondent_id_number": "123456789",
-            "answers": [{"question_id": q["id"], "option_id": opt_id}],
-        },
-    )
-    assert ok_cmnd.status_code == 201, ok_cmnd.get_json()
+def test_section_order_drives_question_order_everywhere(client, admin_user, auth_header):
+    headers = auth_header("admin_test")
+    survey = _create_survey(client, headers)
+    sid = survey["id"]
+    sec_a = client.post(f"/api/surveys/{sid}/sections", headers=headers, json={"title": "Phần A"}).get_json()["data"]
+    sec_b = client.post(f"/api/surveys/{sid}/sections", headers=headers, json={"title": "Phần B"}).get_json()["data"]
 
-    ok_cccd = client.post(
-        f"/api/public/surveys/{survey['id']}/submit",
-        json={
-            "respondent_name": "Trần Thị B",
-            "respondent_phone": "0909000111",
-            "respondent_id_number": "079123456789",
-            "answers": [{"question_id": q["id"], "option_id": opt_id}],
-        },
+    def add(text, section_id):
+        return client.post(
+            f"/api/surveys/{sid}/questions",
+            headers=headers,
+            json={"question_text": text, "question_type": "text", "section_id": section_id},
+        ).get_json()["data"]
+
+    # Thêm xen kẽ để sort_order toàn cục không trùng thứ tự phần.
+    add("B1", sec_b["id"])
+    add("A1", sec_a["id"])
+    add("B2", sec_b["id"])
+
+    def texts(rows):
+        return [r["question_text"] for r in rows]
+
+    assert texts(client.get(f"/api/surveys/{sid}/questions", headers=headers).get_json()["data"]) == ["A1", "B1", "B2"]
+
+    swapped = client.post(
+        f"/api/surveys/{sid}/sections/reorder",
+        headers=headers,
+        json={"items": [{"id": sec_b["id"], "sort_order": 1}, {"id": sec_a["id"], "sort_order": 2}]},
     )
-    assert ok_cccd.status_code == 201, ok_cccd.get_json()
+    assert swapped.status_code == 200, swapped.get_json()
+
+    assert texts(client.get(f"/api/surveys/{sid}/questions", headers=headers).get_json()["data"]) == ["B1", "B2", "A1"]
+
+    client.post(f"/api/surveys/{sid}/status", headers=headers, json={"status": "active"})
+    public = client.get(f"/api/public/surveys/{survey['slug']}").get_json()["data"]
+    assert texts(public["questions"]) == ["B1", "B2", "A1"]
 
 
 def test_branch_quota_locks_branch_once_full(client, admin_user, auth_header, make_unit):

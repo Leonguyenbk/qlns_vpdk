@@ -423,12 +423,25 @@ def reorder_sections(survey_id: int, items: list[dict], *, actor, meta: dict) ->
 
 
 # ----------------------------- Câu hỏi -----------------------------
+def order_by_section(query):
+    """Thứ tự hiển thị chuẩn: theo thứ tự Phần, rồi thứ tự câu hỏi trong phần.
+
+    Câu chưa thuộc phần nào đứng trước. Dùng chung cho quản trị, xem trước và
+    trang công khai để đổi thứ tự Phần có tác dụng ở mọi nơi.
+    """
+    return query.outerjoin(SurveySection, SurveyQuestion.section_id == SurveySection.id).order_by(
+        func.coalesce(SurveySection.sort_order, -1),
+        SurveyQuestion.sort_order,
+        SurveyQuestion.id,
+    )
+
+
 def list_questions(survey_id: int, *, include_inactive: bool = False) -> list[dict]:
     get_survey_or_404(survey_id)
     q = db.session.query(SurveyQuestion).filter(SurveyQuestion.survey_id == survey_id)
     if not include_inactive:
         q = q.filter(SurveyQuestion.is_active.is_(True))
-    rows = q.order_by(SurveyQuestion.sort_order).all()
+    rows = order_by_section(q).all()
     return [r.to_dict(only_active_options=not include_inactive) for r in rows]
 
 
