@@ -20,7 +20,7 @@ from app import create_app  # noqa: E402
 app = create_app(os.getenv("FLASK_ENV"))
 
 scheduler = BackgroundScheduler()
-scheduler.add_job(my_task, 'interval', hours=3)
+scheduler.add_job(my_task, 'interval', hours=3, next_run_time=datetime.now())
 scheduler.start()
 
 if __name__ == "__main__":

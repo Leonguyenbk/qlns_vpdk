@@ -58,11 +58,6 @@ SECTIONS = [
     },
     {
         "category": "tin-tuc",
-        "list_url": f"{BASE_URL}/categories/tin-tuc-su-kien-6.html",
-        "max_pages": 4,
-    },
-    {
-        "category": "tin-tuc",
         "list_url": f"{BASE_URL}/categories/thong-tin-chuyen-nganh-2.html",
         "max_pages": 3,
     },
@@ -221,14 +216,32 @@ async def scrape_article(page, url: str, category: str) -> dict | None:
 
         # 2. Ngày đăng
         created_at = None
-        for sel in ["#publishupshow-right", "#publishupshow-bottom", ".date", "time", ".published"]:
+
+        # Ưu tiên lấy từ trang tin tức trước
+        for sel in [
+            "#publishupshow-right span:not(.d-none):not(.detail-publishupshow):not(.detail-hit)",
+            "#publishupshow-bottom span:not(.d-none):not(.detail-hit)",
+            "#publishupshow-right",
+            "#publishupshow-bottom",
+            ".date",
+            "time",
+            ".published"
+        ]:
             el = await page.query_selector(sel)
             if el:
-                txt = await el.inner_text()
+                txt = (await el.inner_text()).strip()
                 parsed = parse_vn_date(txt)
                 if parsed:
                     created_at = parsed
                     break
+
+        # Nếu không có thì thử lấy từ bảng ContentDocument (trang văn bản)
+        if not created_at:
+            el = await page.query_selector(".ContentDocument .table-bordered tbody tr:nth-child(4) td:nth-child(2)")
+            if el:
+                txt = await el.inner_text()
+                created_at = parse_vn_date(txt)
+
         if not created_at:
             created_at = now_vn()
         # Lọc bài quá 6 tháng
@@ -249,6 +262,15 @@ async def scrape_article(page, url: str, category: str) -> dict | None:
                 content = (await el.inner_html()).strip()
                 if len(content) > 100:
                     break
+
+        # Nếu content trống, kiểm tra có iframe PDF không
+        if not content:
+            iframe = await page.query_selector(".listtailieu iframe")
+            if iframe:
+                src = await iframe.get_attribute("src")
+                if src and "file=" in src:
+                    pdf_url = src.split("file=")[-1]
+                    content = f'<a href="{pdf_url}" target="_blank">Xem văn bản PDF</a>'
 
         content = fix_image_urls(content)
 
