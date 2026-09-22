@@ -9,7 +9,7 @@ import {
   SURVEY_STATUS_BADGE,
 } from "../../lib/constants";
 import { apiErrorMessage } from "../../lib/api";
-import { formatDate } from "../../lib/format";
+import { formatDate, formatDateTimeSeconds } from "../../lib/format";
 import {
   PageHeader,
   Button,
@@ -118,9 +118,9 @@ export default function SurveyListPage() {
     {
       key: "start_at",
       header: "Bắt đầu",
-      render: (r) => formatDate(r.start_at),
+      render: (r) => formatDateTimeSeconds(r.start_at),
     },
-    { key: "end_at", header: "Kết thúc", render: (r) => formatDate(r.end_at) },
+    { key: "end_at", header: "Kết thúc", render: (r) => formatDateTimeSeconds(r.end_at) },
     {
       key: "created_by_name",
       header: "Người tạo",

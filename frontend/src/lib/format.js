@@ -20,6 +20,20 @@ export function formatDateTime(value) {
   });
 }
 
+export function formatDateTimeSeconds(value) {
+  if (!value) return "—";
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return "—";
+  return d.toLocaleString("vi-VN", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+  });
+}
+
 export function initials(name) {
   if (!name) return "?";
   const parts = name.trim().split(/\s+/);
