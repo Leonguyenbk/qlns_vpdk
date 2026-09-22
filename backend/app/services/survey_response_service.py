@@ -69,7 +69,10 @@ def get_public_survey(slug: str) -> dict:
     # trang công khai khoá không cho chọn/nộp thêm.
     branches = (
         db.session.query(OrganizationUnit)
-        .filter(OrganizationUnit.unit_type == "BRANCH", OrganizationUnit.is_active.is_(True))
+        .filter(
+            OrganizationUnit.unit_type.in_(("BRANCH", "HEAD_OFFICE")),
+            OrganizationUnit.is_active.is_(True),
+        )
         .order_by(OrganizationUnit.name)
         .all()
     )

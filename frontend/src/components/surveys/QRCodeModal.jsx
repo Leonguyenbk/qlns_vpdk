@@ -16,7 +16,7 @@ export function QRCodeModal({ survey, onClose }) {
   const [dataUrl, setDataUrl] = useState(null);
   const [branchId, setBranchId] = useState("");
   const { data: units } = useUnits({ only_active: true });
-  const branches = (units || []).filter((unit) => unit.unit_type === "BRANCH");
+  const branches = (units || []).filter((unit) => unit.unit_type === "BRANCH" || unit.unit_type === "HEAD_OFFICE");
   const publicUrl = survey
     ? `${window.location.origin}/khao-sat/${survey.slug}${branchId ? `?branch=${branchId}` : ""}`
     : "";

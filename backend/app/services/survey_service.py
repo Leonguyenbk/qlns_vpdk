@@ -326,7 +326,10 @@ def get_branch_limits(survey_id: int) -> list[dict]:
     get_survey_or_404(survey_id)
     branches = (
         db.session.query(OrganizationUnit)
-        .filter(OrganizationUnit.unit_type == "BRANCH", OrganizationUnit.is_active.is_(True))
+        .filter(
+            OrganizationUnit.unit_type.in_(("BRANCH", "HEAD_OFFICE")),
+            OrganizationUnit.is_active.is_(True),
+        )
         .order_by(OrganizationUnit.name)
         .all()
     )
@@ -357,7 +360,10 @@ def set_branch_limits(survey_id: int, items: list[dict], *, actor, meta: dict) -
     valid_branch_ids = {
         b.id
         for b in db.session.query(OrganizationUnit.id)
-        .filter(OrganizationUnit.id.in_(branch_ids), OrganizationUnit.unit_type == "BRANCH")
+        .filter(
+            OrganizationUnit.id.in_(branch_ids),
+            OrganizationUnit.unit_type.in_(("BRANCH", "HEAD_OFFICE")),
+        )
         .all()
     }
     existing = {

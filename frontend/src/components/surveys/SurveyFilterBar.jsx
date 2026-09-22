@@ -52,7 +52,7 @@ export function SurveyFilterBar({ filters, onChange, branchOnly = false }) {
         >
           <option value="">Tất cả chi nhánh</option>
           {units
-            ?.filter((unit) => unit.unit_type === "BRANCH")
+            ?.filter((unit) => unit.unit_type === "BRANCH" || unit.unit_type === "HEAD_OFFICE")
             .map((unit) => (
               <option key={unit.id} value={unit.id}>
                 {unit.name}
