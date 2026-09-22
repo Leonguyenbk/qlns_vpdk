@@ -75,7 +75,15 @@ export default function App() {
 
       {/* Khảo sát – Đánh giá mức độ hài lòng: trang công khai cho người dân, không cần đăng nhập */}
       <Route path="/khao-sat/:slug" element={<PublicSurveyPage />} />
-      <Route path="/tao-ma-qr" element={<QrGeneratorPage />} />
+      {/* Tạo mã QR: công cụ nội bộ, chỉ admin (dùng quyền quản lý vai trò làm dấu hiệu admin) */}
+      <Route
+        path="/tao-ma-qr"
+        element={
+          <ProtectedRoute permission={PERMISSIONS.ROLE_MANAGE}>
+            <QrGeneratorPage />
+          </ProtectedRoute>
+        }
+      />
       <Route
         path="/b/:code/counter"
         element={
