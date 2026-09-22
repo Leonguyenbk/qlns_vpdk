@@ -44,6 +44,7 @@ const TABS = [
     label: "KPI · Danh mục sản phẩm",
     anyOf: [PERMISSIONS.KPI_CRITERIA_MANAGE],
   },
+  { to: "tao-qr", label: "Tạo mã QR", anyOf: [PERMISSIONS.ROLE_MANAGE] },
 ];
 
 /* /admin trần (không chọn tab) -> tự vào tab đầu tiên mà tài khoản có quyền,
