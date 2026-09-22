@@ -8,7 +8,7 @@ tới đúng nội dung câu hỏi/phương án tại thời điểm người d�
 """
 from __future__ import annotations
 
-from datetime import date, datetime
+from datetime import date, datetime, timezone
 
 from sqlalchemy import (
     Boolean,
@@ -50,7 +50,14 @@ QUESTION_TYPES_WITH_FIELDS = {"text_fields"}
 
 
 def _iso(value: datetime | date | None) -> str | None:
-    return value.isoformat() if value else None
+    """ISO 8601, luôn kèm offset UTC — PyMySQL trả datetime naive dù cột khai
+    báo timezone=True, nếu thiếu offset thì trình duyệt sẽ hiểu nhầm là giờ
+    địa phương thay vì UTC (lệch múi giờ khi hiển thị)."""
+    if value is None:
+        return None
+    if isinstance(value, datetime) and value.tzinfo is None:
+        value = value.replace(tzinfo=timezone.utc)
+    return value.isoformat()
 
 
 class Survey(TimestampMixin, db.Model):
