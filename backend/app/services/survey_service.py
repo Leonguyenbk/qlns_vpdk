@@ -10,6 +10,7 @@ from ..models.organization import OrganizationUnit
 from ..models.survey import (
     SURVEY_STATUSES,
     Survey,
+    SurveyAnswer,
     SurveyBranchLimit,
     SurveyOption,
     SurveyQuestion,
@@ -202,10 +203,25 @@ def delete_survey(survey_id: int, *, actor, meta: dict) -> dict:
         db.session.query(SurveyResponse.id).filter(SurveyResponse.survey_id == survey.id).first()
         is not None
     )
-    if has_responses:
-        raise ConflictError("Khảo sát đã có phản hồi nên không thể xóa.")
+    if has_responses and survey.status != "archived":
+        raise ConflictError("Khảo sát đã có phản hồi nên không thể xóa (trừ khi đã lưu trữ).")
     old = survey.to_dict()
-    db.session.delete(survey)  # cascade: questions -> options
+    if has_responses:
+        # Xóa thủ công trước để tránh vướng ràng buộc RESTRICT của
+        # survey_answers.question_id khi cascade từ surveys xóa luôn câu hỏi.
+        response_ids = db.session.query(SurveyResponse.id).filter(
+            SurveyResponse.survey_id == survey.id
+        )
+        db.session.query(SurveyAnswer).filter(
+            SurveyAnswer.response_id.in_(response_ids)
+        ).delete(synchronize_session=False)
+        db.session.query(SurveyResponse).filter(
+            SurveyResponse.survey_id == survey.id
+        ).delete(synchronize_session=False)
+        db.session.query(SurveyBranchLimit).filter(
+            SurveyBranchLimit.survey_id == survey.id
+        ).delete(synchronize_session=False)
+    db.session.delete(survey)  # cascade: sections/questions -> options
     db.session.flush()
     record_audit(
         user_id=actor.id,

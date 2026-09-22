@@ -205,7 +205,8 @@ export default function SurveyListPage() {
                 Sao chép
               </Button>
             )}
-            {can(PERMISSIONS.SURVEY_DELETE) && !r.response_count && (
+            {can(PERMISSIONS.SURVEY_DELETE) &&
+              (!r.response_count || r.status === "archived") && (
               <Button
                 variant="ghost"
                 className="px-2 py-1 text-xs text-red-600"
@@ -311,7 +312,11 @@ export default function SurveyListPage() {
         onConfirm={onDelete}
         loading={remove.isPending}
         title="Xóa khảo sát"
-        message={`Xóa vĩnh viễn khảo sát "${pendingDelete?.title}"? Thao tác này không thể hoàn tác.`}
+        message={
+          pendingDelete?.response_count
+            ? `Xóa vĩnh viễn khảo sát đã lưu trữ "${pendingDelete?.title}" cùng toàn bộ ${pendingDelete.response_count} phản hồi đã ghi nhận? Thao tác này không thể hoàn tác.`
+            : `Xóa vĩnh viễn khảo sát "${pendingDelete?.title}"? Thao tác này không thể hoàn tác.`
+        }
         confirmText="Xóa"
       />
 

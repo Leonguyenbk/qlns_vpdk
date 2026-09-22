@@ -717,6 +717,24 @@ def test_delete_survey_blocked_once_it_has_responses(client, admin_user, auth_he
     assert resp.status_code == 409
 
 
+def test_delete_archived_survey_with_responses_allowed(client, admin_user, auth_header):
+    headers = auth_header("admin_test")
+    survey = _create_survey(client, headers)
+    q = _add_choice_question(client, headers, survey["id"])
+    client.post(f"/api/surveys/{survey['id']}/status", headers=headers, json={"status": "active"})
+    client.post(
+        f"/api/public/surveys/{survey['id']}/submit",
+        json={"answers": [{"question_id": q["id"], "option_id": q["options"][0]["id"]}]},
+    )
+    client.post(f"/api/surveys/{survey['id']}/status", headers=headers, json={"status": "closed"})
+    client.post(f"/api/surveys/{survey['id']}/status", headers=headers, json={"status": "archived"})
+
+    resp = client.delete(f"/api/surveys/{survey['id']}", headers=headers)
+    assert resp.status_code == 200, resp.get_json()
+
+    assert client.get(f"/api/surveys/{survey['id']}", headers=headers).status_code == 404
+
+
 def test_missing_permission_is_forbidden(client, make_user, auth_header):
     make_user("viewer_only", role_code="VIEWER")
     headers = auth_header("viewer_only")

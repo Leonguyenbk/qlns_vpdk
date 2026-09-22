@@ -114,7 +114,7 @@ PERMISSION_DEFINITIONS: list[tuple[str, str]] = [
     (SURVEY_VIEW, "Khảo sát: xem danh sách và chi tiết"),
     (SURVEY_CREATE, "Khảo sát: tạo cuộc khảo sát mới"),
     (SURVEY_UPDATE, "Khảo sát: sửa thông tin, xuất bản, tạm khóa, đóng"),
-    (SURVEY_DELETE, "Khảo sát: xóa khảo sát chưa có dữ liệu"),
+    (SURVEY_DELETE, "Khảo sát: xóa khảo sát chưa có dữ liệu, hoặc đã lưu trữ (kể cả có dữ liệu)"),
     (SURVEY_MANAGE_QUESTIONS, "Khảo sát: quản lý câu hỏi và phương án trả lời"),
     (SURVEY_VIEW_STATISTICS, "Khảo sát: xem thống kê và kết quả"),
     (SURVEY_EXPORT, "Khảo sát: xuất dữ liệu ra Excel"),
