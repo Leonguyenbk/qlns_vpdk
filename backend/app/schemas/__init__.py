@@ -311,6 +311,10 @@ class SurveyStatusSchema(ApiSchema):
     )
 
 
+class SurveyResultsPublicSchema(ApiSchema):
+    is_results_public = fields.Boolean(required=True, error_messages=required)
+
+
 class SurveyOptionInputSchema(ApiSchema):
     nullable_fields = {"option_value", "score"}
     option_text = fields.String(required=True, error_messages=required)
@@ -457,6 +461,7 @@ announcement_status_schema = AnnouncementStatusSchema()
 survey_create_schema = SurveyCreateSchema()
 survey_update_schema = SurveyUpdateSchema()
 survey_status_schema = SurveyStatusSchema()
+survey_results_public_schema = SurveyResultsPublicSchema()
 survey_branch_limits_schema = SurveyBranchLimitsSchema()
 survey_section_create_schema = SurveySectionCreateSchema()
 survey_section_update_schema = SurveySectionUpdateSchema()

@@ -16,6 +16,7 @@ from ...schemas import (
     survey_question_update_schema,
     survey_section_create_schema,
     survey_section_update_schema,
+    survey_results_public_schema,
     survey_status_schema,
     survey_submit_schema,
     survey_update_schema,
@@ -86,6 +87,18 @@ def change_status(survey_id: int):
         survey_id, payload["status"], actor=actor, meta=audit_meta()
     )
     return success(data, "Cập nhật trạng thái khảo sát thành công")
+
+
+@bp.put("/<int:survey_id>/results-public")
+@require_permission(perms.SURVEY_UPDATE)
+def set_results_public(survey_id: int):
+    actor, _ = actor_and_scope()
+    payload = validated_json(survey_results_public_schema)
+    data = survey_service.set_results_public(
+        survey_id, payload["is_results_public"], actor=actor, meta=audit_meta()
+    )
+    message = "Đã công khai bảng xếp hạng" if data["is_results_public"] else "Đã ẩn bảng xếp hạng công khai"
+    return success(data, message)
 
 
 @bp.post("/<int:survey_id>/duplicate")
@@ -311,6 +324,11 @@ def export_survey_summary(survey_id: int):
 @public_bp.get("/<string:slug>")
 def get_public_survey(slug: str):
     return success(survey_response_service.get_public_survey(slug))
+
+
+@public_bp.get("/<string:slug>/results")
+def get_public_leaderboard(slug: str):
+    return success(survey_statistics_service.get_public_leaderboard(slug))
 
 
 @public_bp.post("/<int:survey_id>/submit")

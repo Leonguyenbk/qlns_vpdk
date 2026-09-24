@@ -57,6 +57,7 @@ import SurveyStatisticsPage from "./pages/surveys/SurveyStatisticsPage";
 import SurveyResultsHubPage from "./pages/surveys/SurveyResultsHubPage";
 import SurveyStatisticsHubPage from "./pages/surveys/SurveyStatisticsHubPage";
 import PublicSurveyPage from "./pages/public/PublicSurveyPage";
+import PublicSurveyResultsPage from "./pages/public/PublicSurveyResultsPage";
 import QrGeneratorPage from "./pages/admin/QrGeneratorPage";
 
 const GOISO_STAFF = [PERMISSIONS.GOISO_COUNTER, PERMISSIONS.GOISO_ADMIN];
@@ -75,6 +76,8 @@ export default function App() {
 
       {/* Khảo sát – Đánh giá mức độ hài lòng: trang công khai cho người dân, không cần đăng nhập */}
       <Route path="/khao-sat/:slug" element={<PublicSurveyPage />} />
+      {/* Bảng xếp hạng công khai (chỉ khi người tạo/admin bật) — chỉ thứ hạng + điểm */}
+      <Route path="/ket-qua-khao-sat/:slug" element={<PublicSurveyResultsPage />} />
       {/* Đường cũ /tao-ma-qr — chuyển vào tab trong trang Quản trị */}
       <Route path="/tao-ma-qr" element={<Navigate to="/admin/tao-qr" replace />} />
       <Route

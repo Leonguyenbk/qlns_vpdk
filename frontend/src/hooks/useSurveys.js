@@ -36,6 +36,11 @@ export function useSurveyMutations() {
       mutationFn: (id) => api.post(`/surveys/${id}/duplicate`),
       onSuccess: invalidate,
     }),
+    setResultsPublic: useMutation({
+      mutationFn: ({ id, is_results_public }) =>
+        api.put(`/surveys/${id}/results-public`, { is_results_public }),
+      onSuccess: invalidate,
+    }),
   };
 }
 

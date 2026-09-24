@@ -495,6 +495,90 @@ def test_scored_options_calculate_average_and_rank_branches(
     assert stats_after["overview"]["average_score"] == 45.0
 
 
+def test_public_leaderboard_hidden_until_enabled(client, admin_user, auth_header, make_unit):
+    headers = auth_header("admin_test")
+    branch_low = make_unit("PUB-LOW", name="Chi nhánh công khai thấp", unit_type="BRANCH")
+    branch_high = make_unit("PUB-HIGH", name="Chi nhánh công khai cao", unit_type="BRANCH")
+    survey = _create_survey(client, headers, title="Khảo sát công khai kết quả")
+    question = client.post(
+        f"/api/surveys/{survey['id']}/questions",
+        headers=headers,
+        json={
+            "question_text": "Mức độ hài lòng?",
+            "question_type": "single_choice",
+            "is_required": True,
+            "options": [
+                {"option_text": "Chưa tốt", "score": 0},
+                {"option_text": "Rất tốt", "score": 100},
+            ],
+        },
+    ).get_json()["data"]
+    low_option, high_option = question["options"]
+
+    client.post(f"/api/surveys/{survey['id']}/status", headers=headers, json={"status": "active"})
+    for branch, option in ((branch_low, low_option), (branch_high, high_option)):
+        resp = client.post(
+            f"/api/public/surveys/{survey['id']}/submit",
+            json={
+                "branch_id": branch.id,
+                "answers": [{"question_id": question["id"], "option_id": option["id"]}],
+            },
+        )
+        assert resp.status_code == 201, resp.get_json()
+
+    # Mặc định chưa công khai: trang công khai trả available=False, không lộ dữ liệu.
+    hidden = client.get(f"/api/public/surveys/{survey['slug']}/results").get_json()["data"]
+    assert hidden["available"] is False
+    assert hidden["by_branch"] == []
+
+    # Đóng rồi lưu trữ — set_results_public phải hoạt động dù update_survey thường
+    # thì chặn sửa khảo sát đã đóng/lưu trữ.
+    client.post(f"/api/surveys/{survey['id']}/status", headers=headers, json={"status": "closed"})
+    client.post(f"/api/surveys/{survey['id']}/status", headers=headers, json={"status": "archived"})
+
+    enabled_resp = client.put(
+        f"/api/surveys/{survey['id']}/results-public",
+        headers=auth_header("admin_test"),
+        json={"is_results_public": True},
+    )
+    assert enabled_resp.status_code == 200, enabled_resp.get_json()
+    assert enabled_resp.get_json()["data"]["is_results_public"] is True
+
+    shown = client.get(f"/api/public/surveys/{survey['slug']}/results").get_json()["data"]
+    assert shown["available"] is True
+    assert shown["total_responses"] == 2
+    assert shown["by_branch"][0]["branch_id"] == branch_high.id
+    assert shown["by_branch"][0]["rank"] == 1
+    assert shown["by_branch"][0]["average_total_score"] == 100.0
+    assert shown["by_branch"][1]["branch_id"] == branch_low.id
+    assert shown["by_branch"][1]["rank"] == 2
+    # Không lộ chi tiết câu hỏi/phương án trên trang công khai.
+    assert "by_question" not in shown
+
+    # Tắt lại công khai.
+    off = client.put(
+        f"/api/surveys/{survey['id']}/results-public",
+        headers=headers,
+        json={"is_results_public": False},
+    ).get_json()["data"]
+    assert off["is_results_public"] is False
+    assert client.get(f"/api/public/surveys/{survey['slug']}/results").get_json()["data"]["available"] is False
+
+
+def test_set_results_public_requires_survey_update_permission(client, admin_user, auth_header, make_user):
+    headers = auth_header("admin_test")
+    survey = _create_survey(client, headers, title="Khảo sát kiểm tra quyền công khai")
+
+    make_user("viewer_results_public", role_code="VIEWER")
+    viewer_headers = auth_header("viewer_results_public")
+    resp = client.put(
+        f"/api/surveys/{survey['id']}/results-public",
+        headers=viewer_headers,
+        json={"is_results_public": True},
+    )
+    assert resp.status_code == 403
+
+
 def test_branch_rank_uses_total_score_not_pooled_average(client, admin_user, auth_header, make_unit):
     """Chi nhánh trả lời đủ câu hỏi (tổng điểm cao hơn) phải xếp trên chi nhánh chỉ
     trả lời một câu, dù "điểm trung bình" gộp từng câu hỏi của hai bên bằng nhau."""

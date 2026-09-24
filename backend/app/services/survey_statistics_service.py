@@ -6,10 +6,11 @@ from collections import defaultdict
 from sqlalchemy import func
 from sqlalchemy.orm import joinedload
 
+from ..common.exceptions import NotFoundError
 from ..exports.survey_export import build_summary_workbook
 from ..extensions import db
 from ..models import OrganizationUnit
-from ..models.survey import SurveyAnswer, SurveyOption, SurveyQuestion, SurveyResponse
+from ..models.survey import Survey, SurveyAnswer, SurveyOption, SurveyQuestion, SurveyResponse
 from .survey_filters import apply_branch_scope, apply_response_filters
 from .survey_question_service import list_questions
 from .survey_scoring import max_possible_score
@@ -718,6 +719,66 @@ def _by_branch(
             previous_score = row["average_total_score"]
         row["rank"] = current_rank
     return result
+
+
+def get_public_leaderboard(slug: str) -> dict:
+    """Bảng xếp hạng công khai theo chi nhánh (chỉ thứ hạng + điểm trung bình),
+    KHÔNG kèm chi tiết từng câu hỏi/phương án — dùng cho trang công khai
+    /ket-qua-khao-sat/<slug>. Trả `available=False` thay vì 404 khi khảo sát
+    tồn tại nhưng chưa được bật công khai, để trang hiển thị thông báo rõ ràng."""
+    survey = db.session.query(Survey).filter(Survey.slug == slug).first()
+    if survey is None:
+        raise NotFoundError("Không tìm thấy khảo sát.")
+    data = {
+        "title": survey.title,
+        "slug": survey.slug,
+        "status": survey.status,
+        "available": bool(survey.is_results_public),
+        "unavailable_reason": None if survey.is_results_public else "Khảo sát chưa công khai kết quả.",
+        "max_possible_score": None,
+        "total_responses": 0,
+        "by_branch": [],
+    }
+    if not survey.is_results_public:
+        return data
+
+    response_ids = [
+        r[0]
+        for r in db.session.query(SurveyResponse.id)
+        .filter(SurveyResponse.survey_id == survey.id)
+        .all()
+    ]
+    (
+        rating_qids,
+        option_score_map,
+        yes_no_score_map,
+        satisfaction_option_map,
+        deduction_question_map,
+    ) = _score_sources(survey.id)
+    values_by_response = _score_values_by_response(
+        response_ids, rating_qids, option_score_map, yes_no_score_map, deduction_question_map
+    )
+    satisfaction_by_response = _score_values_by_response(
+        response_ids, rating_qids, satisfaction_option_map, use_recorded_scores=False
+    )
+    max_score = _survey_max_possible_score(survey.id)
+    by_branch = _by_branch(response_ids, values_by_response, satisfaction_by_response, max_score)
+
+    data["max_possible_score"] = max_score
+    data["total_responses"] = len(response_ids)
+    data["by_branch"] = [
+        {
+            "branch_id": row["branch_id"],
+            "branch_name": row["branch_name"],
+            "rank": row["rank"],
+            "average_total_score": row["average_total_score"],
+            "average_percentage": row["average_percentage"],
+            "total_responses": row["total_responses"],
+        }
+        for row in by_branch
+        if row["branch_id"] is not None
+    ]
+    return data
 
 
 def export_summary(survey_id: int, args, *, actor, scope):

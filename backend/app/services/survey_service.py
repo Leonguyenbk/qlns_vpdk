@@ -197,6 +197,27 @@ def change_status(survey_id: int, new_status: str, *, actor, meta: dict) -> dict
     return survey.to_dict()
 
 
+def set_results_public(survey_id: int, is_public: bool, *, actor, meta: dict) -> dict:
+    """Bật/tắt trang xếp hạng công khai (chỉ điểm + thứ hạng theo chi nhánh,
+    không chi tiết từng câu hỏi) — tách khỏi update_survey vì cần bật được cả
+    khi khảo sát đã đóng/lưu trữ (thường là lúc muốn công bố kết quả)."""
+    survey = get_survey_or_404(survey_id)
+    old = survey.to_dict()
+    survey.is_results_public = bool(is_public)
+    db.session.flush()
+    record_audit(
+        user_id=actor.id,
+        action="survey.set_results_public",
+        entity_type="survey",
+        entity_id=survey.id,
+        old_values=old,
+        new_values=survey.to_dict(),
+        **meta,
+    )
+    db.session.commit()
+    return survey.to_dict()
+
+
 def delete_survey(survey_id: int, *, actor, meta: dict) -> dict:
     survey = get_survey_or_404(survey_id)
     has_responses = (

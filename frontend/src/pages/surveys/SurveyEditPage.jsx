@@ -29,6 +29,7 @@ import { LoadingState, ErrorState } from "../../components/ui/DataStates";
 import { QRCodeModal } from "../../components/surveys/QRCodeModal";
 import { PreviewModal } from "../../components/surveys/PreviewModal";
 import { BranchLimitsCard } from "../../components/surveys/BranchLimitsCard";
+import { PublicResultsCard } from "../../components/surveys/PublicResultsCard";
 
 function toLocalInput(iso) {
   if (!iso) return "";
@@ -327,6 +328,11 @@ export default function SurveyEditPage() {
           <BranchLimitsCard
             surveyId={id}
             canEdit={can(PERMISSIONS.SURVEY_UPDATE) && !locked}
+          />
+
+          <PublicResultsCard
+            survey={survey}
+            canEdit={can(PERMISSIONS.SURVEY_UPDATE)}
           />
         </div>
       )}

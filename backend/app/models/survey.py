@@ -75,6 +75,9 @@ class Survey(TimestampMixin, db.Model):
     is_anonymous: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     start_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     end_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # Công khai bảng xếp hạng theo chi nhánh (chỉ thứ hạng + điểm, không chi
+    # tiết câu hỏi) tại /ket-qua-khao-sat/<slug> — người tạo khảo sát/admin bật.
+    is_results_public: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     created_by: Mapped[int | None] = mapped_column(
         ForeignKey("users.id", ondelete="SET NULL"), nullable=True
     )
@@ -102,6 +105,7 @@ class Survey(TimestampMixin, db.Model):
             "welcome_message": self.welcome_message,
             "status": self.status,
             "is_anonymous": self.is_anonymous,
+            "is_results_public": self.is_results_public,
             "start_at": _iso(self.start_at),
             "end_at": _iso(self.end_at),
             "created_by": self.created_by,
