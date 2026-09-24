@@ -99,9 +99,9 @@ export default function LoginPage() {
           <div className="mx-auto w-full max-w-md">
             <div className="flex items-center gap-2.5">
               <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-white/15 text-xs font-bold tracking-wide ring-1 ring-white/25">
-                NS
+                VP
               </span>
-              <span className="text-sm font-semibold">Quản lý nhân sự</span>
+              <span className="text-sm font-semibold">Văn phòng Đăng ký đất đai tỉnh Đắk Lắk</span>
             </div>
             <h2 className="mt-4 text-2xl font-extrabold leading-tight">Chào mừng trở lại!</h2>
             <p className="mt-1 text-sm text-white/85">
@@ -236,9 +236,9 @@ export default function LoginPage() {
           <div className="relative flex h-full flex-col justify-between py-14 pl-[26%] pr-12">
             <div className="flex items-center gap-2.5">
               <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-white/15 text-sm font-bold tracking-wide ring-1 ring-white/25">
-                NS
+                VP
               </span>
-              <span className="text-sm font-semibold">Quản lý nhân sự</span>
+              <span className="text-sm font-semibold">Văn phòng Đăng ký đất đai tỉnh Đắk Lắk</span>
             </div>
 
             <div>
@@ -253,7 +253,7 @@ export default function LoginPage() {
             </div>
 
             <p className="text-xs uppercase tracking-[0.18em] text-white/55">
-              Văn phòng Đăng ký Đất đai
+              Văn phòng Đăng ký Đất đai tỉnh Đắk Lắk
             </p>
           </div>
         </div>
