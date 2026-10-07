@@ -1,7 +1,11 @@
 import { useState } from "react";
 import toast from "react-hot-toast";
 import { useSurveyStatistics } from "../../hooks/useSurveyResponses";
-import { exportSurveySummary } from "../../hooks/useSurveys";
+import {
+  exportSurveySummary,
+  exportSurveyComments,
+  exportSurveyCommentsJson,
+} from "../../hooks/useSurveys";
 import { useCan } from "../Can";
 import { PERMISSIONS } from "../../lib/constants";
 import { apiErrorMessage } from "../../lib/api";
@@ -105,6 +109,7 @@ function QuestionStatCard({ question }) {
 export function SurveyStatisticsView({ surveyId }) {
   const [filters, setFilters] = useState({ branch_id: "" });
   const [exporting, setExporting] = useState(false);
+  const [exportingComments, setExportingComments] = useState(false);
   const { can } = useCan();
   const params = Object.fromEntries(Object.entries(filters).filter(([, v]) => v));
   const { data, isLoading, isError, error, refetch } = useSurveyStatistics(surveyId, params);
@@ -119,6 +124,18 @@ export function SurveyStatisticsView({ surveyId }) {
       toast.error(apiErrorMessage(err, "Xuất Excel thất bại"));
     } finally {
       setExporting(false);
+    }
+  };
+
+  const onExportComments = async (format) => {
+    setExportingComments(true);
+    try {
+      if (format === "json") await exportSurveyCommentsJson(surveyId, params);
+      else await exportSurveyComments(surveyId, params);
+    } catch (err) {
+      toast.error(apiErrorMessage(err, "Xuất ý kiến góp ý thất bại"));
+    } finally {
+      setExportingComments(false);
     }
   };
 
@@ -138,9 +155,25 @@ export function SurveyStatisticsView({ surveyId }) {
       <div className="mb-1 flex items-start justify-between gap-3">
         <SurveyFilterBar filters={filters} onChange={setFilter} branchOnly />
         {can(PERMISSIONS.SURVEY_EXPORT) && (
-          <Button variant="secondary" onClick={onExport} disabled={exporting}>
-            {exporting ? "Đang xuất…" : "Xuất Excel"}
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            <Button variant="secondary" onClick={onExport} disabled={exporting}>
+              {exporting ? "Đang xuất…" : "Xuất Excel"}
+            </Button>
+            <Button
+              variant="secondary"
+              onClick={() => onExportComments("xlsx")}
+              disabled={exportingComments}
+            >
+              {exportingComments ? "Đang xuất…" : "Tải ý kiến góp ý (Excel)"}
+            </Button>
+            <Button
+              variant="secondary"
+              onClick={() => onExportComments("json")}
+              disabled={exportingComments}
+            >
+              {exportingComments ? "Đang xuất…" : "Tải ý kiến góp ý (JSON cho AI)"}
+            </Button>
+          </div>
         )}
       </div>
 

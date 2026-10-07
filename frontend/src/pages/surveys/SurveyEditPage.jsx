@@ -7,8 +7,6 @@ import {
   useSurvey,
   useSurveyMutations,
   exportSurvey,
-  exportSurveyComments,
-  exportSurveyCommentsJson,
 } from "../../hooks/useSurveys";
 import { useCan } from "../../components/Can";
 import {
@@ -63,7 +61,6 @@ export default function SurveyEditPage() {
   const [showQr, setShowQr] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
   const [exporting, setExporting] = useState(false);
-  const [exportingComments, setExportingComments] = useState(false);
 
   const {
     register,
@@ -144,18 +141,6 @@ export default function SurveyEditPage() {
       toast.error(apiErrorMessage(err, "Xuất Excel thất bại"));
     } finally {
       setExporting(false);
-    }
-  };
-
-  const onExportComments = async (format) => {
-    setExportingComments(true);
-    try {
-      if (format === "json") await exportSurveyCommentsJson(id);
-      else await exportSurveyComments(id);
-    } catch (err) {
-      toast.error(apiErrorMessage(err, "Xuất ý kiến góp ý thất bại"));
-    } finally {
-      setExportingComments(false);
     }
   };
 
@@ -293,24 +278,6 @@ export default function SurveyEditPage() {
                   disabled={exporting}
                 >
                   {exporting ? "Đang xuất…" : "Xuất Excel"}
-                </Button>
-              )}
-              {can(PERMISSIONS.SURVEY_EXPORT) && (
-                <Button
-                  variant="secondary"
-                  onClick={() => onExportComments("xlsx")}
-                  disabled={exportingComments}
-                >
-                  {exportingComments ? "Đang xuất…" : "Tải ý kiến góp ý (Excel)"}
-                </Button>
-              )}
-              {can(PERMISSIONS.SURVEY_EXPORT) && (
-                <Button
-                  variant="secondary"
-                  onClick={() => onExportComments("json")}
-                  disabled={exportingComments}
-                >
-                  {exportingComments ? "Đang xuất…" : "Tải ý kiến góp ý (JSON cho AI)"}
                 </Button>
               )}
               {can(PERMISSIONS.SURVEY_CREATE) && (
