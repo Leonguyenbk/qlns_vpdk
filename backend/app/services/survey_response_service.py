@@ -11,7 +11,7 @@ from sqlalchemy import func
 
 from ..common.exceptions import BusinessRuleError, NotFoundError, ValidationError
 from ..common.utils import clean_str, ensure_aware, parse_date, parse_pagination, utcnow, validate_id_number
-from ..exports.survey_export import build_workbook
+from ..exports.survey_export import build_comments_workbook, build_workbook
 from ..extensions import db
 from ..models import Employee, OrganizationUnit
 from ..models.survey import Survey, SurveyAnswer, SurveyBranchLimit, SurveyQuestion, SurveyResponse
@@ -339,3 +339,45 @@ def export_responses(survey_id: int, args, *, actor, scope):
     q = apply_branch_scope(q, actor=actor, scope=scope, column=SurveyResponse.branch_id)
     responses = q.order_by(SurveyResponse.submitted_at.asc()).all()
     return build_workbook(survey, responses)
+
+
+def list_text_comments(survey_id: int, args, *, actor, scope) -> list[dict]:
+    """Chỉ câu trả lời dạng văn bản tự do (text/textarea) — ý kiến góp ý cá
+    nhân — tách riêng khỏi chi tiết toàn bộ câu trả lời để dễ đọc/phân tích
+    (xuất JSON cho AI đọc, xuất Excel để tổng hợp)."""
+    get_survey_or_404(survey_id)
+    q = (
+        db.session.query(SurveyAnswer, SurveyResponse, SurveyQuestion)
+        .join(SurveyResponse, SurveyAnswer.response_id == SurveyResponse.id)
+        .join(SurveyQuestion, SurveyAnswer.question_id == SurveyQuestion.id)
+        .filter(
+            SurveyResponse.survey_id == survey_id,
+            SurveyQuestion.question_type.in_(("text", "textarea")),
+            SurveyAnswer.answer_text.isnot(None),
+            SurveyAnswer.answer_text != "",
+        )
+    )
+    q = apply_response_filters(q, args, response_model=SurveyResponse)
+    q = apply_branch_scope(q, actor=actor, scope=scope, column=SurveyResponse.branch_id)
+    rows = q.order_by(SurveyResponse.submitted_at.asc()).all()
+    return [
+        {
+            "response_id": response.id,
+            "submitted_at": ensure_aware(response.submitted_at).isoformat()
+            if response.submitted_at
+            else None,
+            "branch_id": response.branch_id,
+            "branch_name": response.branch.name if response.branch else None,
+            "question_id": question.id,
+            "question_text": question.question_text,
+            "comment": answer.answer_text,
+        }
+        for answer, response, question in rows
+    ]
+
+
+def export_text_comments(survey_id: int, args, *, actor, scope):
+    """Xuất Excel chỉ chứa ý kiến góp ý tự do — xem `list_text_comments`."""
+    survey = get_survey_or_404(survey_id)
+    comments = list_text_comments(survey_id, args, actor=actor, scope=scope)
+    return build_comments_workbook(survey, comments)

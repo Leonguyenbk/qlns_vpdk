@@ -48,6 +48,22 @@ export function exportSurvey(id, params) {
   return downloadFile(`/surveys/${id}/export`, { params, fallbackName: `khao-sat-${id}.xlsx` });
 }
 
+/** Chỉ ý kiến góp ý tự do (text/textarea) — tách riêng khỏi chi tiết toàn bộ
+ * câu trả lời, để tổng hợp (Excel) hoặc đưa cho AI đọc/phân tích (JSON). */
+export function exportSurveyComments(id, params) {
+  return downloadFile(`/surveys/${id}/comments/export`, {
+    params,
+    fallbackName: `y-kien-gop-y-khao-sat-${id}.xlsx`,
+  });
+}
+
+export function exportSurveyCommentsJson(id, params) {
+  return downloadFile(`/surveys/${id}/comments/export`, {
+    params: { ...params, format: "json" },
+    fallbackName: `y-kien-gop-y-khao-sat-${id}.json`,
+  });
+}
+
 /** Xuất bảng TỔNG HỢP tỷ lệ theo câu hỏi (toàn hệ thống hoặc theo chi nhánh nếu
  * có lọc) — không có thông tin người trả lời, khác với `exportSurvey`. */
 export function exportSurveySummary(id, params) {

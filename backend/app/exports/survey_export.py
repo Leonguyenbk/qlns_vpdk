@@ -245,3 +245,39 @@ def build_summary_workbook(survey, stats: dict, *, scope_label: str | None = Non
     wb.save(buf)
     buf.seek(0)
     return buf
+
+
+def build_comments_workbook(survey, comments: list[dict]) -> io.BytesIO:
+    """Chỉ ý kiến góp ý dạng văn bản tự do (text/textarea) — tách riêng khỏi
+    các loại câu hỏi khác để dễ đọc/tổng hợp, không lẫn vào chi tiết toàn bộ
+    câu trả lời như `build_workbook`."""
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Ý kiến góp ý"
+    ws.append([survey.title])
+    ws.append([f"Tổng số ý kiến: {len(comments)}"])
+    ws.append([])
+    header_row = ws.max_row + 1
+    headers = ["STT", "Ngày khảo sát", "Chi nhánh", "Câu hỏi", "Nội dung góp ý"]
+    ws.append(headers)
+    for cell in ws[header_row]:
+        cell.font = _HEADER_FONT
+        cell.fill = _HEADER_FILL
+    for i, c in enumerate(comments, start=1):
+        ws.append(
+            [
+                i,
+                c["submitted_at"][:16].replace("T", " ") if c["submitted_at"] else "",
+                c["branch_name"] or "",
+                c["question_text"],
+                c["comment"],
+            ]
+        )
+    widths = (6, 18, 22, 36, 70)
+    for col, width in zip(range(1, len(headers) + 1), widths):
+        ws.column_dimensions[get_column_letter(col)].width = width
+
+    buf = io.BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+    return buf

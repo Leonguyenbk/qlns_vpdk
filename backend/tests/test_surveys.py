@@ -1158,3 +1158,65 @@ def test_text_fields_question_needs_at_least_one_field_and_toggle_required(clien
         assert client.delete(f"/api/survey-options/{opt['id']}", headers=headers).status_code == 200
     last = first["options"][-1]
     assert client.delete(f"/api/survey-options/{last['id']}", headers=headers).status_code == 422
+
+
+def test_text_comments_endpoint_only_returns_free_text_answers(
+    client, admin_user, auth_header, make_unit, make_user
+):
+    headers = auth_header("admin_test")
+    branch = make_unit("CMT-BRANCH", name="Chi nhánh góp ý", unit_type="BRANCH")
+    survey = _create_survey(client, headers, title="Khảo sát có ý kiến góp ý")
+    choice_q = _add_choice_question(client, headers, survey["id"])
+    comment_q = client.post(
+        f"/api/surveys/{survey['id']}/questions",
+        headers=headers,
+        json={"question_text": "Ý kiến góp ý khác", "question_type": "textarea"},
+    ).get_json()["data"]
+
+    client.post(f"/api/surveys/{survey['id']}/status", headers=headers, json={"status": "active"})
+    resp = client.post(
+        f"/api/public/surveys/{survey['id']}/submit",
+        json={
+            "branch_id": branch.id,
+            "answers": [
+                {"question_id": choice_q["id"], "option_id": choice_q["options"][0]["id"]},
+                {"question_id": comment_q["id"], "answer_text": "Cán bộ nhiệt tình, cảm ơn!"},
+            ],
+        },
+    )
+    assert resp.status_code == 201, resp.get_json()
+    # Lượt thứ 2 không góp ý gì (bỏ trống ô textarea) — không được lẫn vào danh sách.
+    client.post(
+        f"/api/public/surveys/{survey['id']}/submit",
+        json={
+            "branch_id": branch.id,
+            "answers": [
+                {"question_id": choice_q["id"], "option_id": choice_q["options"][1]["id"]},
+            ],
+        },
+    )
+
+    comments = client.get(f"/api/surveys/{survey['id']}/comments", headers=headers).get_json()["data"]
+    assert len(comments) == 1
+    assert comments[0]["comment"] == "Cán bộ nhiệt tình, cảm ơn!"
+    assert comments[0]["question_text"] == "Ý kiến góp ý khác"
+    assert comments[0]["branch_name"] == "Chi nhánh góp ý"
+    assert comments[0]["submitted_at"]
+
+    json_export = client.get(
+        f"/api/surveys/{survey['id']}/comments/export?format=json", headers=headers
+    )
+    assert json_export.status_code == 200
+    assert json_export.mimetype == "application/json"
+    import json as _json
+    assert _json.loads(json_export.data) == comments
+
+    xlsx_export = client.get(f"/api/surveys/{survey['id']}/comments/export", headers=headers)
+    assert xlsx_export.status_code == 200
+    assert xlsx_export.mimetype == "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+
+    make_user("viewer_comments", role_code="VIEWER")
+    forbidden = client.get(
+        f"/api/surveys/{survey['id']}/comments", headers=auth_header("viewer_comments")
+    )
+    assert forbidden.status_code == 403

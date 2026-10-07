@@ -1,6 +1,9 @@
 """Route module Khảo sát – Đánh giá mức độ hài lòng (quản trị + công khai)."""
 from __future__ import annotations
 
+import io
+import json
+
 from flask import Blueprint, request, send_file
 
 from ...common.auth_context import require_permission
@@ -317,6 +320,45 @@ def export_survey_summary(survey_id: int):
         mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         as_attachment=True,
         download_name=f"tong-hop-khao-sat-{survey_id}.xlsx",
+    )
+
+
+@bp.get("/<int:survey_id>/comments")
+@require_permission(perms.SURVEY_VIEW_STATISTICS)
+def list_text_comments(survey_id: int):
+    actor, scope = actor_and_scope()
+    data = survey_response_service.list_text_comments(
+        survey_id, request.args, actor=actor, scope=scope
+    )
+    return success(data)
+
+
+@bp.get("/<int:survey_id>/comments/export")
+@require_permission(perms.SURVEY_EXPORT)
+def export_text_comments(survey_id: int):
+    """Xuất riêng ý kiến góp ý tự do (text/textarea) — `?format=json` cho AI đọc
+    phân tích, mặc định `xlsx` để tổng hợp."""
+    actor, scope = actor_and_scope()
+    fmt = (request.args.get("format") or "xlsx").lower()
+    if fmt == "json":
+        data = survey_response_service.list_text_comments(
+            survey_id, request.args, actor=actor, scope=scope
+        )
+        buf = io.BytesIO(json.dumps(data, ensure_ascii=False, indent=2).encode("utf-8"))
+        return send_file(
+            buf,
+            mimetype="application/json",
+            as_attachment=True,
+            download_name=f"y-kien-gop-y-khao-sat-{survey_id}.json",
+        )
+    buf = survey_response_service.export_text_comments(
+        survey_id, request.args, actor=actor, scope=scope
+    )
+    return send_file(
+        buf,
+        mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        as_attachment=True,
+        download_name=f"y-kien-gop-y-khao-sat-{survey_id}.xlsx",
     )
 
 
